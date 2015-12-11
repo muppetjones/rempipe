@@ -4,7 +4,6 @@ import re
 
 import remsci.scripted.base as base
 from remsci.scripted.interface import SubparserBase
-from remsci.lib.tree import RemTree
 from remsci.lib.utility import path
 from remsci.lib.decorators import file_or_handle
 
