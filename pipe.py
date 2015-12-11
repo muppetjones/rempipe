@@ -105,5 +105,9 @@ if __name__ == '__main__':
         raise
         pass
 
+    # update root directory
+    if args.root:
+        ROOT_DIR = path.protect(args.root)
+
     project_dir = os.path.join(ROOT_DIR, 'samples', args.project)
     pipe(file_list, args.genome, project_dir)

@@ -60,6 +60,11 @@ class FastqScripted(SubparserBase):
             help='Hisat genome',
         )
 
+        self.subparser.add_argument(
+            '--root', dest='root',
+            help='root directory',
+        )
+
         # only fastq files by default
         self.subparser.set_defaults(
             pattern_list=[r'\.f(?:ast)?q', r'fastq\.gz'])
