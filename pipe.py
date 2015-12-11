@@ -4,6 +4,7 @@ import os.path
 import subprocess
 import sys
 import time
+sys.path.append("../remsci/")
 
 import remsci.scripted.base as base
 from remsci.lib.utility import path
@@ -11,7 +12,6 @@ from libpipe.parsers.fastq import FastqScripted
 from libpipe.cmds import (SkewerCmd, HisatCmd, Bowtie2Cmd)
 
 
-sys.path.append("../remsci/")
 ROOT_DIR = path.protect('~/data/rempipe')
 
 
