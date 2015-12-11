@@ -1,0 +1,9 @@
+db.sqlite3
+__pycache
+*.pyc
+.DS_Store
+*dummy*
+
+# static cache
+**/static/CACHE/
+**/migrations/*
