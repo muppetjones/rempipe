@@ -3,7 +3,7 @@
 import os.path
 import subprocess
 import sys
-sys.path.append(os.path.expanduser("~/dev/remsci/"))
+sys.path.append("../remsci/")
 
 import remsci.scripted.base as base
 from remsci.lib.utility import path
