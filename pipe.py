@@ -42,7 +42,7 @@ def pipe(file_list, genome, project_dir):
 
         # setup alignment
         # NOTE: need to check for encoding
-        hisat_kwargs = {
+        align_kwargs = {
             'x': genome,
             'S': '{}_{}.sam'.format(
                 out_prefix,
@@ -51,17 +51,21 @@ def pipe(file_list, genome, project_dir):
         }
         trimmed_fastq = skewer.output()
         if len(trimmed_fastq) == 1:
-            hisat_kwargs['U'] = trimmed_fastq[0]
+            align_kwargs['U'] = trimmed_fastq[0]
         else:
-            hisat_kwargs['1'], hisat_kwargs['2'] = trimmed_fastq
-        hisat = Bowtie2Cmd(timestamp=timestamp, **hisat_kwargs)
+            align_kwargs['1'], align_kwargs['2'] = trimmed_fastq
+        human_kw = [m for m in ['human', 'sapien', 'G37RCh'] if m in genome]
+        if human_kw:
+            align = HisatCmd(timestamp=timestamp, **align_kwargs)
+        else:
+            align = Bowtie2Cmd(timestamp=timestamp, **align_kwargs)
 
         # write pbs file
         pbs_file = '{}_pipe_{}.pbs'.format(out_prefix, timestamp)
         log_file = pbs_file.replace('pbs', 'log')
         with open(pbs_file, 'w') as oh:
             file_content = '\n'.join([
-                pbs, skewer.cmd(), hisat.cmd(),
+                pbs, skewer.cmd(), align.cmd(),
             ]) + '\n'
 
             oh.write(file_content)
@@ -73,7 +77,7 @@ def pipe(file_list, genome, project_dir):
             log.debug(' '.join(qsub_command))
             retcode = subprocess.check_call(qsub_command, stdout=qid)
             log.debug('retcode: {}'.format(retcode))
-            
+
 
 def main():
     pass
