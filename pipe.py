@@ -33,6 +33,7 @@ def pipe(file_list, genome, project_dir):
         name = f[0]
         files = f[1:]
         out_dir = os.path.join(project_dir, name)
+        log.debug(out_dir)
         path.makedirs(out_dir)
 
         # trimming
@@ -53,10 +54,11 @@ def pipe(file_list, genome, project_dir):
             hisat_kwargs['U'] = trimmed_fastq[0]
         else:
             hisat_kwargs['1'], hisat_kwargs['2'] = trimmed_fastq
-        hisat = Bowtie2Cmd(timestamp=timestamp, **kwargs)
+        hisat = Bowtie2Cmd(timestamp=timestamp, **hisat_kwargs)
 
         # write pbs file
         pbs_file = '{}_pipe_{}.pbs'.format(out_prefix, timestamp)
+        log_file = pbs_file.replace('pbs', 'log')
         with open(pbs_file, 'w') as oh:
             file_content = '\n'.join([
                 pbs, skewer.cmd(), hisat.cmd(),
@@ -66,12 +68,12 @@ def pipe(file_list, genome, project_dir):
 
         # run pbs file
         qid_file = '{}_pipe_{}.qid'.format(out_prefix, timestamp)
-        qsub_command = 'qsub -N {} -o {} > {}'.format(
-            '{}_pipe_{}.pbs'.format(name, timestamp),
-            pbs_file, qid_file,
-        )
-        subprocess.call(qsub_command, shell=True)
-
+        qsub_command = ['qsub', '-N', name, '-o', log_file, pbs_file,]
+        with open(qid_file, 'w') as qid:
+            log.debug(' '.join(qsub_command))
+            retcode = subprocess.check_call(qsub_command, stdout=qid)
+            log.debug('retcode: {}'.format(retcode))
+            
 
 def main():
     pass

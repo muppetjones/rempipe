@@ -7,24 +7,27 @@ class BaseCmd(object):
     def __init__(self, *args, **kwargs):
 
         # check for required kwargs
-        missing_req = []
-        for req in self.required_kwargs:
-            if isinstance(req, tuple):
-                missing_dual_req = [r for r in req if r not in kwargs]
-                if missing_dual_req:
+        try:
+            missing_req = []
+            for req in self.required_kwargs:
+                if isinstance(req, tuple):
+                    missing_dual_req = [r for r in req if r not in kwargs]
+                    if missing_dual_req:
+                        missing_req.append(req)
+                elif req not in kwargs:
                     missing_req.append(req)
-            elif req not in kwargs:
-                missing_req.append(req)
-        if missing_req:
-            raise ValueError(
-                'Missing required parameters: {}'.format(missing_req))
+            if missing_req:
+                raise ValueError(
+                    'Missing required parameters: {}'.format(missing_req))
 
-        # check for expected number of args
-        if len(args) < self.required_args:
-            raise ValueError(
-                'Missing positional parameters; expected {}, given {}'.format(
-                    self.required_args, len(args)
-                ))
+            # check for expected number of args
+            if len(args) < self.required_args:
+                raise ValueError(
+                    'Missing positional parameters; expected {}, given {}'.format(
+                        self.required_args, len(args)
+                    ))
+        except AttributeError:
+            pass  # required_kwargs or required_args not set
 
         self.bin = self.bin_name
         self.kwargs = self.defaults
@@ -34,6 +37,10 @@ class BaseCmd(object):
         # flags and redirect options must be set on a per software basis
         self.flags = []
         self.redirect = ''
+
+        # required options must also be set per sofware
+        self.required_kwargs = {}
+        self.required_args = 0
 
     def cmd(self):
         flags = ' '.join(self.flags)
