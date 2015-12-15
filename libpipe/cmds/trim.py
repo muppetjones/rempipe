@@ -25,25 +25,27 @@ class SkewerCmd(BaseCmd):
         'o': "the prefix to use for output (will be <given>-trimmed-pair.fq)",
     }
 
+    required_kwargs = []
+    required_args = 1
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        print(args)
         # ensure the '-o' option is given
         # -- use the common prefix of the two input files
         # -- or the basename of the the first file otherwise
         if 'o' not in self.kwargs:
-            print(self.args)
             prefix = os.path.commonprefix(self.args)
             if not prefix or prefix == self.args[0]:
                 prefix = os.path.splitext(self.args[0])[0]
             self.kwargs['o'] = prefix
 
+    @property
     def output(self):
 
         if len(self.args) > 1:
             out_list = [
-                '{}-trimmed-pair{}.fastq'.format(self.kwargs['o'], i)
+                '{}-trimmed-pair{}.fastq'.format(self.kwargs['o'], i + 1)
                 for i, v in enumerate(self.args)
             ]
         else:

@@ -33,7 +33,8 @@ class FastqScripted(SubparserBase):
             '--paired_end', dest='paired_end',
             nargs='?', const=r'_2\.f', type=str,
             metavar='PATTERN',
-            help='Specify paired end data. Optional: Pattern for identification of 2nd pair.',
+            help=('Specify paired end data.'
+                  + 'Optional: Pattern for identification of 2nd pair.'),
         )
 
         self.subparser.add_argument(
@@ -60,8 +61,21 @@ class FastqScripted(SubparserBase):
         )
 
         self.subparser.add_argument(
-            '--root', dest='root',
+            '--root', dest='root_dir',
             help='root directory',
+        )
+
+        self.subparser.add_argument(
+            '--data', dest='data_dir',
+            help='data directory. Should contain fastq files and summary.',
+        )
+
+        self.subparser.add_argument(
+            '--force', dest='force',
+            action='store_true',
+            default=False,
+            help=('Force pipe to rerun steps. ' +
+                  'Default: Skip step if output found.'),
         )
 
         # only fastq files by default
@@ -72,7 +86,7 @@ class FastqScripted(SubparserBase):
 
     def run(self, args):
         if args.summary is not None:
-            return self._get_files_from_summary(args.summary)
+            return self._get_files_from_summary(args.summary, args.data_dir)
 
         if args.file_list is None:
             raise ValueError('No fastq files found')
@@ -93,7 +107,7 @@ class FastqScripted(SubparserBase):
             return pe_files
 
     @file_or_handle
-    def _get_files_from_summary(self, fh):
+    def _get_files_from_summary(self, fh, data_dir=None):
         '''Reads a summary file and returns a list of names and files
 
         Expected format:
@@ -102,19 +116,25 @@ class FastqScripted(SubparserBase):
             and the file. Paired-end should be listed on the same line.
         '''
 
-        files = []
         rows = [line.rstrip().split() for line in fh]
         names = [cols[0] for cols in rows]
         r1 = [path.protect(cols[1]) for cols in rows]
+        r2 = [path.protect(cols[2]) for cols in rows]
+
+        if not data_dir:
+            data_dir = fh.name
+
+        # HACK
+        r1 = [os.path.join(os.path.dirname(data_dir), r) for r in r1]
+        r2 = [os.path.join(os.path.dirname(data_dir), r) for r in r2]
 
         # check for valid paired end in third column
-        try:
-            r2 = [path.protect(cols[2]) for cols in rows]
-            r2_0 = os.path.join(os.path.dirname(fh.name), r2[0])
-            if not os.path.isfile(r2[0]) and not os.path.isfile(r2_0):
-                raise IndexError()
-        except IndexError:
-            pass
+        # try:
+        #     r2_0 = os.path.join(os.path.dirname(fh.name), r2[0])
+        #     if not os.path.isfile(r2[0]) and not os.path.isfile(r2_0):
+        #         raise IndexError()
+        # except IndexError:
+        #     pass
 
         try:
             return list(zip(names, r1, r2))

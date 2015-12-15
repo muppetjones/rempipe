@@ -23,16 +23,22 @@ class BaseCmd(object):
             # check for expected number of args
             if len(args) < self.required_args:
                 raise ValueError(
-                    'Missing positional parameters; expected {}, given {}'.format(
-                        self.required_args, len(args)
+                    'Missing {} of {} positional parameters; '.format(
+                        self.required_args - len(args), self.required_args
                     ))
         except AttributeError:
             pass  # required_kwargs or required_args not set
 
         self.bin = self.bin_name
-        self.kwargs = self.defaults
+        try:
+            self.sub = self.sub_cmd
+        except AttributeError:
+            pass  # not all commands have a sub command
+        self.kwargs = {}
+        self.kwargs.update(self.defaults)
         self.kwargs.update(kwargs)
         self.args = args
+        log.debug(self.args)
 
         # flags and redirect options must be set on a per software basis
         self.flags = []
@@ -42,15 +48,31 @@ class BaseCmd(object):
         self.required_kwargs = {}
         self.required_args = 0
 
+    def __str__(self):
+        return self.cmd()
+
+    @property
+    def name(self):
+        return self.bin_name
+
+    @property
+    def output(self):
+        '''Return list of created files. Define on a software level'''
+        return None
+
     def cmd(self):
+        try:
+            command = "{} {}".format(self.bin, self.sub)
+        except AttributeError:
+            command = self.bin
         flags = ' '.join(self.flags)
         kwargs = ' '.join(
             "-{} {}".format(k, v)
-            for k, v in self.defaults.items()
+            for k, v in self.kwargs.items()
         )
         args = ' '.join(self.args)
         return '{} {} {} {} {}'.format(
-            self.bin,
+            command,
             flags,
             kwargs,
             args,
@@ -72,7 +94,3 @@ class BaseCmd(object):
             ))
         except AttributeError:
             pass
-
-    def output(self):
-        '''Return list of created files. Define on a software level'''
-        return None
