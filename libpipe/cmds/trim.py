@@ -25,6 +25,9 @@ class SkewerCmd(BaseCmd):
         'o': "the prefix to use for output (will be <given>-trimmed-pair.fq)",
     }
 
+    required_kwargs = []
+    required_args = 1
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -43,7 +46,7 @@ class SkewerCmd(BaseCmd):
 
         if len(self.args) > 1:
             out_list = [
-                '{}-trimmed-pair{}.fastq'.format(self.kwargs['o'], i)
+                '{}-trimmed-pair{}.fastq'.format(self.kwargs['o'], i + 1)
                 for i, v in enumerate(self.args)
             ]
         else:

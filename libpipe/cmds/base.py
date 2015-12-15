@@ -35,6 +35,9 @@ class BaseCmd(object):
         self.flags = []
         self.redirect = ''
 
+    def __str__(self):
+        return self.cmd()
+
     def cmd(self):
         flags = ' '.join(self.flags)
         kwargs = ' '.join(
