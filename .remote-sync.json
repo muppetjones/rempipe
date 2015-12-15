@@ -1,0 +1,14 @@
+{
+  "transport": "scp",
+  "hostname": "10.11.21.32",
+  "port": "22",
+  "username": "sbush",
+  "target": "/data/sbush/dev/rempipe",
+  "ignore": [
+    ".remote-sync.json",
+    ".git/**"
+  ],
+  "uploadOnSave": true,
+  "deleteLocal": false,
+  "password": "paul65sdvk"
+}
