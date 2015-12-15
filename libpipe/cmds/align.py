@@ -59,11 +59,12 @@ class HisatCmd(BaseCmd):
         log_time = timestamp if timestamp else time.strftime("%y%m%d-%H%M%S")
 
         log_file = '_'.join(
-            self.name, log_sample, log_genome, log_time) + '.log'
+            [self.bin_name, log_sample, log_genome, log_time]) + '.log'
         log_path = os.path.join(log_dir, log_file)
 
         self.redirect = '2>&1 | tee -a {}'.format(log_path)
 
+    @property
     def output(self):
         return [self.kwargs['S']]
 
