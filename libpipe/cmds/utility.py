@@ -12,7 +12,7 @@ class FastqcCmd(BaseCmd):
     defaults = {}
 
     attributes = {
-        'o': "output directory",
+        '-o': "output directory",
     }
 
     required_kwargs = []
@@ -24,11 +24,11 @@ class FastqcCmd(BaseCmd):
         # ensure the '-o' option is given
         # -- use the common prefix of the two input files
         # -- or the basename of the the first file otherwise
-        if 'o' not in self.kwargs:
+        if '-o' not in self.kwargs:
             prefix = os.path.commonprefix(self.args)
             if not prefix or prefix == self.args[0]:
                 prefix = os.path.splitext(self.args[0])[0]
-            self.kwargs['o'] = prefix
+            self.kwargs['-o'] = prefix
 
     @property
     def output(self):
@@ -44,7 +44,7 @@ class FastqcCmd(BaseCmd):
         # update the path if 'o' was given
         try:
             files = [
-                os.path.join(self.kwargs['o'], os.path.basename(f))
+                os.path.join(self.kwargs['-o'], os.path.basename(f))
                 for f in files
             ]
         except KeyError:
@@ -60,9 +60,9 @@ class SamtoolsSortCmd(BaseCmd):
     defaults = {}
 
     attributes = {
-        'o': 'Output file.',
-        'O': 'Output format.',
-        'T': 'Temp file prefix.',
+        '-o': 'Output file.',
+        '-O': 'Output format.',
+        '-T': 'Temp file prefix.',
     }
 
     required_kwargs = []
@@ -72,22 +72,22 @@ class SamtoolsSortCmd(BaseCmd):
         super().__init__(*args, **kwargs)
 
         # if we were only given a single file, make the prefix
-        if 'o' not in self.kwargs:
+        if '-o' not in self.kwargs:
             if self.args[0].endswith('sam'):
                 bam_file = os.path.splitext(self.args[0])[0] + '.bam'
             else:
                 bam_file = os.path.splitext(self.args[0])[0] + 's.bam'
-            self.kwargs['o'] = bam_file
+            self.kwargs['-o'] = bam_file
 
-        if 'T' not in self.kwargs:
-            t_kw = os.path.splitext(self.kwargs['o'])[0] + '.tmp'
-            self.kwargs['T'] = t_kw
+        if '-T' not in self.kwargs:
+            t_kw = os.path.splitext(self.kwargs['-o'])[0] + '.tmp'
+            self.kwargs['-T'] = t_kw
 
         log.debug(self.kwargs)
 
     @property
     def output(self):
-        return [self.kwargs['o'], ]
+        return [self.kwargs['-o'], ]
 
 
 class SamtoolsIndexCmd(BaseCmd):

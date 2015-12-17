@@ -1,24 +1,38 @@
+from abc import ABCMeta
+
 import logging
 log = logging.getLogger(__name__)
 
 
-class BaseCmd(object):
+class BaseCmd(metaclass=ABCMeta):
+
+    # flags and redirect options must be set on a per software basis
+    flags = []
+    redirect = ''
+
+    # required options must also be set per sofware
+    required_kwargs = {}
+    required_args = 0
 
     def __init__(self, *args, **kwargs):
 
+        # ensure the expected hyphens are in place
+        # NOTE: we need to do this BEFORE checking requirements
+        #       to ensure the given kwargs match the expected kwargs
+        def ensure_hyphen(flag):
+            if not flag.startswith('-'):
+                fmt = '-{}' if len(flag) == 1 else '--{}'
+                flag = fmt.format(flag)
+            return flag
+        kwargs = {ensure_hyphen(k): v for k, v in kwargs.items()}
+
         # check for required kwargs
         try:
-            missing_req = []
-            for req in self.required_kwargs:
-                if isinstance(req, tuple):
-                    missing_dual_req = [r for r in req if r not in kwargs]
-                    if missing_dual_req:
-                        missing_req.append(req)
-                elif req not in kwargs:
-                    missing_req.append(req)
-            if missing_req:
-                raise ValueError(
-                    'Missing required parameters: {}'.format(missing_req))
+            missing = self._check_kwargs(kwargs)
+            if missing:
+                raise ValueError('Missing arguments:\n\t{}\n'.format(
+                    '\n\t'.join(missing)
+                ))
 
             # check for expected number of args
             if len(args) < self.required_args:
@@ -38,15 +52,6 @@ class BaseCmd(object):
         self.kwargs.update(self.defaults)
         self.kwargs.update(kwargs)
         self.args = args
-        log.debug(self.args)
-
-        # flags and redirect options must be set on a per software basis
-        self.flags = []
-        self.redirect = ''
-
-        # required options must also be set per sofware
-        self.required_kwargs = {}
-        self.required_args = 0
 
     def __str__(self):
         return self.cmd()
@@ -60,6 +65,27 @@ class BaseCmd(object):
         '''Return list of created files. Define on a software level'''
         return None
 
+    def _check_kwargs(self, kwargs):
+        '''Make sure that the given kwargs contain all required kwargs
+
+        Arguments:
+            A kwargs dict.
+        Returns:
+            A list of missing kwargs.
+        '''
+        simple = [kw for kw in self.required_kwargs if isinstance(kw, str)]
+        compound = [kw for kw in self.required_kwargs if kw not in simple]
+
+        missing = [kw for kw in simple if kw not in kwargs]
+
+        # compound requirement -- require all or none of args in the tuple
+        for cmpd in compound:
+            missed = [kw for kw in cmpd if kw not in kwargs]
+            if missed and len(missed) != len(cmpd):
+                missing.extend(missed)
+
+        return missing
+
     def cmd(self):
         try:
             command = "{} {}".format(self.bin, self.sub)
@@ -67,7 +93,7 @@ class BaseCmd(object):
             command = self.bin
         flags = ' '.join(self.flags)
         kwargs = ' '.join(
-            "-{} {}".format(k, v)
+            "{} {}".format(k, v)
             for k, v in self.kwargs.items()
         )
         args = ' '.join(self.args)

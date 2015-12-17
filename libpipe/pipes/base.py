@@ -3,13 +3,15 @@ import os
 import os.path
 import subprocess
 
+
+import libpipe.templates
+
 import logging
 log = logging.getLogger(__name__)
 
+
 PIPE_PBS_TEMPLATE = ''
 DO_RUN = False
-
-import libpipe.templates
 
 
 class BasePipe(object):
@@ -20,7 +22,7 @@ class BasePipe(object):
 
         # replace do_run with dummy function
         if force:
-            self.do_run = lambda x: True
+            self._do_run = lambda x: True
 
         # initialize template information
         self.pbs_template_path = os.path.join(
@@ -30,11 +32,10 @@ class BasePipe(object):
         # initialize commands
         self.cmds = []
 
-    def do_run(self, cmd):
-        log.debug('in do_run')
+    def _do_run(self, cmd):
         return False if cmd._has_output() else True
 
-    def write_pbs(self, pbs_file):
+    def _write_pbs(self, pbs_file):
         if not self.pbs_template:
             with open(self.pbs_template_path, 'r') as ih:
                 self.pbs_template = ih.read()
@@ -49,7 +50,7 @@ class BasePipe(object):
 
             for cmd in self.cmds:
                 cmd_str = str(cmd) + "\n\n"
-                if self.do_run(cmd):
+                if self._do_run(cmd):
                     oh.write(comment_str.format(cmd.name))
                     oh.write(cmd_str)
                 else:
