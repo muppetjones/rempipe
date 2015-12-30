@@ -8,6 +8,7 @@ sys.path.append("../remsci/")
 
 import remsci.scripted.base as base
 from remsci.lib.utility import path
+from libpipe.pipes.base import BasePipe
 from libpipe.parsers.fastq import FastqScripted
 from libpipe.cmds import (
     SkewerCmd, HisatCmd, Bowtie2Cmd, FastqcCmd,
@@ -56,6 +57,7 @@ def pipe(file_list, genome, project_dir, force=False):
                 out_prefix,
                 os.path.basename(genome),
             ),
+            'p': 3,  # set for local (should use pbs paramters on qsub)
         }
         if len(trimmed_fastq) == 1:
             align_kwargs['U'] = trimmed_fastq[0]
@@ -68,25 +70,28 @@ def pipe(file_list, genome, project_dir, force=False):
         # else:
         #     align = Bowtie2Cmd(timestamp=timestamp, **align_kwargs)
 
-        log.debug(align.args)
-        log.debug(align.kwargs)
-
-        log.debug(align.output)
-
         # samtools
         sam_sort = SamtoolsSortCmd(*(align.output))
-        log.debug(sam_sort.args)
-        log.debug(sam_sort.kwargs)
         sam_index = SamtoolsIndexCmd(*(sam_sort.output))
 
-        # write pbs file
-        pbs_file = '{}_pipe_{}.pbs'.format(out_prefix, timestamp)
-        cmds = [fastqc_1, trim, fastqc_2, align, sam_sort, sam_index]
-        _write_pbs(pbs_file, cmds)
+        # Setup pipe
+        # NOTE: This is the alpha test of the pipe class.
+        pipe = BasePipe(force=force)
+        pipe.cmds.extend([
+            fastqc_1, trim, fastqc_2, align, sam_sort, sam_index,
+        ])
+
+        # write pbs file & run
+        pbs_file = '{}_pipe_{}_{}.pbs'.format(
+            out_prefix, timestamp, os.path.basename(genome))
+        pipe.write_script(pbs_file=pbs_file)
+        pipe.run(job_name=name, pbs_file=pbs_file)
+        # cmds = [fastqc_1, trim, fastqc_2, align, sam_sort, sam_index]
+        # _write_pbs(pbs_file, cmds)
 
         # run pbs in qsub
-        qid = _run_pbs(name, pbs_file)
-        log.debug("Running as '{}'".format(qid))
+        # qid = _run_pbs(name, pbs_file)
+        # log.debug("Running as '{}'".format(qid))
 
 
 def _write_pbs(pbs_file, cmds):
@@ -98,7 +103,6 @@ def _write_pbs(pbs_file, cmds):
     # write pbs file
     with open(pbs_file, 'w') as oh:
         oh.write(PIPE_PBS_TEMPLATE + "\n")
-        oh.write("which samtools\n")
 
         omit_msg = '# Output found. Skip.\n# '
         comment_str = 'echo "Running {}..."\n'

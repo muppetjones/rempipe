@@ -7,16 +7,17 @@ log = logging.getLogger(__name__)
 
 
 class FastqcCmd(BaseCmd):
+    NAME = 'fastqc'
+    INVOKE_STR = 'fastqc'
 
-    bin_name = 'fastqc'
-    defaults = {}
+    DEFAULTS = {}
 
     attributes = {
         '-o': "output directory",
     }
 
-    required_kwargs = []
-    required_args = 1
+    REQ_KWARGS = []
+    REQ_ARGS = 1
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -54,10 +55,10 @@ class FastqcCmd(BaseCmd):
 
 
 class SamtoolsSortCmd(BaseCmd):
+    NAME = 'samtools_sort'
+    INVOKE_STR = 'samtools sort'
 
-    bin_name = 'samtools'
-    sub_cmd = 'sort'
-    defaults = {}
+    DEFAULTS = {}
 
     attributes = {
         '-o': 'Output file.',
@@ -65,8 +66,8 @@ class SamtoolsSortCmd(BaseCmd):
         '-T': 'Temp file prefix.',
     }
 
-    required_kwargs = []
-    required_args = 1
+    REQ_KWARGS = []
+    REQ_ARGS = 1
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -83,23 +84,21 @@ class SamtoolsSortCmd(BaseCmd):
             t_kw = os.path.splitext(self.kwargs['-o'])[0] + '.tmp'
             self.kwargs['-T'] = t_kw
 
-        log.debug(self.kwargs)
-
     @property
     def output(self):
         return [self.kwargs['-o'], ]
 
 
 class SamtoolsIndexCmd(BaseCmd):
+    NAME = 'samtools_index'
+    INVOKE_STR = 'samtools index'
 
-    bin_name = 'samtools'
-    sub_cmd = 'index'
-    defaults = {}
+    DEFAULTS = {}
 
     attributes = {}
 
-    required_kwargs = []
-    required_args = 1
+    REQ_KWARGS = []
+    REQ_ARGS = 1
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

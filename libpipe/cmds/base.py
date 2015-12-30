@@ -1,3 +1,4 @@
+import os.path
 from abc import ABCMeta
 
 import logging
@@ -6,15 +7,46 @@ log = logging.getLogger(__name__)
 
 class BaseCmd(metaclass=ABCMeta):
 
-    # flags and redirect options must be set on a per software basis
-    flags = []
-    redirect = ''
+    # command defining attributes
+    NAME = None  # human readable name of command, e.g., 'samtools_sort'
+    INVOKE_STR = None  # string to invoke command, e.g., 'samtools sort'
+    DEFAULTS = {}  # starting values for kwargs
+    HELP_DICT = {  # help text
+        'synopsis': 'cmd_invoke -f FILE [-n INT, -h] FILE ...',
+        'description': 'A description of the command.',
+        'positional arguments': [
+            ('FILE', 'Example input one'),
+            ('FILE', 'Example input two'),
+        ],
+        'keyword arguments': [
+            ('-f|--file', 'FILE', 'Example keyword argument'),
+            ('-n', 'INT', 'Example keyword argument'),
+        ],
+        'flags': [
+            ('-v', 'Example flag argument'),
+        ],
+    }
 
-    # required options must also be set per sofware
-    required_kwargs = {}
-    required_args = 0
+    # these parameters should be set during init
+    # NOTE: redirect (& possibly flags) should be set at a class level
+    FLAGS = []
+    KWARGS = {}
+    ARGS = []
+    REDIRECT = ''
+
+    # set argument requirements
+    # NOTE: required kwargs is a list of the required argument flags
+    # NOTE: required args is an int of the number of required args
+    # NOTE: flags, by definition, are optional
+    REQ_KWARGS = []
+    REQ_ARGS = 0
 
     def __init__(self, *args, **kwargs):
+        '''Initialize command object
+
+        Create a command object using given paramters.
+        Flags, e.g., '-v', should be given as positional parameters.
+        '''
 
         # ensure the expected hyphens are in place
         # NOTE: we need to do this BEFORE checking requirements
@@ -26,6 +58,10 @@ class BaseCmd(metaclass=ABCMeta):
             return flag
         kwargs = {ensure_hyphen(k): v for k, v in kwargs.items()}
 
+        # separate flags from args
+        flags = [v for v in args if v.startswith('-')]
+        args = [v for v in args if v not in flags]
+
         # check for required kwargs
         try:
             missing = self._check_kwargs(kwargs)
@@ -35,35 +71,52 @@ class BaseCmd(metaclass=ABCMeta):
                 ))
 
             # check for expected number of args
-            if len(args) < self.required_args:
+            if len(args) < self.REQ_ARGS:
                 raise ValueError(
                     'Missing {} of {} positional parameters; '.format(
-                        self.required_args - len(args), self.required_args
+                        self.REQ_ARGS - len(args), self.REQ_KWARGS
                     ))
         except AttributeError:
             pass  # required_kwargs or required_args not set
 
-        self.bin = self.bin_name
-        try:
-            self.sub = self.sub_cmd
-        except AttributeError:
-            pass  # not all commands have a sub command
+        # make sure we deep copy defaults and args
+        self.redirect = self.REDIRECT
+
         self.kwargs = {}
-        self.kwargs.update(self.defaults)
+        self.kwargs.update(self.DEFAULTS)
         self.kwargs.update(kwargs)
-        self.args = args
+
+        self.args = []
+        self.args.extend(args)
+
+        self.flags = []
+        self.flags.extend(flags)
+
+    @property
+    def name(self):
+        '''Name property. Do NOT override'''
+        return self.NAME
+
+    @property
+    def invoke_str(self):
+        '''Invocation string property. Do NOT override (unless necessary)'''
+        return self.INVOKE_STR
 
     def __str__(self):
         return self.cmd()
 
     @property
-    def name(self):
-        return self.bin_name
-
-    @property
     def output(self):
-        '''Return list of created files. Define on a software level'''
+        '''Return list of created files.
+
+        Must override. Should at the very least return the input to allow
+        easier chaining.
+        '''
         return None
+
+    @classmethod
+    def _trubase(self, path_name):
+        return os.path.splitext(os.path.basename(path_name))[0]
 
     def _check_kwargs(self, kwargs):
         '''Make sure that the given kwargs contain all required kwargs
@@ -73,8 +126,8 @@ class BaseCmd(metaclass=ABCMeta):
         Returns:
             A list of missing kwargs.
         '''
-        simple = [kw for kw in self.required_kwargs if isinstance(kw, str)]
-        compound = [kw for kw in self.required_kwargs if kw not in simple]
+        simple = [kw for kw in self.REQ_KWARGS if isinstance(kw, str)]
+        compound = [kw for kw in self.REQ_KWARGS if kw not in simple]
 
         missing = [kw for kw in simple if kw not in kwargs]
 
@@ -86,37 +139,37 @@ class BaseCmd(metaclass=ABCMeta):
 
         return missing
 
-    def cmd(self):
-        try:
-            command = "{} {}".format(self.bin, self.sub)
-        except AttributeError:
-            command = self.bin
-        flags = ' '.join(self.flags)
-        kwargs = ' '.join(
+    def cmd(self, readable=True):
+        sep = ' \\\n  ' if readable else ' '
+
+        flags = ' '.join(self.flags)  # flags don't need to be separated
+        kwargs = sep.join(
             "{} {}".format(k, v)
-            for k, v in self.kwargs.items()
+            for k, v in sorted(self.kwargs.items())
         )
-        args = ' '.join(self.args)
-        return '{} {} {} {} {}'.format(
-            command,
-            flags,
-            kwargs,
-            args,
-            self.redirect,
-        )
+        args = sep.join(self.args)
+        cmd_parts = filter(  # remove missing elements
+            None, [self.invoke_str, flags, kwargs, args, self.redirect])
+        return sep.join(cmd_parts)
 
     def help(self):
 
-        try:
-            print(self.description)
-        except AttributeError:
-            pass
+        # 'example', 'args', 'kwargs', 'flags']
+        help_order = [
+            'synopsis', 'description',
+            'positional arguments', 'keyword arguments', 'flags']
 
-        try:
-            print("Attributes")
-            print("\n".join(
-                "\t{}\t{}".format(k, v)
-                for k, v in self.attributes.items()
+        sec_txt = ["NAME\n\t{}\n".format(self.NAME), ]
+
+        for sec in help_order:
+            if isinstance(self.HELP_DICT[sec], list):
+                txt = '\n\t'.join([
+                    '\t'.join(t) for t in self.HELP_DICT[sec]])
+            else:
+                txt = self.HELP_DICT[sec]
+            sec_txt.append('{}\n\t{}\n'.format(
+                sec.upper(), txt
             ))
-        except AttributeError:
-            pass
+
+        sec_txt = "\n".join(sec_txt)
+        return sec_txt

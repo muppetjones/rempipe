@@ -1,18 +1,26 @@
 
 import os.path
+import libpipe.templates
+
 from libpipe.cmds.base import BaseCmd
 
 
 class SkewerCmd(BaseCmd):
 
-    bin_name = 'skewer'
-    defaults = {
+    NAME = 'skewer'
+    INVOKE_STR = 'skewer'
+
+    DEFAULTS = {
         '-Q': 20,
         '-q': 9,
         '-l': 35,
         '-m': 'pe',
         '-t': 8,
-        '-x': '/data/sbush/data/adapters/adapters_illumina_truseq.fa',
+        '-x': os.path.join(
+            os.path.dirname(
+                libpipe.templates.__file__),
+            'adapters_illumina_pe.fa',
+        ),
     }
 
     attributes = {
@@ -25,10 +33,10 @@ class SkewerCmd(BaseCmd):
         '-o': "the prefix to use for output (will be <given>-trimmed-pair.fq)",
     }
 
-    required_kwargs = []
-    required_args = 1
+    REQ_KWARGS = []
+    REQ_ARGS = 1
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, quiet=True, **kwargs):
         super().__init__(*args, **kwargs)
 
         # ensure the '-o' option is given
@@ -39,6 +47,9 @@ class SkewerCmd(BaseCmd):
             if not prefix or prefix == self.args[0]:
                 prefix = os.path.splitext(self.args[0])[0]
             self.kwargs['-o'] = prefix
+
+        if quiet:
+            self.flags.append('--quiet')
 
     @property
     def output(self):

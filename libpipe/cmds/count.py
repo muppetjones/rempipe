@@ -7,9 +7,9 @@ log = logging.getLogger(__name__)
 
 class BedtoolsMulticovCmd(BaseCmd):
 
-    bin_name = 'samtools'
-    sub_cmd = 'sort'
-    defaults = {}
+    NAME = 'samtools_sort'
+    INVOKE_STR = 'samtools sort'
+    DEFAULTS = {}
 
     attributes = {
         '-o': 'Output file.',
@@ -17,8 +17,8 @@ class BedtoolsMulticovCmd(BaseCmd):
         '-T': 'Temp file prefix.',
     }
 
-    required_kwargs = []
-    required_args = 1
+    REQ_KWARGS = []
+    REQ_ARGS = 1
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
