@@ -10,7 +10,7 @@ class HisatCmd(BaseCmd):
     NAME = 'hisat'
     INVOKE_STR = 'hisat'
 
-    HELP_LIST = [
+    ARGUMENTS = [
         ('-x', 'FILE', 'Hisat reference genome index (base name)'),
         ('-1', 'FILE[,FILE]', 'comma separated list of paired-end 1 files'),
         ('-2', 'FILE[,FILE]', 'comma separated list of paired-end 2 files'),
@@ -32,7 +32,7 @@ class HisatCmd(BaseCmd):
         '-X': 500,
     }
 
-    REQ_KWARGS = ['-x', ('-1', '-2'), '-S']
+    REQ_KWARGS = ['-x', ('-1', '-2'), ['-1', '-S']]
     REQ_ARGS = 0
 
     def __init__(
@@ -73,7 +73,6 @@ class HisatCmd(BaseCmd):
         un_conc = os.path.splitext(self.kwargs['-S'])[0] + '.unal.fastq'
         self.kwargs.update({'--un-conc': un_conc})
 
-    @property
     def output(self):
         return [self.kwargs['-S']]
 

@@ -2,6 +2,9 @@ import unittest
 
 from libpipe.cmds.help import HelpCmd
 
+import logging
+log = logging.getLogger(__name__)
+
 
 class TestHelpCmd(unittest.TestCase):
 
@@ -39,3 +42,22 @@ class TestHelpCmd(unittest.TestCase):
         hc_str = str(hc)
         self.assertIn('NAME', hc_str)  # test for expected 'NAME' in template
         self.assertNotIn('name', hc_str)  # ignore case test
+
+    def test_str_formats_args_correctly(self):
+        sect = {'arguments': [
+            (None, 'FILE', 'pos'),
+            ('-f', 'PATH', 'kw'),
+            ('-v', None, 'flag'),
+        ]}
+        hc = HelpCmd(**sect)
+        hc_help = str(hc)
+
+        expected_help = [
+            '{:<25}{}'.format('FILE', 'pos'),
+            '{:<15}{:<10}{}'.format('-f', 'PATH', 'kw'),
+            '{:<25}{}'.format('-v', 'flag'),
+        ]
+
+        for exp_help in expected_help:
+            with self.subTest(expected=exp_help):
+                self.assertIn(exp_help, hc_help)

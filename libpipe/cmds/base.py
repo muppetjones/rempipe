@@ -1,38 +1,62 @@
 import os.path
 from abc import ABCMeta
 
+from libpipe.cmds.help import HelpCmd
+
 import logging
 log = logging.getLogger(__name__)
 
 
 class BaseCmd(metaclass=ABCMeta):
 
+    '''A base (abstract) class for handling command line calls.
+
+    Defines a number of methods and attributes for creating command
+    line, well, commands.
+
+    NOTE: Argument requirements are checked in `cmd`.
+
+    Class Attributes:
+        NAME        A human readable string for identifying the command.
+        INVOKE_STR  The string used to invoke the command.
+        ARGUMENTS   A list of arguments defined by (<flag>, <type>, <descr>).
+                    When <flag> is None, the argument is positional, and
+                    when <type> is None, the argument is just a flag.
+        DEFAULTS    Default values for keyword arguments. Make sure that
+                    the flags have expected leading hyphens, e.g., '-f'.
+        HELP_DICT   A dict containing elements for creating a HelpCmd object.
+                    More of a reference for the class than anything.
+                    Could be used to type check eventually.
+        HELP        A HelpCmd object (initialized during help call)
+
+        REQ_KWARGS  A list of the required keyword args, e.g., ['-f'].
+                    A tuple indicates required together, e.g., [('-1', '-2')].
+                    A list indicates XOR requirement, e.g., [['-U', '-1']].
+        REQ_ARGS    Int denoting how many positional arguments are expected.
+
+    SEE ALSO:
+        HelpCmd
+    '''
+
     # command defining attributes
     NAME = None  # human readable name of command, e.g., 'samtools_sort'
     INVOKE_STR = None  # string to invoke command, e.g., 'samtools sort'
+    ARGUMENTS = None  # see HELP_DICT['arguments'] for example
     DEFAULTS = {}  # starting values for kwargs
+
+    # Help related attributes
     HELP_DICT = {  # help text
         'synopsis': 'cmd_invoke -f FILE [-n INT, -h] FILE ...',
         'description': 'A description of the command.',
-        'positional arguments': [
-            ('FILE', 'Example input one'),
-            ('FILE', 'Example input two'),
-        ],
-        'keyword arguments': [
+        'arguments': [
+            (None, 'FILE', 'Example input one'),
+            (None, 'FILE', 'Example input two'),
             ('-f|--file', 'FILE', 'Example keyword argument'),
             ('-n', 'INT', 'Example keyword argument'),
-        ],
-        'flags': [
-            ('-v', 'Example flag argument'),
+            ('-v', None, 'Example flag argument'),
         ],
     }
-
-    # these parameters should be set during init
-    # NOTE: redirect (& possibly flags) should be set at a class level
-    FLAGS = []
-    KWARGS = {}
-    ARGS = []
-    REDIRECT = ''
+    HELP = None  # instantiated at first call to 'help'
 
     # set argument requirements
     # NOTE: required kwargs is a list of the required argument flags
@@ -41,6 +65,10 @@ class BaseCmd(metaclass=ABCMeta):
     REQ_KWARGS = []
     REQ_ARGS = 0
 
+    #
+    #   Magic methods
+    #
+
     def __init__(self, *args, **kwargs):
         '''Initialize command object
 
@@ -48,7 +76,9 @@ class BaseCmd(metaclass=ABCMeta):
         Flags, e.g., '-v', should be given as positional parameters.
         '''
 
-        # ensure the expected hyphens are in place
+        # ensure the expected kwarg hyphens are in place
+        # NOTE: Gives flags with len > 1 a double hyphen, e.g., '--',
+        #       SO if it only takes a single hyphen MAKE SURE YOU PUT IT!
         # NOTE: we need to do this BEFORE checking requirements
         #       to ensure the given kwargs match the expected kwargs
         def ensure_hyphen(flag):
@@ -59,28 +89,16 @@ class BaseCmd(metaclass=ABCMeta):
         kwargs = {ensure_hyphen(k): v for k, v in kwargs.items()}
 
         # separate flags from args
-        flags = [v for v in args if v.startswith('-')]
+        # -- best option would be to set defaults in a custom init
+        try:
+            flags = [v for v in args if v.startswith('-')]
+        except AttributeError:
+            msg = 'Make sure to expand keyword args, e.g., Cmd(**kwargs)'
+            raise AttributeError(msg)
         args = [v for v in args if v not in flags]
 
-        # check for required kwargs
-        try:
-            missing = self._check_kwargs(kwargs)
-            if missing:
-                raise ValueError('Missing arguments:\n\t{}\n'.format(
-                    '\n\t'.join(missing)
-                ))
-
-            # check for expected number of args
-            if len(args) < self.REQ_ARGS:
-                raise ValueError(
-                    'Missing {} of {} positional parameters; '.format(
-                        self.REQ_ARGS - len(args), self.REQ_KWARGS
-                    ))
-        except AttributeError:
-            pass  # required_kwargs or required_args not set
-
         # make sure we deep copy defaults and args
-        self.redirect = self.REDIRECT
+        self.redirect = None  # self.REDIRECT
 
         self.kwargs = {}
         self.kwargs.update(self.DEFAULTS)
@@ -92,6 +110,14 @@ class BaseCmd(metaclass=ABCMeta):
         self.flags = []
         self.flags.extend(flags)
 
+    def __str__(self):
+        '''Returns the BASH executable string'''
+        return self.cmd()
+
+    #
+    #   Property methods
+    #
+
     @property
     def name(self):
         '''Name property. Do NOT override'''
@@ -102,10 +128,10 @@ class BaseCmd(metaclass=ABCMeta):
         '''Invocation string property. Do NOT override (unless necessary)'''
         return self.INVOKE_STR
 
-    def __str__(self):
-        return self.cmd()
+    #
+    #   "Public" access
+    #
 
-    @property
     def output(self):
         '''Return list of created files.
 
@@ -114,34 +140,40 @@ class BaseCmd(metaclass=ABCMeta):
         '''
         return None
 
-    @classmethod
-    def _trubase(self, path_name):
-        return os.path.splitext(os.path.basename(path_name))[0]
-
-    def _check_kwargs(self, kwargs):
-        '''Make sure that the given kwargs contain all required kwargs
+    def link(self, cmd):
+        '''Set dest input to self output
 
         Arguments:
-            A kwargs dict.
-        Returns:
-            A list of missing kwargs.
+        cmd     Another command object.
+        Return:
+        The given command object (for chaining)
         '''
-        simple = [kw for kw in self.REQ_KWARGS if isinstance(kw, str)]
-        compound = [kw for kw in self.REQ_KWARGS if kw not in simple]
 
-        missing = [kw for kw in simple if kw not in kwargs]
-
-        # compound requirement -- require all or none of args in the tuple
-        for cmpd in compound:
-            missed = [kw for kw in cmpd if kw not in kwargs]
-            if missed and len(missed) != len(cmpd):
-                missing.extend(missed)
-
-        return missing
+        cmd.input = self.output
+        return cmd
 
     def cmd(self, readable=True):
+        '''Create BASH executable string.
+
+        Arguments:
+            readable (bool) Denotes whether command should be human readable
+        Returns:
+            A BASH executable string.
+        Raises:
+            ValueError if argument requirements are not met.
+        '''
+
+        # ensure we can create the command as expected
+        try:
+            self._check_required()
+        except ValueError:
+            log.error(self.help())
+            raise
+
+        # put the command on separate lines for human readable version
         sep = ' \\\n  ' if readable else ' '
 
+        # make strings from given parameters
         flags = ' '.join(self.flags)  # flags don't need to be separated
         kwargs = sep.join(
             "{} {}".format(k, v)
@@ -153,23 +185,102 @@ class BaseCmd(metaclass=ABCMeta):
         return sep.join(cmd_parts)
 
     def help(self):
+        '''Return usage text
 
-        # 'example', 'args', 'kwargs', 'flags']
-        help_order = [
-            'synopsis', 'description',
-            'positional arguments', 'keyword arguments', 'flags']
+        NOTE: Creates the HelpCmd object iff not found
+        '''
 
-        sec_txt = ["NAME\n\t{}\n".format(self.NAME), ]
+        if self.HELP is None:
+            try:
+                self.HELP_DICT['arguments'] = self.ARGUMENTS
+            except AttributeError:
+                pass  # alias
+            self.HELP_DICT['name'] = self.NAME
+            self.HELP = HelpCmd(**self.HELP_DICT)
+        return str(self.HELP)
 
-        for sec in help_order:
-            if isinstance(self.HELP_DICT[sec], list):
-                txt = '\n\t'.join([
-                    '\t'.join(t) for t in self.HELP_DICT[sec]])
-            else:
-                txt = self.HELP_DICT[sec]
-            sec_txt.append('{}\n\t{}\n'.format(
-                sec.upper(), txt
-            ))
+    #
+    #   "Private" access
+    #
 
-        sec_txt = "\n".join(sec_txt)
-        return sec_txt
+    @classmethod
+    def _trubase(self, path_name):
+        return os.path.splitext(os.path.basename(path_name))[0]
+
+    def _check_required(self):
+        '''Ensure all argument requirements are fulfilled
+
+        Returns:
+            True if all requirements fulfilled.
+        Raises:
+            ValueError with missing requirements if requirement not met
+        '''
+
+        # check for required kwargs
+        try:
+            missing = self._missing_kwargs()
+        except ValueError:
+            raise  # > 1 XOR option given
+
+        try:
+            if missing:
+                raise ValueError('Missing arguments:\n\t{}\n'.format(
+                    '\n\t'.join(str(m) for m in missing)
+                ))
+
+            # check for expected number of args
+            if len(self.args) < self.REQ_ARGS:
+                raise ValueError(
+                    'Missing {} of {} positional parameters; '.format(
+                        self.REQ_ARGS - len(self.args), self.REQ_KWARGS
+                    ))
+        except AttributeError:
+            pass  # required_kwargs or required_args not set
+
+        return True
+
+    def _missing_kwargs(self):
+        '''Make sure that the given kwargs contain all required kwargs
+
+        Checks all elements in REQ_KWARGS.
+        > Strings are simple checks against the kwargs attribute.
+        > Lists are XOR required keywords, e.g., one and only one req.
+        > Tuples are AND required keywords, e.g., if one, then all.
+
+        Example REQ_KWARGS:
+            ['-f', ('-1', '-2'), ['-1', '-U']]
+
+        Arguments:
+            A kwargs dict.
+        Returns:
+            A list of missing kwargs.
+        '''
+
+        # simple requirement
+        simple = [kw for kw in self.REQ_KWARGS if isinstance(kw, str)]
+        missing = [kw for kw in simple if kw not in self.kwargs]
+
+        # log.debug('in _missing_kwargs: {} vs {}'.format(
+        #     self.REQ_KWARGS, self.kwargs))
+
+        # compound requirement -- require all or none of args in the tuple
+        compound = [kw for kw in self.REQ_KWARGS if kw not in simple]
+        for cmpd in compound:
+
+            # tuple indicates all or nothing
+            if isinstance(cmpd, tuple):
+                # log.debug('{}: AND'.format(cmpd))
+                missed = [kw for kw in cmpd if kw not in self.kwargs]
+                missing.extend(missed)
+
+            # a list indicates one and only one
+            elif isinstance(cmpd, list):
+                # log.debug('{}: XOR'.format(cmpd))
+                found = [kw for kw in cmpd if kw in self.kwargs]
+                if not found:
+                    missing.extend(cmpd)
+                elif len(found) != 1:
+                    raise ValueError(
+                        'More than one arg given: {}'.format(cmpd))
+
+        return missing

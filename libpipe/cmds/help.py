@@ -16,31 +16,24 @@ class HelpCmd(object):
     '''
 
     TEMPLATE = dedent('''
-        NAME
-            {name}
+        NAME{sep}{name}
 
-        SYNOPSIS
-            {synopsis}
+        SYNOPSIS{sep}{synopsis}
 
-        DESCRIPTION
-            {description}
+        DESCRIPTION{sep}{description}
 
-        POSITIONAL ARGUMENTS
-            {pos}
+        POSITIONAL ARGUMENTS{sep}{pos}
 
-        KEYWORD ARGUMENTS
-            {kw}
+        KEYWORD ARGUMENTS{sep}{kw}
 
-        FLAGS
-            {flag}
+        FLAGS{sep}{flag}
 
-        EXAMPLES
-            {examples}
+        EXAMPLES{sep}{examples}
     ''')
 
     def __init__(self,
                  name=None, synopsis=None, description=None,
-                 args=None, examples=None,
+                 arguments=None, examples=None,
                  ):
         self.dict = {
             'name':  name,
@@ -53,10 +46,10 @@ class HelpCmd(object):
         }
         try:
             self.dict.update({
-                'pos':  [a for a in args if a[0] is None],
-                'flag':  [a for a in args if a[1] is None],
+                'pos':  [a for a in arguments if a[0] is None],
+                'flag':  [a for a in arguments if a[1] is None],
                 'kw':  [
-                    a for a in args
+                    a for a in arguments
                     if a[0] is not None and a[1] is not None
                 ],
             })
@@ -75,4 +68,31 @@ class HelpCmd(object):
         return self._make_help()
 
     def _make_help(self):
-        return self.TEMPLATE.format(**self.dict)
+        help_str_dict = {}
+        help_str_dict.update(self.dict)
+
+        # format arguments
+        sep = '\n\t'
+        fmt = ['{:<15}{:<10}{}', '{:<25}{}']
+
+        for key in ['pos', 'flag']:
+            try:
+                line_list = [
+                    fmt[1].format(*[v for v in val if v is not None])
+                    for val in help_str_dict[key]
+                ]
+                help_str_dict[key] = sep.join(line_list)
+            except TypeError:
+                pass  # no pos or flag found
+
+        for key in ['kw']:
+            try:
+                line_list = [
+                    fmt[0].format(*val)
+                    for val in help_str_dict[key]
+                ]
+                help_str_dict[key] = sep.join(line_list)
+            except TypeError:
+                pass  # no pos or flag found
+        help_str_dict['sep'] = sep
+        return self.TEMPLATE.format(**help_str_dict)
