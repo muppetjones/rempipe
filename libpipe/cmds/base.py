@@ -38,10 +38,10 @@ class BaseCmd(metaclass=ABCMeta):
                     E.g., [ [('-f', ), ('.txt', )], ... ]
 
     Class Methods:
-        __prepreq__()   Use to setup any last minute details before
+        _prepreq()   Use to setup any last minute details before
                         requirements are checked, such as handling the
                         results of linking.
-        __prepcmd__()   Use to setup any last minute details before cmd
+        _prepcmd()   Use to setup any last minute details before cmd
                         is called, such as setting up redirect
 
     SEE ALSO:
@@ -200,13 +200,13 @@ class BaseCmd(metaclass=ABCMeta):
         # run requirements prep, if provided by child
         # -- use for ensuring the requirements are met
         try:
-            self.__prepreq__()
+            self._prepreq()
         except AttributeError:
             pass  # may not be set on child class
 
         # ensure we can create the command as expected
         try:
-            self._check_requirements()
+            self.__check_requirements()
         except ValueError:
             log.error(self.help())
             raise
@@ -215,15 +215,15 @@ class BaseCmd(metaclass=ABCMeta):
         # -- use to ensure all data is ready for the command
         # -- NOTE: should require the necessary arguments
         try:
-            self.__prepcmd__()
+            self._prepcmd()
         except AttributeError:
             pass  # may not be set on child class
 
-        return self.__cmd__(*args, **kwargs)
+        return self._cmd(*args, **kwargs)
 
-    def __prepreq__(self):
+    def _prepreq(self):
         try:
-            self.__input__()  # should call self._get_input
+            self._input()  # should call self._get_input
         except AttributeError:
             return  # nothing to do
 
@@ -239,7 +239,7 @@ class BaseCmd(metaclass=ABCMeta):
 
         return args
 
-    def __cmd__(self, readable=True):
+    def _cmd(self, readable=True):
         '''Create BASH executable string.
 
         Arguments:
@@ -283,7 +283,7 @@ class BaseCmd(metaclass=ABCMeta):
     #   "Private" access
     #
 
-    def _check_requirements(self):
+    def __check_requirements(self):
         '''Ensure all argument requirements are fulfilled
 
         Returns:
@@ -294,7 +294,7 @@ class BaseCmd(metaclass=ABCMeta):
 
         # check for required kwargs
         try:
-            missing = self._missing_kwargs()
+            missing = self.__check_kwargs()
         except ValueError:
             raise  # > 1 XOR option given
         else:
@@ -312,13 +312,13 @@ class BaseCmd(metaclass=ABCMeta):
 
         # check for expected file types
         try:
-            all_valid = self._check_type()
+            all_valid = self.__check_type()
         except ValueError:
             raise  # Bad file type
 
         return
 
-    def _check_type(self):
+    def __check_type(self):
         '''Check specified kwargs to ensure given expected file type.
 
         NOTE: All extensions in REQ_TYPE should have leading periods.
@@ -343,7 +343,7 @@ class BaseCmd(metaclass=ABCMeta):
                         'Invalid extension "{}" for arg {}'.format(extn, f))
         return True
 
-    def _missing_kwargs(self):
+    def __check_kwargs(self):
         '''Make sure that the given kwargs contain all required kwargs
 
         Checks all elements in REQ_KWARGS.
@@ -364,7 +364,7 @@ class BaseCmd(metaclass=ABCMeta):
         simple = [kw for kw in self.REQ_KWARGS if isinstance(kw, str)]
         missing = [kw for kw in simple if kw not in self.kwargs]
 
-        # log.debug('in _missing_kwargs: {} vs {}'.format(
+        # log.debug('in __check_kwargs: {} vs {}'.format(
         #     self.REQ_KWARGS, self.kwargs))
 
         # compound requirement -- require all or none of args in the tuple

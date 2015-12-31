@@ -18,7 +18,7 @@ class TestHistatCmd(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
         # override base cmd method
-        patcher = patch.object(libpipe.cmds.base.BaseCmd, '__cmd__')
+        patcher = patch.object(libpipe.cmds.base.BaseCmd, '_cmd')
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -33,7 +33,7 @@ class TestHistatCmd(unittest.TestCase):
 
     def test_prepcmd_sets_redirect_to_log_file(self):
         hc = self.sample_cmd()
-        hc.__prepcmd__()
+        hc._prepcmd()
 
         self.assertTrue(
             hc.redirect.endswith('path/seq_gen_000_hisat.log'),
@@ -42,7 +42,7 @@ class TestHistatCmd(unittest.TestCase):
 
     def test_prepcmd_sets_redirect_for_stdout_and_stderr_to_tee(self):
         hc = self.sample_cmd()
-        hc.__prepcmd__()
+        hc._prepcmd()
 
         self.assertTrue(
             hc.redirect.startswith('2>&1 | tee -a'),
@@ -51,19 +51,19 @@ class TestHistatCmd(unittest.TestCase):
 
     def test_prepcmd_sets_unal_based_on_given_samfile_name(self):
         hc = self.sample_cmd()
-        hc.__prepcmd__()
+        hc._prepcmd()
 
         expected_file = os.path.splitext(hc.kwargs['-S'])[0] + '.unal.fastq'
 
         self.assertIn('--un', hc.kwargs)
         self.assertEqual(hc.kwargs['--un'], expected_file)
 
-    def test_check_requirements_raises_ValueError_if_only_one_ppe_given(self):
+    def test_cmd_raises_ValueError_if_only_one_ppe_given(self):
         hc = self.sample_cmd()
         hc.kwargs['-1'] = hc.kwargs['-U']
         del hc.kwargs['-U']
         with self.assertRaises(ValueError):
-            hc._check_requirements()
+            hc.cmd()
 
     def test_prepreq_raises_CmdLinkError_if_link_input_does_not_match_type(self):
         with patch.object(HisatCmd, 'output', autospec=True, return_value=['seq.txt']):
@@ -72,7 +72,7 @@ class TestHistatCmd(unittest.TestCase):
             ohc.link(ihc)
 
         with self.assertRaisesRegexp(HisatCmd.CmdLinkError, ohc.name):
-            ihc.__prepreq__()
+            ihc._prepreq()
 
     def test_prepreq_sets_single_link_input_to_U_kwarg(self):
 
@@ -80,7 +80,7 @@ class TestHistatCmd(unittest.TestCase):
             ohc = self.sample_cmd()
             ihc = self.sample_cmd()
             ohc.link(ihc)
-        ihc.__prepreq__()
+        ihc._prepreq()
 
         self.assertEqual(ihc.kwargs['-U'], 'seq.fq')
 
@@ -91,7 +91,7 @@ class TestHistatCmd(unittest.TestCase):
             ohc = self.sample_cmd()
             ihc = self.sample_cmd()
             ohc.link(ihc)
-        ihc.__prepreq__()
+        ihc._prepreq()
 
         self.assertEqual(ihc.kwargs['-1'], 'seq.1.fq')
         self.assertEqual(ihc.kwargs['-2'], 'seq.2.fq')
@@ -99,7 +99,7 @@ class TestHistatCmd(unittest.TestCase):
     def test_prepreq_preserves_kwargs_if_no_input_given(self):
 
         ihc = self.sample_cmd()
-        ihc.__prepreq__()
+        ihc._prepreq()
 
         self.assertEqual(ihc.kwargs['-U'], 'path/seq.fa')
 
@@ -111,4 +111,4 @@ class TestHistatCmd(unittest.TestCase):
             ihc = self.sample_cmd()
             ohc.link(ihc)
         with self.assertRaises(HisatCmd.CmdLinkError):
-            ihc.__input__()
+            ihc._input()

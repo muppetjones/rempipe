@@ -76,7 +76,7 @@ class HisatCmd(BaseCmd):
     #   "Private" methods
     #
 
-    def __input__(self):
+    def _input(self):
         '''Match linked output to sequence inputs'''
 
         args = self._get_input()
@@ -96,7 +96,7 @@ class HisatCmd(BaseCmd):
                     args, self.input.__self__.name)
                 raise self.CmdLinkError(msg)
 
-    def __prepcmd__(self):
+    def _prepcmd(self):
         '''Prep for hisat cmd
 
         > parse log file name and set for redirect
