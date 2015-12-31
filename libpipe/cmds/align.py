@@ -27,18 +27,21 @@ class HisatCmd(BaseCmd):
         ('-f', None, 'Reads are FASTA files'),
     ]
     DEFAULTS = {
-        '-p': "$(wc -l < $PBS_NODEFILE)",
+        '-p': 3,  # "$(wc -l < $PBS_NODEFILE)",
         '-I': 0,
         '-X': 500,
     }
 
     REQ_KWARGS = ['-x', ('-1', '-2'), ['-1', '-S']]
     REQ_ARGS = 0
+    REQ_TYPE = [
+        [('-1', '-2', '-U'), ('.fastq', '.fq', '.fastq', '.fa')],
+        [('-S', ), ('sam', )],
+    ]
 
     def __init__(
             self, *args,
             encoding='--phred33', orientation='--fr', format='-q',
-            timestamp=None,
             **kwargs):
 
         try:
@@ -46,35 +49,42 @@ class HisatCmd(BaseCmd):
         except ValueError:
             raise   # requirements failure; pass it on up
 
+        # update flags
         self.flags.extend([
             encoding, orientation
         ])
 
+        # set the timestamp if not done already
+        if not self.timestamp:
+            self.timestamp = time.strftime("%y%m%d-%H%M%S")
+
+    def output(self):
+        return [self.kwargs['-S']]
+
+    def __prepcmd__(self):
         # parse log file name (based on given file info)
-        try:
+        # sample_name: the basename of the given file
+        try:  # single end reads
             log_dir = os.path.dirname(self.kwargs['-U'])
             sample_name = self._trubase(self.kwargs['-U'])
-        except AttributeError:
+            unal_key = '--un'
+        except KeyError:  # paired-end reads
             log_dir = os.path.dirname(self.kwargs['-1'])
             sample_name = self._trubase(self.kwargs['-1'])
+            unal_key = '--un-conc'
 
-        # sample_name: the basename of the given file
+        # parse the genome name
         genome_name = os.path.basename(self.kwargs['-x'])
-        timestamp = timestamp if timestamp else time.strftime("%y%m%d-%H%M%S")
-
-        log_file = '_'.join(
-            [sample_name, genome_name, timestamp, self.name]) + '.log'
-        log_path = os.path.join(log_dir, log_file)
+        self.id = '_'.join(
+            [sample_name, genome_name, self.timestamp, self.name])
+        log_path = os.path.join(log_dir, self.id + '.log')
 
         # setup stdout redirect
         self.redirect = '2>&1 | tee -a {}'.format(log_path)
 
         # ensure unaligned reads are written to a file
-        un_conc = os.path.splitext(self.kwargs['-S'])[0] + '.unal.fastq'
-        self.kwargs.update({'--un-conc': un_conc})
-
-    def output(self):
-        return [self.kwargs['-S']]
+        unal = os.path.splitext(self.kwargs['-S'])[0] + '.unal.fastq'
+        self.kwargs.update({unal_key: unal})
 
 
 class Bowtie2Cmd(HisatCmd):

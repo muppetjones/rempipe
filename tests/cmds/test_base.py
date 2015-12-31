@@ -1,6 +1,6 @@
 import unittest
 import libpipe
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 
 from libpipe.cmds.base import BaseCmd
@@ -47,6 +47,15 @@ class TestBaseCmds(unittest.TestCase):
     def sample(self):
         kwargs = {'-f': 'req_kwarg', '-n': 'a'}
         return self.CMD(**kwargs)
+
+    def test_init_saves_timestamp_if_given(self):
+        kw = {'timestamp': '151012-162900'}
+        cmd = self.CMD(**kw)
+        self.assertEqual(cmd.timestamp, kw['timestamp'])
+
+    def test_init_saves_a_timestamp_if_not_given(self):
+        cmd = self.CMD()
+        self.assertRegexpMatches(cmd.timestamp, '\d{6}-\d{6}')
 
     def test_init_raises_AttributeError_if_keyword_args_not_expanded(self):
         '''Test for common mistake of passing keyword dict directly'''
@@ -232,3 +241,62 @@ class TestBaseCmds(unittest.TestCase):
 
         self.assertEqual(b.output, c.input)
         self.assertEqual(d, c)
+
+    def test_check_type_raises_ValueError_if_wrong_filetype_given(self):
+        self.CMD.REQ_TYPE = [
+            [('-f', ), ('.txt', )],
+        ]
+        a = self.sample()
+        with self.assertRaises(ValueError):
+            a._check_type()
+
+    def test_check_type_does_not_raise_if_expected_filetype_given(self):
+        self.CMD.REQ_TYPE = [
+            [('-f', ), ('.txt', )],
+        ]
+        kwargs = {'-f': 'req_kwarg.txt'}
+        a = self.sample()
+        a.kwargs = kwargs
+        a._check_type()  # should not raise
+
+    def test_check_type_does_not_raise_if_expected_kwarg_not_given(self):
+        self.CMD.REQ_TYPE = [
+            [('-x', ), ('.txt', )],
+        ]
+        a = self.sample()
+        a._check_type()  # should not raise
+
+    def test_check_type_also_checks_positional_arguments(self):
+        self.CMD.REQ_TYPE = [
+            [(0, 1), ('.txt', )],
+        ]
+        a = self.sample()
+        a.args = ['req_args.txt']
+        a._check_type()  # should not raise; implicit check against missing [1]
+
+    def test_check_type_raises_ValueError_for_bad_pos_arg_type(self):
+        self.CMD.REQ_TYPE = [
+            [(0, 1), ('.txt', )],
+        ]
+        a = self.sample()
+        a.args = ['req_args.txt', 'req_args.csv']
+        with self.assertRaises(ValueError):
+            a._check_type()
+
+    def test_command_runs_prepreq_before_checking_requirements(self):
+        self.CMD.__prepreq__ = Mock(side_effect=Exception('__prepreq__'))
+        self.CMD._check_requirements = Mock()
+        a = self.sample()
+        with self.assertRaisesRegexp(Exception, '__prepreq__'):
+            a.cmd()
+        self.assertEqual(self.CMD.__prepreq__.call_count, 1)
+        self.assertEqual(self.CMD._check_requirements.call_count, 0)
+
+    def test_command_runs_prepcmd_after_checking_requirements(self):
+        self.CMD.__prepcmd__ = Mock(side_effect=Exception('__prepcmd__'))
+        self.CMD._check_requirements = Mock()
+        a = self.sample()
+        with self.assertRaisesRegexp(Exception, '__prepcmd__'):
+            a.cmd()
+        self.assertEqual(self.CMD._check_requirements.call_count, 1)
+        self.assertEqual(self.CMD.__prepcmd__.call_count, 1)

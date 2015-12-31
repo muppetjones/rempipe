@@ -1,4 +1,5 @@
 import os.path
+import time
 from abc import ABCMeta
 
 from libpipe.cmds.help import HelpCmd
@@ -33,6 +34,15 @@ class BaseCmd(metaclass=ABCMeta):
                     A tuple indicates required together, e.g., [('-1', '-2')].
                     A list indicates XOR requirement, e.g., [['-U', '-1']].
         REQ_ARGS    Int denoting how many positional arguments are expected.
+        REQ_TYPE    A list of kwarg flags and their expected extensions.
+                    E.g., [ [('-f', ), ('.txt', )], ... ]
+
+    Class Methods:
+        __prepreq__()   Use to setup any last minute details before
+                        requirements are checked, such as handling the
+                        results of linking.
+        __prepcmd__()   Use to setup any last minute details before cmd
+                        is called, such as setting up redirect
 
     SEE ALSO:
         HelpCmd
@@ -64,6 +74,7 @@ class BaseCmd(metaclass=ABCMeta):
     # NOTE: flags, by definition, are optional
     REQ_KWARGS = []
     REQ_ARGS = 0
+    REQ_TYPE = []
 
     #
     #   Magic methods
@@ -75,6 +86,14 @@ class BaseCmd(metaclass=ABCMeta):
         Create a command object using given paramters.
         Flags, e.g., '-v', should be given as positional parameters.
         '''
+
+        # save a timestamp, if passed
+        try:
+            self.timestamp = kwargs['timestamp']
+            del kwargs['timestamp']
+        except KeyError:
+            self.timestamp = time.strftime("%y%m%d-%H%M%S")
+            # self.timestamp = None
 
         # ensure the expected kwarg hyphens are in place
         # NOTE: Gives flags with len > 1 a double hyphen, e.g., '--',
@@ -129,6 +148,14 @@ class BaseCmd(metaclass=ABCMeta):
         return self.INVOKE_STR
 
     #
+    #   Class methods
+    #
+
+    @classmethod
+    def _trubase(self, path_name):
+        return os.path.splitext(os.path.basename(path_name))[0]
+
+    #
     #   "Public" access
     #
 
@@ -152,7 +179,34 @@ class BaseCmd(metaclass=ABCMeta):
         cmd.input = self.output
         return cmd
 
-    def cmd(self, readable=True):
+    def cmd(self, *args, **kwargs):
+        '''Run command preprocessing and return command'''
+
+        # run requirements prep, if provided by child
+        # -- use for ensuring the requirements are met
+        try:
+            self.__prepreq__()
+        except AttributeError:
+            pass  # may not be set on child class
+
+        # ensure we can create the command as expected
+        try:
+            self._check_requirements()
+        except ValueError:
+            log.error(self.help())
+            raise
+
+        # run command prep, if provided by child
+        # -- use to ensure all data is ready for the command
+        # -- NOTE: should require the necessary arguments
+        try:
+            self.__prepcmd__()
+        except AttributeError:
+            pass  # may not be set on child class
+
+        return self.__cmd__(*args, **kwargs)
+
+    def __cmd__(self, readable=True):
         '''Create BASH executable string.
 
         Arguments:
@@ -162,13 +216,6 @@ class BaseCmd(metaclass=ABCMeta):
         Raises:
             ValueError if argument requirements are not met.
         '''
-
-        # ensure we can create the command as expected
-        try:
-            self._check_required()
-        except ValueError:
-            log.error(self.help())
-            raise
 
         # put the command on separate lines for human readable version
         sep = ' \\\n  ' if readable else ' '
@@ -203,11 +250,7 @@ class BaseCmd(metaclass=ABCMeta):
     #   "Private" access
     #
 
-    @classmethod
-    def _trubase(self, path_name):
-        return os.path.splitext(os.path.basename(path_name))[0]
-
-    def _check_required(self):
+    def _check_requirements(self):
         '''Ensure all argument requirements are fulfilled
 
         Returns:
@@ -221,22 +264,50 @@ class BaseCmd(metaclass=ABCMeta):
             missing = self._missing_kwargs()
         except ValueError:
             raise  # > 1 XOR option given
-
-        try:
+        else:
             if missing:
                 raise ValueError('Missing arguments:\n\t{}\n'.format(
                     '\n\t'.join(str(m) for m in missing)
                 ))
 
-            # check for expected number of args
-            if len(self.args) < self.REQ_ARGS:
-                raise ValueError(
-                    'Missing {} of {} positional parameters; '.format(
-                        self.REQ_ARGS - len(self.args), self.REQ_KWARGS
-                    ))
-        except AttributeError:
-            pass  # required_kwargs or required_args not set
+        # check for expected number of args
+        if len(self.args) < self.REQ_ARGS:
+            raise ValueError(
+                'Missing {} of {} positional parameters; '.format(
+                    self.REQ_ARGS - len(self.args), self.REQ_KWARGS
+                ))
 
+        # check for expected file types
+        try:
+            all_valid = self._check_type()
+        except ValueError:
+            raise  # Bad file type
+
+        return
+
+    def _check_type(self):
+        '''Check specified kwargs to ensure given expected file type.
+
+        NOTE: All extensions in REQ_TYPE should have leading periods.
+        TODO: Update to use Django model to handle file types.
+        '''
+
+        for req in self.REQ_TYPE:
+            flags, types = req
+            # flags = [f for f in flags if f in self.kwargs]
+            for f in flags:
+                try:
+                    extn = os.path.splitext(self.kwargs[f])[1]
+
+                except KeyError:
+                    try:
+                        extn = os.path.splitext(self.args[f])[1]
+                    except (TypeError, IndexError):
+                        continue  # we don't have the flag, so skip check
+
+                if extn not in types:
+                    raise ValueError(
+                        'Invalid extension "{}" for arg {}'.format(extn, f))
         return True
 
     def _missing_kwargs(self):
