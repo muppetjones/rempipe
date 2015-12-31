@@ -4,6 +4,9 @@ import time
 
 from libpipe.cmds.base import BaseCmd
 
+import logging
+log = logging.getLogger(__name__)
+
 
 class HisatCmd(BaseCmd):
 
@@ -39,6 +42,10 @@ class HisatCmd(BaseCmd):
         [('-S', ), ('sam', )],
     ]
 
+    #
+    #   Magic methods
+    #
+
     def __init__(
             self, *args,
             encoding='--phred33', orientation='--fr', format='-q',
@@ -58,10 +65,44 @@ class HisatCmd(BaseCmd):
         if not self.timestamp:
             self.timestamp = time.strftime("%y%m%d-%H%M%S")
 
+    #
+    #   "Public" methods
+    #
+
     def output(self):
         return [self.kwargs['-S']]
 
+    #
+    #   "Private" methods
+    #
+
+    def __input__(self):
+        '''Match linked output to sequence inputs'''
+
+        args = self._get_input()
+        if not args:
+            return
+
+        fq_types = ('.fastq', '.fq', '.fastq', '.fa')
+        filtered = self._filter_by_type(args, fq_types)
+
+        try:
+            self.kwargs['-1'], self.kwargs['-2'] = filtered
+        except ValueError:
+            try:
+                self.kwargs['-U'], = filtered
+            except ValueError:
+                msg = 'Unknown input from link: {} ({})'.format(
+                    args, self.input.__self__.name)
+                raise self.CmdLinkError(msg)
+
     def __prepcmd__(self):
+        '''Prep for hisat cmd
+
+        > parse log file name and set for redirect
+        > ensure unaligned reads are output
+        '''
+
         # parse log file name (based on given file info)
         # sample_name: the basename of the given file
         try:  # single end reads

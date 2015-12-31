@@ -77,6 +77,13 @@ class BaseCmd(metaclass=ABCMeta):
     REQ_TYPE = []
 
     #
+    #   Custom Exceptions
+    #
+
+    class CmdLinkError(ValueError):
+        pass
+
+    #
     #   Magic methods
     #
 
@@ -152,6 +159,14 @@ class BaseCmd(metaclass=ABCMeta):
     #
 
     @classmethod
+    def _filter_by_type(self, args, filt):
+        filtered = [
+            arg for arg in args
+            if os.path.splitext(arg)[1] in filt
+        ]
+        return filtered
+
+    @classmethod
     def _trubase(self, path_name):
         return os.path.splitext(os.path.basename(path_name))[0]
 
@@ -205,6 +220,24 @@ class BaseCmd(metaclass=ABCMeta):
             pass  # may not be set on child class
 
         return self.__cmd__(*args, **kwargs)
+
+    def __prepreq__(self):
+        try:
+            self.__input__()  # should call self._get_input
+        except AttributeError:
+            return  # nothing to do
+
+    def _get_input(self):
+        '''Matches linked input to expected arguments. Must override.'''
+
+        try:
+            args = self.input()
+        except AttributeError:
+            return None
+        except TypeError:
+            raise TypeError('Bad link: "input" is not callable')
+
+        return args
 
     def __cmd__(self, readable=True):
         '''Create BASH executable string.

@@ -1,6 +1,6 @@
 import os.path
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 import libpipe
 from libpipe.cmds.align import HisatCmd
@@ -64,3 +64,51 @@ class TestHistatCmd(unittest.TestCase):
         del hc.kwargs['-U']
         with self.assertRaises(ValueError):
             hc._check_requirements()
+
+    def test_prepreq_raises_CmdLinkError_if_link_input_does_not_match_type(self):
+        with patch.object(HisatCmd, 'output', autospec=True, return_value=['seq.txt']):
+            ohc = self.sample_cmd()
+            ihc = self.sample_cmd()
+            ohc.link(ihc)
+
+        with self.assertRaisesRegexp(HisatCmd.CmdLinkError, ohc.name):
+            ihc.__prepreq__()
+
+    def test_prepreq_sets_single_link_input_to_U_kwarg(self):
+
+        with patch.object(HisatCmd, 'output', return_value=['seq.fq']):
+            ohc = self.sample_cmd()
+            ihc = self.sample_cmd()
+            ohc.link(ihc)
+        ihc.__prepreq__()
+
+        self.assertEqual(ihc.kwargs['-U'], 'seq.fq')
+
+    def test_prepreq_sets_double_link_input_to_1_and_2_kwarg(self):
+
+        args = ['seq.1.fq', 'seq.2.fq']
+        with patch.object(HisatCmd, 'output', return_value=args):
+            ohc = self.sample_cmd()
+            ihc = self.sample_cmd()
+            ohc.link(ihc)
+        ihc.__prepreq__()
+
+        self.assertEqual(ihc.kwargs['-1'], 'seq.1.fq')
+        self.assertEqual(ihc.kwargs['-2'], 'seq.2.fq')
+
+    def test_prepreq_preserves_kwargs_if_no_input_given(self):
+
+        ihc = self.sample_cmd()
+        ihc.__prepreq__()
+
+        self.assertEqual(ihc.kwargs['-U'], 'path/seq.fa')
+
+    def test_magic_input_raises_error_if_more_than_two_seq_given(self):
+
+        args = ['seq.1.fq', 'seq.2.fq', 'seq.fq']
+        with patch.object(HisatCmd, 'output', autospec=True, return_value=args):
+            ohc = self.sample_cmd()
+            ihc = self.sample_cmd()
+            ohc.link(ihc)
+        with self.assertRaises(HisatCmd.CmdLinkError):
+            ihc.__input__()

@@ -283,7 +283,7 @@ class TestBaseCmds(unittest.TestCase):
         with self.assertRaises(ValueError):
             a._check_type()
 
-    def test_command_runs_prepreq_before_checking_requirements(self):
+    def test_cmd_runs_prepreq_before_checking_requirements(self):
         self.CMD.__prepreq__ = Mock(side_effect=Exception('__prepreq__'))
         self.CMD._check_requirements = Mock()
         a = self.sample()
@@ -292,7 +292,7 @@ class TestBaseCmds(unittest.TestCase):
         self.assertEqual(self.CMD.__prepreq__.call_count, 1)
         self.assertEqual(self.CMD._check_requirements.call_count, 0)
 
-    def test_command_runs_prepcmd_after_checking_requirements(self):
+    def test_cmd_runs_prepcmd_after_checking_requirements(self):
         self.CMD.__prepcmd__ = Mock(side_effect=Exception('__prepcmd__'))
         self.CMD._check_requirements = Mock()
         a = self.sample()
@@ -300,3 +300,50 @@ class TestBaseCmds(unittest.TestCase):
             a.cmd()
         self.assertEqual(self.CMD._check_requirements.call_count, 1)
         self.assertEqual(self.CMD.__prepcmd__.call_count, 1)
+
+    def test_get_input_calls_linked_output(self):
+        ohc = self.sample()
+        ihc = self.sample()
+
+        mock = Mock()
+        ohc.output = mock
+        ohc.link(ihc)
+        ihc._get_input()
+
+        self.assertEqual(mock.call_count, 1, "Linked output not called")
+
+    def test_get_input_returns_linked_output(self):
+        ohc = self.sample()
+        ihc = self.sample()
+
+        exp = ['a', 'b', 'c']
+        mock = Mock(return_value=exp)
+        ohc.output = mock
+        ohc.link(ihc)
+
+        self.assertEqual(ihc._get_input(), exp)
+
+    def test_get_input_returns_None_if_no_linked_input(self):
+        ihc = self.sample()
+        self.assertIsNone(ihc._get_input())
+
+    def test_get_input_raises_TypeError_if_input_not_callable(self):
+        ihc = self.sample()
+        ihc.input = 'foo'
+        with self.assertRaises(TypeError):
+            ihc._get_input()
+
+    def test_filter_type_returns_files_with_expected_type(self):
+        args = ['seq.1.fq', 'seq.2.fq', 'seq.txt']
+        extn = ['.fq']
+
+        self.assertEqual(self.CMD._filter_by_type(args, extn), args[:-1])
+
+    def test_filter_type_returns_empty_if_not_found(self):
+        args = ['seq.1.fq', 'seq.2.fq', 'seq.txt']
+        extn = ['.csv']
+
+        self.assertFalse(
+            self.CMD._filter_by_type(args, extn),
+            'Filter returned non-empty list'
+        )
