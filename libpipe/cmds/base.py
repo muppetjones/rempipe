@@ -83,6 +83,15 @@ class BaseCmd(metaclass=ABCMeta):
     class CmdLinkError(ValueError):
         pass
 
+    class PositionalArgError(IndexError):
+        pass
+
+    class KeywordArgError(AttributeError):
+        pass
+
+    class FileTypeError(TypeError):
+        pass
+
     #
     #   Magic methods
     #
@@ -207,7 +216,11 @@ class BaseCmd(metaclass=ABCMeta):
         # ensure we can create the command as expected
         try:
             self.__check_requirements()
-        except ValueError:
+        except (
+            self.KeywordArgError,
+            self.PositionalArgError,
+            self.FileTypeError
+        ):
             log.error(self.help())
             raise
 
@@ -223,21 +236,67 @@ class BaseCmd(metaclass=ABCMeta):
 
     def _prepreq(self):
         try:
-            self._input()  # should call self._get_input
+            self.__match_input()
         except AttributeError:
             return  # nothing to do
 
-    def _get_input(self):
-        '''Matches linked input to expected arguments. Must override.'''
+    def __match_input(self):
+        '''Match linked output to sequence inputs
 
+        Matches input according to given order and stores any extra as
+        positional arguments IFF REQ_ARGS > 1, e.g.,
+            input: ['a.txt', 'a.fq', 'b.fq']
+            REQ_ARGS = 1
+            REQ_TYPE = [[('-b', '-a'), ('.fq',)]]  <-- notice the order!
+        will result in the following argument conditions:
+            kwargs: {'-b': 'a.fq', '-a': 'b.fq'}
+            args: ['a.txt']
+
+        Also, you may use
+        '''
+
+        # Ensure we have valid, linked input
         try:
             args = self.input()
         except AttributeError:
-            return None
+            raise AttributeError('Attribute "input" is not set (no link)')
         except TypeError:
             raise TypeError('Bad link: "input" is not callable')
+        else:
+            if not args:
+                raise AttributeError('No linked input found')
+            else:
+                n_args = len(args)
 
-        return args
+        # match with required type
+        for req_type in self.REQ_TYPE:
+            try:
+                flag_list, type_list, match_any = req_type
+            except ValueError:
+                flag_list, type_list = req_type
+                match_any = True
+
+            # find args with matching file type and update kwargs
+            filtered = self._filter_by_type(args, type_list)
+            if match_any or len(filtered) == len(flag_list):
+                self.kwargs.update(dict(zip(flag_list, filtered)))
+            else:
+                continue  # we don't want to remove if we didn't use!!
+
+            # remove used
+            args = [a for a in args if a not in filtered]
+
+        # otherwise, use as required args IFF expected
+        if len(self.args) < self.REQ_ARGS:
+            n_still_required = self.REQ_ARGS - len(self.args)
+            self.args.extend(args[:n_still_required])
+
+        # finally, if we haven't used ANY of the input, raise CmdLinkError
+        else:
+            if len(args) == n_args:
+                raise self.CmdLinkError('Unable to use linked input')
+
+        return
 
     def _cmd(self, readable=True):
         '''Create BASH executable string.
@@ -289,31 +348,34 @@ class BaseCmd(metaclass=ABCMeta):
         Returns:
             True if all requirements fulfilled.
         Raises:
-            ValueError with missing requirements if requirement not met
+            KeywordArgError if invalid keyword(s) given.
+            PositionalArgError if missing positional arguments.
+            FileTypeError if given files do not match expected type.
         '''
 
         # check for required kwargs
         try:
             missing = self.__check_kwargs()
-        except ValueError:
+        except self.KeywordArgError:
             raise  # > 1 XOR option given
         else:
             if missing:
-                raise ValueError('Missing arguments:\n\t{}\n'.format(
-                    '\n\t'.join(str(m) for m in missing)
+                msg = 'Missing required keyword arguments: {}'
+                raise self.KeywordArgError(msg.format(
+                    ', '.join(str(m) for m in missing)
                 ))
 
         # check for expected number of args
         if len(self.args) < self.REQ_ARGS:
-            raise ValueError(
-                'Missing {} of {} positional parameters; '.format(
-                    self.REQ_ARGS - len(self.args), self.REQ_KWARGS
-                ))
+            msg = 'Missing {} of {} required positional parameters'
+            raise self.PositionalArgError(msg.format(
+                self.REQ_ARGS - len(self.args), self.REQ_KWARGS
+            ))
 
         # check for expected file types
         try:
-            all_valid = self.__check_type()
-        except ValueError:
+            self.__check_type()
+        except self.FileTypeError:
             raise  # Bad file type
 
         return
@@ -323,10 +385,20 @@ class BaseCmd(metaclass=ABCMeta):
 
         NOTE: All extensions in REQ_TYPE should have leading periods.
         TODO: Update to use Django model to handle file types.
+
+        Returns:
+            True if expected file types match given files.
+        Raises:
+            TypeError if a given argument has wrong file type.
         '''
 
         for req in self.REQ_TYPE:
-            flags, types = req
+            try:
+                # match_any used for matching only, not checking
+                flags, types, match_any = req
+            except ValueError:
+                flags, types = req
+
             # flags = [f for f in flags if f in self.kwargs]
             for f in flags:
                 try:
@@ -339,8 +411,8 @@ class BaseCmd(metaclass=ABCMeta):
                         continue  # we don't have the flag, so skip check
 
                 if extn not in types:
-                    raise ValueError(
-                        'Invalid extension "{}" for arg {}'.format(extn, f))
+                    msg = 'Invalid file type "{}" given for argument {}'
+                    raise self.FileTypeError(msg.format(extn, f))
         return True
 
     def __check_kwargs(self):
@@ -384,7 +456,7 @@ class BaseCmd(metaclass=ABCMeta):
                 if not found:
                     missing.extend(cmpd)
                 elif len(found) != 1:
-                    raise ValueError(
+                    raise self.KeywordArgError(
                         'More than one arg given: {}'.format(cmpd))
 
         return missing

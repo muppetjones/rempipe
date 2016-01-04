@@ -48,6 +48,10 @@ class TestBaseCmds(unittest.TestCase):
         kwargs = {'-f': 'req_kwarg', '-n': 'a'}
         return self.CMD(**kwargs)
 
+    #
+    #   Initialization tests
+    #
+
     def test_init_saves_timestamp_if_given(self):
         kw = {'timestamp': '151012-162900'}
         cmd = self.CMD(**kw)
@@ -64,68 +68,19 @@ class TestBaseCmds(unittest.TestCase):
         with self.assertRaises(AttributeError):
             self.CMD(kw)
 
-    def test_cmd_raises_ValueError_if_required_kwarg_not_given(self):
-        self.CMD.REQ_KWARGS = ['-f']
-        cmd = self.CMD()  # should not raise
-
-        with self.assertRaises(ValueError):
-            cmd.cmd()
-
-    def test_cmd_raises_ValueError_if_missing_req_number_args(self):
-        self.CMD.REQ_ARGS = 2
-        kwargs = {'-f': 'req_kwarg'}
-        cmd = self.CMD('only_one_cmd', **kwargs)  # shold not raise
-
-        with self.assertRaises(ValueError):
-            cmd.cmd()
-
-    def test_cmd_raises_ValueError_if_missing_req_AND_args(self):
-        self.CMD.REQ_KWARGS = [('-f', '-o', '-n')]
-        self.CMD.DEFAULTS = {}
-        kw = {'-f': 0, '-n': 2}
-
-        cmd = self.CMD(**kw)  # should not raise
-        with self.assertRaises(ValueError):
-            cmd.cmd()
-
-    def test_cmd_raises_ValueError_if_missing_all_req_XOR_args(self):
-        self.CMD.REQ_KWARGS = [['-f', '-o', '-n']]
-        self.CMD.DEFAULTS = {}
-
-        cmd = self.CMD(**{'-h': 1})
-        with self.assertRaises(ValueError):
-            cmd.cmd()
-
-    def test_cmd_raises_ValueError_if_more_than_one_req_XOR_arg_given(self):
-        self.CMD.REQ_KWARGS = [['-f', '-o', '-n']]
-        self.CMD.DEFAULTS = {}
-        kw = {'-f': 0, '-n': 2}
-
-        cmd = self.CMD(**kw)
-        with self.assertRaises(ValueError):
-            cmd.cmd()
-
-    def test_no_exceptions_with_expected_arguments(self):
-        self.CMD.REQ_ARGS = 2
-        args = ['first_arg', 'second_arg']
-        kwargs = {'-f': 'req_kwarg'}
-
-        cmd = self.CMD(*args, **kwargs)  # no error raised
-        cmd.cmd()  # no error raised
-
     def test_defaults_set_on_init(self):
         cmd = self.CMD()
 
         self.assertEqual(cmd.kwargs['-n'], self.CMD.DEFAULTS['-n'])
 
-    def test_defaults_overridden_if_args_given(self):
+    def test_init_defaults_overridden_if_args_given(self):
         kwargs = {'-f': 'req_kwarg', '-n': 8}
         cmd = self.CMD(**kwargs)
 
         self.assertNotEqual(cmd.kwargs['-n'], self.CMD.DEFAULTS['-n'])
         self.assertEqual(cmd.kwargs['-n'], 8)
 
-    def test_hyphens_added_to_kwargs_if_omitted_during_init(self):
+    def test_init_adds_hyphens_to_kwargs_if_omitted_during(self):
 
         kwargs = {'f': 'req_kwarg', 'n': 8, 'a': 'foo'}
         cmd = self.CMD(**kwargs)
@@ -133,7 +88,7 @@ class TestBaseCmds(unittest.TestCase):
         kwargs = {'-' + k: v for k, v in kwargs.items()}
         self.assertDictEqual(kwargs, cmd.kwargs)
 
-    def test_double_hyphens_added_to_str_kwargs_if_omitted_during_init(self):
+    def test_init_adds_double_hyphens_to_str_kwargs_if_omitted(self):
 
         kwargs = {'f': 'req_kwarg', 'foo': 'bar'}
         cmd = self.CMD(**kwargs)
@@ -141,11 +96,6 @@ class TestBaseCmds(unittest.TestCase):
         kwargs = {k: v for k, v in self.CMD.DEFAULTS.items()}
         kwargs.update({'-f': 'req_kwarg', '--foo': 'bar'})
         self.assertEqual(kwargs, cmd.kwargs)
-
-    def test_trubase_returns_path_wo_dir_or_extn(self):
-
-        basename = BaseCmd._trubase('~/test/path/with/file.name.txt')
-        self.assertEqual(basename, 'file.name')
 
     def test_defaults_unchanged_after_init(self):
 
@@ -164,6 +114,15 @@ class TestBaseCmds(unittest.TestCase):
         self.assertEqual(self.CMD.DEFAULTS['-n'], defaults['-n'])
         self.assertEqual(self.CMD.DEFAULTS['-n'], cmd.DEFAULTS['-n'])
         self.assertNotEqual(self.CMD.DEFAULTS['-n'], cmd.kwargs['-n'])
+
+    #
+    #   Misc
+    #
+
+    def test_trubase_returns_path_wo_dir_or_extn(self):
+
+        basename = BaseCmd._trubase('~/test/path/with/file.name.txt')
+        self.assertEqual(basename, 'file.name')
 
     def test_cmd_returns_expected_cmd_string(self):
 
@@ -185,6 +144,10 @@ class TestBaseCmds(unittest.TestCase):
 
         self.assertEqual(
             cmd.cmd(readable=False).rstrip(), expected_cmd.rstrip())
+
+    #
+    #   Help tests
+    #
 
     def test_help_text_contains_name(self):
         cmd = self.sample()
@@ -217,6 +180,10 @@ class TestBaseCmds(unittest.TestCase):
             'Help does not contain expected flags text'
         )
 
+    #
+    #   Link tests
+    #
+
     def test_link_sets_dest_input_to_src_output(self):
         a = self.sample()
         b = self.sample()
@@ -242,12 +209,192 @@ class TestBaseCmds(unittest.TestCase):
         self.assertEqual(b.output, c.input)
         self.assertEqual(d, c)
 
-    def test_cmd_raises_ValueError_if_wrong_filetype_given(self):
+    def test_cmd_matches_linked_input_without_error(self):
+        self.CMD.REQ_KWARGS = ['-f']
+        self.CMD.REQ_TYPE = [
+            [('-f', ), ('.txt', )],
+        ]
+
+        a = self.CMD()
+        a.output = lambda: ['file.txt']
+        b = self.CMD()
+        a.link(b)
+
+        b.cmd()  # should not raise
+        self.assertEqual(b.kwargs['-f'], a.output()[0])
+
+    def test_cmd_raises_AttributeError_if_req_not_fulfiled_by_link(self):
+        self.CMD.REQ_KWARGS = ['-f']
+        self.CMD.REQ_TYPE = [
+            [('-f', ), ('.txt', )],
+        ]
+
+        a = self.CMD()
+        b = self.CMD()
+        a.link(b)
+
+        with self.assertRaises(AttributeError):
+            b.cmd()
+
+    def test_cmd_raises_ValueError_if_unable_to_use_linked_input(self):
+        self.CMD.REQ_KWARGS = ['-f']
+        self.CMD.REQ_TYPE = [
+            [('-f', ), ('.txt', )],
+        ]
+
+        a = self.CMD()
+        a.output = lambda: ['file.csv']
+        b = self.CMD()
+        a.link(b)
+
+        with self.assertRaises(ValueError):
+            b.cmd()
+
+    def test_cmd_raises_ValueError_if_linked_input_unused_w_exact_match(self):
+        self.CMD.REQ_KWARGS = ['-1']
+        self.CMD.REQ_TYPE = [
+            [('-1', '-2'), ('.txt', ), False],
+        ]
+
+        a = self.CMD()
+        a.output = lambda: ['file.txt']
+        b = self.CMD()
+        a.link(b)
+
+        with self.assertRaises(ValueError):
+            b.cmd()
+
+    def test_cmd_sets_linked_input_to_correct_flag_if_not_match_any(self):
+        self.CMD.REQ_TYPE = [
+            [('-1', '-2'), ('.txt', ), False],
+            [('-U', ), ('.txt', ), False],
+        ]
+
+        a = self.CMD()
+        a.output = lambda: ['file.txt']
+        b = self.CMD()
+        a.link(b)
+
+        b.cmd()  # should not raise!
+        self.assertEqual(b.kwargs['-U'], a.output()[0])
+
+    def test_cmd_raises_TypeError_if_input_not_callable(self):
+        self.CMD.REQ_KWARGS = ['-1']
+        self.CMD.REQ_TYPE = [
+            [('-1', '-2'), ('.txt', ), False],
+        ]
+
+        a = self.CMD()
+        a.output = ['file.txt']
+        b = self.CMD()
+        a.link(b)
+
+        with self.assertRaises(TypeError):
+            b.cmd()
+
+    def test_cmd_sets_linked_input_to_pos_arg_if_req(self):
+        self.CMD.REQ_ARGS = 1
+        self.CMD.DEFAULTS = []
+        self.CMD.REQ_TYPE = [
+            [('-1', '-2'), ('.txt', ), False],
+        ]
+
+        a = self.CMD()
+        b = self.CMD()
+        a.output = lambda: ['file.txt', 'file.1', 'file2.txt']
+        a.link(b)
+
+        b.cmd()  # should not raise
+        self.assertEqual(b.kwargs, {'-1': 'file.txt', '-2': 'file2.txt'})
+        self.assertIn('file.1', b.args)
+
+    #
+    #   Required argument tests
+    #
+
+    def test_cmd_raises_IndexError_if_missing_req_number_args(self):
+        self.CMD.REQ_ARGS = 2
+        args = ['only_one_arg']
+        cmd = self.CMD(*args)  # shold not raise
+
+        with self.assertRaises(IndexError):
+            cmd.cmd()
+
+    def test_no_exceptions_with_expected_arguments(self):
+        self.CMD.REQ_ARGS = 2
+        args = ['first_arg', 'second_arg']
+
+        cmd = self.CMD(*args)  # no error raised
+        cmd.cmd()  # no error raised
+
+    def test_cmd_raises_AttributeError_if_required_kwarg_not_given(self):
+        self.CMD.REQ_KWARGS = ['-f']
+        cmd = self.CMD()  # should not raise
+
+        with self.assertRaises(AttributeError):
+            cmd.cmd()
+
+    def test_cmd_raises_AttributeError_if_missing_req_AND_args(self):
+        self.CMD.REQ_KWARGS = [('-f', '-o', '-n')]  # req all three
+        self.CMD.DEFAULTS = {}
+        kw = {'-f': 0, '-n': 2}
+
+        cmd = self.CMD(**kw)  # should not raise
+        with self.assertRaises(AttributeError):
+            cmd.cmd()
+
+    def test_cmd_raises_AttributeError_if_missing_all_req_XOR_args(self):
+        self.CMD.REQ_KWARGS = [['-f', '-o', '-n']]
+        self.CMD.DEFAULTS = {}
+
+        cmd = self.CMD(**{'-h': 1})
+        with self.assertRaises(AttributeError):
+            cmd.cmd()
+
+    def test_cmd_raises_AttributeError_if_gt_1_req_XOR_arg_given(self):
+        self.CMD.REQ_KWARGS = [['-f', '-o', '-n']]
+        self.CMD.DEFAULTS = {}
+        kw = {'-f': 0, '-n': 2}
+
+        cmd = self.CMD(**kw)
+        with self.assertRaises(AttributeError):
+            cmd.cmd()
+
+    #
+    #   File type tests
+    #
+
+    def test_cmd_type_checks_positional_arguments(self):
+        self.CMD.REQ_TYPE = [
+            [(0, 1), ('.txt', )],
+        ]
+        a = self.sample()
+        a.args = ['req_args.txt']
+        # should not raise; implicit check against missing [1]
+        a.cmd()
+
+    def test_cmd_does_not_raise_TypeError_if_checked_kwarg_not_given(self):
+        self.CMD.REQ_TYPE = [
+            [('-x', ), ('.txt', )],
+        ]
+        a = self.sample()
+        a.cmd()  # should not raise
+
+    def test_cmd_raises_TypeError_if_wrong_filetype_given(self):
         self.CMD.REQ_TYPE = [
             [('-f', ), ('.txt', )],
         ]
         a = self.sample()
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
+            a.cmd()
+
+    def test_cmd_raises_TypeError_for_bad_pos_arg_type(self):
+        self.CMD.REQ_TYPE = [
+            [(0, 1), ('.txt', )],
+        ]
+        a = self.sample()
+        a.args = ['req_args.txt', 'req_args.csv']
+        with self.assertRaises(TypeError):
             a.cmd()
 
     def test_cmd_does_not_raise_if_expected_filetype_given(self):
@@ -259,84 +406,9 @@ class TestBaseCmds(unittest.TestCase):
         a.kwargs = kwargs
         a.cmd()  # should not raise
 
-    def test_cmd_does_not_raise_if_expected_kwarg_not_given(self):
-        self.CMD.REQ_TYPE = [
-            [('-x', ), ('.txt', )],
-        ]
-        a = self.sample()
-        a.cmd()  # should not raise
-
-    def test_cmd_also_checks_positional_arguments(self):
-        self.CMD.REQ_TYPE = [
-            [(0, 1), ('.txt', )],
-        ]
-        a = self.sample()
-        a.args = ['req_args.txt']
-        # should not raise; implicit check against missing [1]
-        a.cmd()
-
-    def test_cmd_raises_ValueError_for_bad_pos_arg_type(self):
-        self.CMD.REQ_TYPE = [
-            [(0, 1), ('.txt', )],
-        ]
-        a = self.sample()
-        a.args = ['req_args.txt', 'req_args.csv']
-        with self.assertRaises(ValueError):
-            a.cmd()
-
-    @unittest.skip('Needs rewrite')
-    def test_cmd_runs_prepreq_before_checking_requirements(self):
-        self.CMD._prepreq = Mock(side_effect=Exception('_prepreq'))
-        self.CMD.__check_requirements = Mock()
-        a = self.sample()
-        with self.assertRaisesRegexp(Exception, '_prepreq'):
-            a.cmd()
-        self.assertEqual(self.CMD._prepreq.call_count, 1)
-        self.assertEqual(self.CMD.__check_requirements.call_count, 0)
-
-    @unittest.skip('Needs rewrite')
-    def test_cmd_runs_prepcmd_after_checking_requirements(self):
-        m = Mock(side_effect=Exception('_prepcmd'))
-        self.CMD._prepcmd = m
-        with patch.object(BaseCmd, '__check_requirements') as cr:
-            a = self.sample()
-            # self.CMD.__check_requirements = m
-            with self.assertRaisesRegexp(Exception, '_prepcmd'):
-                a.cmd()
-            self.assertEqual(cr.call_count, 1)
-            self.assertEqual(m.call_count, 1)
-
-    def test_get_input_calls_linked_output(self):
-        ohc = self.sample()
-        ihc = self.sample()
-
-        mock = Mock()
-        ohc.output = mock
-        ohc.link(ihc)
-        ihc._get_input()
-
-        self.assertEqual(mock.call_count, 1, "Linked output not called")
-
-    def test_get_input_returns_linked_output(self):
-        ohc = self.sample()
-        ihc = self.sample()
-
-        exp = ['a', 'b', 'c']
-        mock = Mock(return_value=exp)
-        ohc.output = mock
-        ohc.link(ihc)
-
-        self.assertEqual(ihc._get_input(), exp)
-
-    def test_get_input_returns_None_if_no_linked_input(self):
-        ihc = self.sample()
-        self.assertIsNone(ihc._get_input())
-
-    def test_get_input_raises_TypeError_if_input_not_callable(self):
-        ihc = self.sample()
-        ihc.input = 'foo'
-        with self.assertRaises(TypeError):
-            ihc._get_input()
+    #
+    #   Execution
+    #
 
     def test_filter_type_returns_files_with_expected_type(self):
         args = ['seq.1.fq', 'seq.2.fq', 'seq.txt']

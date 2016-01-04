@@ -38,7 +38,8 @@ class HisatCmd(BaseCmd):
     REQ_KWARGS = ['-x', ('-1', '-2'), ['-1', '-S']]
     REQ_ARGS = 0
     REQ_TYPE = [
-        [('-1', '-2', '-U'), ('.fastq', '.fq', '.fastq', '.fa')],
+        [('-1', '-2'), ('.fastq', '.fq', '.fastq', '.fa'), False],
+        [('-U', ), ('.fastq', '.fq', '.fastq', '.fa'), False],
         [('-S', ), ('sam', )],
     ]
 
@@ -76,25 +77,25 @@ class HisatCmd(BaseCmd):
     #   "Private" methods
     #
 
-    def _input(self):
-        '''Match linked output to sequence inputs'''
-
-        args = self._get_input()
-        if not args:
-            return
-
-        fq_types = ('.fastq', '.fq', '.fastq', '.fa')
-        filtered = self._filter_by_type(args, fq_types)
-
-        try:
-            self.kwargs['-1'], self.kwargs['-2'] = filtered
-        except ValueError:
-            try:
-                self.kwargs['-U'], = filtered
-            except ValueError:
-                msg = 'Unknown input from link: {} ({})'.format(
-                    args, self.input.__self__.name)
-                raise self.CmdLinkError(msg)
+    # def _input(self):
+    #     '''Match linked output to sequence inputs'''
+    #
+    #     args = self._get_input()
+    #     if not args:
+    #         return
+    #
+    #     fq_types = ('.fastq', '.fq', '.fastq', '.fa')
+    #     filtered = self._filter_by_type(args, fq_types)
+    #
+    #     try:
+    #         self.kwargs['-1'], self.kwargs['-2'] = filtered
+    #     except ValueError:
+    #         try:
+    #             self.kwargs['-U'], = filtered
+    #         except ValueError:
+    #             msg = 'Unknown input from link: {} ({})'.format(
+    #                 args, self.input.__self__.name)
+    #             raise self.CmdLinkError(msg)
 
     def _prepcmd(self):
         '''Prep for hisat cmd
