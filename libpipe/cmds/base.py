@@ -35,7 +35,22 @@ class BaseCmd(metaclass=ABCMeta):
                     A list indicates XOR requirement, e.g., [['-U', '-1']].
         REQ_ARGS    Int denoting how many positional arguments are expected.
         REQ_TYPE    A list of kwarg flags and their expected extensions.
-                    E.g., [ [('-f', ), ('.txt', )], ... ]
+                    A single requirement will have two to three elements:
+                        <flags tuple>, <extension tuple>, [match any bool]
+                    For example, the following type requirement would
+                    naively define the input required by hisat:
+                        REQ_TYPE = [
+                            [('-1', '-2'), ('.fq', '.fa'), False],
+                            [('-U', ),     ('.fq', '.fa'), False],
+                            [('-S', ),     ('sam', )],
+                        ]
+                    The 'match_any' bool element is used only for matching
+                    linked command input and is assumed True if ommitted.
+                    If False, the option will not be matched unless the
+                    given flags are matched exactly. In the above example,
+                    a single linked fastq file would be set to '-U' and three
+                    linked fastq files would not be used at all.
+                    See '__match_input' and '_check_type' for more details.
 
     Class Methods:
         _prepreq()   Use to setup any last minute details before
@@ -241,9 +256,9 @@ class BaseCmd(metaclass=ABCMeta):
             return  # nothing to do
 
     def __match_input(self):
-        '''Match linked output to sequence inputs
+        '''Match linked inputs to keyword arguments according to REQ_TYPE
 
-        Matches input according to given order and stores any extra as
+        Uses REQ_TYPE to match linked input to a keyword argument or to
         positional arguments IFF REQ_ARGS > 1, e.g.,
             input: ['a.txt', 'a.fq', 'b.fq']
             REQ_ARGS = 1
@@ -252,7 +267,11 @@ class BaseCmd(metaclass=ABCMeta):
             kwargs: {'-b': 'a.fq', '-a': 'b.fq'}
             args: ['a.txt']
 
-        Also, you may use
+        Return:
+            None
+        Raises:
+            Attribute error if no link or input is found.
+            TypeError if linked input is not callable.
         '''
 
         # Ensure we have valid, linked input
