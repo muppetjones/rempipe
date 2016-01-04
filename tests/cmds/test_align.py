@@ -24,20 +24,30 @@ class TestHistatCmd(unittest.TestCase):
 
     def sample_cmd(self):
         kw = {
-            '-U': 'path/seq.fa',
+            '-U': 'upath/seq.fa',
             '-x': 'gpath/gen',
             'timestamp': '000',
             '-S': 'path/al.sam',
         }
         return HisatCmd(**kw)
 
+    def test_prepcmd_sets_S_if_not_given(self):
+        hc = self.sample_cmd()
+        del hc.kwargs['-S']
+        hc._prepcmd()
+
+        self.assertEqual(
+            hc.kwargs['-S'],
+            'upath/seq_gen.sam',
+        )
+
     def test_prepcmd_sets_redirect_to_log_file(self):
         hc = self.sample_cmd()
         hc._prepcmd()
 
         self.assertTrue(
-            hc.redirect.endswith('path/seq_gen_000_hisat.log'),
-            'Redirect not set to expected log file',
+            hc.redirect.endswith('path/al_gen_000_hisat.log'),
+            'Redirect not set to expected log file ({})'.format(hc.redirect),
         )
 
     def test_prepcmd_sets_redirect_for_stdout_and_stderr_to_tee(self):
@@ -102,14 +112,4 @@ class TestHistatCmd(unittest.TestCase):
         ihc = self.sample_cmd()
         ihc._prepreq()
 
-        self.assertEqual(ihc.kwargs['-U'], 'path/seq.fa')
-
-    # def test_magic_input_raises_error_if_more_than_two_seq_given(self):
-    #
-    #     args = ['seq.1.fq', 'seq.2.fq', 'seq.fq']
-    #     with patch.object(HisatCmd, 'output', autospec=True, return_value=args):
-    #         ohc = self.sample_cmd()
-    #         ihc = self.sample_cmd()
-    #         ohc.link(ihc)
-    #     with self.assertRaises(HisatCmd.CmdLinkError):
-    #         ihc._input()
+        self.assertEqual(ihc.kwargs['-U'], 'upath/seq.fa')

@@ -7,6 +7,14 @@ log = logging.getLogger(__name__)
 
 
 class FastqcCmd(BaseCmd):
+
+    '''FastQC command
+
+    Command Usage:
+        fastqc [-o output dir] [--(no)extract] [-f fastq|bam|sam]
+               [-c contaminant file] seqfile1 .. seqfileN
+    '''
+
     NAME = 'fastqc'
     INVOKE_STR = 'fastqc'
 
@@ -19,19 +27,6 @@ class FastqcCmd(BaseCmd):
     REQ_KWARGS = []
     REQ_ARGS = 1
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # ensure the '-o' option is given
-        # -- use the common prefix of the two input files
-        # -- or the basename of the the first file otherwise
-        if '-o' not in self.kwargs:
-            prefix = os.path.commonprefix(self.args)
-            if not prefix or prefix == self.args[0]:
-                prefix = os.path.splitext(self.args[0])[0]
-            self.kwargs['-o'] = prefix
-
-    @property
     def output(self):
 
         files = []
@@ -53,31 +48,53 @@ class FastqcCmd(BaseCmd):
 
         return files
 
+    def _prepcmd(self):
+        # ensure the '-o' option is given
+        # -- use the common prefix of the two input files
+        # -- or the basename of the the first file otherwise
+        if '-o' not in self.kwargs:
+            prefix = os.path.commonprefix(self.args)
+            if not prefix or prefix == self.args[0]:
+                prefix = os.path.splitext(self.args[0])[0]
+            self.kwargs['-o'] = prefix
+
 
 class SamtoolsSortCmd(BaseCmd):
+
+    '''Samtools Sort
+
+    Creates command to generate a sorted BAM file from a SAM or BAM file.
+
+    Command Usage:
+        samtools sort [options...] <in>
+
+    Command Usage (legacy):
+        samtools sort [options...] <in> <out.prefix>
+    '''
+
     NAME = 'samtools_sort'
     INVOKE_STR = 'samtools sort'
 
+    ARGUMENTS = [
+        ('-o', 'FILE', 'File to write final output to'),
+        ('-O', 'FORMAT', 'Write output as FORMAT (sam/bam/cram)'),
+        ('-T', 'PREFIX', 'Write temporary files to PREFIX.nnn.bam'),
+    ]
     DEFAULTS = {}
-
-    attributes = {
-        '-o': 'Output file.',
-        '-O': 'Output format.',
-        '-T': 'Temp file prefix.',
-    }
 
     REQ_KWARGS = []
     REQ_ARGS = 1
+    REQ_TYPE = [
+        [(0, ), ('.bam', '.sam')]
+    ]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
+    def _prepcmd(self):
         # if we were only given a single file, make the prefix
         if '-o' not in self.kwargs:
             if self.args[0].endswith('sam'):
                 bam_file = os.path.splitext(self.args[0])[0] + '.bam'
             else:
-                bam_file = os.path.splitext(self.args[0])[0] + 's.bam'
+                bam_file = os.path.splitext(self.args[0])[0] + '.s.bam'
             self.kwargs['-o'] = bam_file
 
         if '-T' not in self.kwargs:
@@ -90,23 +107,36 @@ class SamtoolsSortCmd(BaseCmd):
 
 
 class SamtoolsIndexCmd(BaseCmd):
+
+    '''Samtools Index
+
+    Command Usage:
+        samtools index [-bc] [-m INT] <in.bam>
+    '''
+
     NAME = 'samtools_index'
     INVOKE_STR = 'samtools index'
 
+    ARGUMENTS = [
+        (None, 'FILE', 'BAM file to index'),
+        ('-b', None, 'Generate BAI-format index for BAM files [default]'),
+        ('-c', None, 'Generate CAI-format index for BAM files'),
+        ('-m', 'INT', 'Set min interval size for CSI indices to 2^INT'),
+    ]
     DEFAULTS = {}
-
-    attributes = {}
 
     REQ_KWARGS = []
     REQ_ARGS = 1
+    REQ_TYPE = [
+        [(0, ), ('.bam')]
+    ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, fmt='-b', **kwargs):
         super().__init__(*args, **kwargs)
 
-        # if we were only given a single file, make the prefix
-        if not self.args[0].endswith('.bam'):
-            raise ValueError('Samtools index requires a BAM file')
+        self.flags.extend([
+            fmt,
+        ])
 
-    @property
     def output(self):
         return [self.args[0], ]  # return the given bam file

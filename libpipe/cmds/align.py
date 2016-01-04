@@ -10,6 +10,13 @@ log = logging.getLogger(__name__)
 
 class HisatCmd(BaseCmd):
 
+    '''HISAT command setup
+
+    Command usage:
+        hisat [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r>} -S <sam>
+
+    '''
+
     NAME = 'hisat'
     INVOKE_STR = 'hisat'
 
@@ -18,7 +25,7 @@ class HisatCmd(BaseCmd):
         ('-1', 'FILE[,FILE]', 'comma separated list of paired-end 1 files'),
         ('-2', 'FILE[,FILE]', 'comma separated list of paired-end 2 files'),
         ('-U', 'FILE[,FILE]', 'comma separated list of unpaired reads'),
-        ('-S', 'FILE', 'output sam file'),
+        ('-S', 'FILE', 'Output sam file (defaults to read prefix)'),
         ('-p', 'INT', 'number of processors'),
         ('-I', 'INT', 'minimum fragment length. Default = 0.'),
         ('-X', 'INT', 'aximum fragment length. Default = 500.'),
@@ -35,7 +42,7 @@ class HisatCmd(BaseCmd):
         '-X': 500,
     }
 
-    REQ_KWARGS = ['-x', ('-1', '-2'), ['-1', '-S']]
+    REQ_KWARGS = ['-x', ('-1', '-2'), ['-1', '-U']]
     REQ_ARGS = 0
     REQ_TYPE = [
         [('-1', '-2'), ('.fastq', '.fq', '.fastq', '.fa'), False],
@@ -71,31 +78,16 @@ class HisatCmd(BaseCmd):
     #
 
     def output(self):
-        return [self.kwargs['-S']]
+        out_list = [self.kwargs['-S'], ]
+        try:
+            out_list.append(self.kwargs['--un'])
+        except KeyError:
+            out_list.append(self.kwargs['--un-conc'])
+        return out_list
 
     #
     #   "Private" methods
     #
-
-    # def _input(self):
-    #     '''Match linked output to sequence inputs'''
-    #
-    #     args = self._get_input()
-    #     if not args:
-    #         return
-    #
-    #     fq_types = ('.fastq', '.fq', '.fastq', '.fa')
-    #     filtered = self._filter_by_type(args, fq_types)
-    #
-    #     try:
-    #         self.kwargs['-1'], self.kwargs['-2'] = filtered
-    #     except ValueError:
-    #         try:
-    #             self.kwargs['-U'], = filtered
-    #         except ValueError:
-    #             msg = 'Unknown input from link: {} ({})'.format(
-    #                 args, self.input.__self__.name)
-    #             raise self.CmdLinkError(msg)
 
     def _prepcmd(self):
         '''Prep for hisat cmd
@@ -103,28 +95,47 @@ class HisatCmd(BaseCmd):
         > parse log file name and set for redirect
         > ensure unaligned reads are output
         '''
-
-        # parse log file name (based on given file info)
-        # sample_name: the basename of the given file
-        try:  # single end reads
-            log_dir = os.path.dirname(self.kwargs['-U'])
-            sample_name = self._trubase(self.kwargs['-U'])
-            unal_key = '--un'
-        except KeyError:  # paired-end reads
-            log_dir = os.path.dirname(self.kwargs['-1'])
-            sample_name = self._trubase(self.kwargs['-1'])
-            unal_key = '--un-conc'
-
         # parse the genome name
         genome_name = os.path.basename(self.kwargs['-x'])
+
+        # ensure we have an output file
+        try:
+            out_dir = os.path.dirname(self.kwargs['-S'])
+            run_name = self._trubase(self.kwargs['-S'])
+        except KeyError:
+            try:
+                # unpaired sequence file
+                out_dir = os.path.dirname(self.kwargs['-U'])
+                run_name = self._trubase(self.kwargs['-U'])
+            except KeyError:
+                # paired-end sequence file
+                out_dir = os.path.dirname(self.kwargs['-1'])
+                run_name = os.path.commonprefix(
+                    self.kwargs['-1'], self.kwargs['-2'])
+
+                # ensure common prefix includes some of the base name
+                if run_name == out_dir:
+                    run_name = self._trubase(self.kwargs['-1'])
+                else:
+                    run_name = os.path.basename(run_name)
+            finally:
+                # generated output name should contain genome name, too
+                if genome_name not in run_name:
+                    run_name = '_'.join([run_name, genome_name])
+
+                # ensure we have '-S' set
+                self.kwargs['-S'] = os.path.join(out_dir, run_name + '.sam')
+
+        # set log file name
         self.id = '_'.join(
-            [sample_name, genome_name, self.timestamp, self.name])
-        log_path = os.path.join(log_dir, self.id + '.log')
+            [run_name, genome_name, self.timestamp, self.name])
+        log_path = os.path.join(out_dir, self.id + '.log')
 
         # setup stdout redirect
         self.redirect = '2>&1 | tee -a {}'.format(log_path)
 
         # ensure unaligned reads are written to a file
+        unal_key = '--un' if '-U' in self.kwargs else '--un-conc'
         unal = os.path.splitext(self.kwargs['-S'])[0] + '.unal.fastq'
         self.kwargs.update({unal_key: unal})
 
