@@ -1,6 +1,6 @@
 import os.path
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 
 import libpipe
 from libpipe.cmds.align import HisatCmd

@@ -7,8 +7,14 @@ log = logging.getLogger(__name__)
 
 class BedtoolsMulticovCmd(BaseCmd):
 
-    NAME = 'samtools_sort'
-    INVOKE_STR = 'samtools sort'
+    NAME = 'bedtools_multicov'
+    INVOKE_STR = 'bedtools multicov'
+
+    ARGUMENTS = {
+        ('-bams', 'FILE', 'The bam file'),
+        ('-bed', 'FILE', 'The bed file'),
+    }
+
     DEFAULTS = {}
 
     attributes = {
@@ -17,24 +23,41 @@ class BedtoolsMulticovCmd(BaseCmd):
         '-T': 'Temp file prefix.',
     }
 
-    REQ_KWARGS = []
+    REQ_KWARGS = ['-bed', '-bams']
     REQ_ARGS = 1
+    REQ_TYPE = [
+        [('-bams', ), ('.bam', )],
+        [('-bed', ), ('.bed', '.gff', '.gtf')],
+    ]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        log.debug(self.args)
+    def _prepreq(self):
+        super()._prepreq()
 
-        # if we were only given a single file, make the prefix
-        if '-o' not in self.kwargs:
-            if self.args[0].endswith('sam'):
-                bam_file = os.path.splitext(self.args[0])[0] + '.bam'
-            else:
-                bam_file = os.path.splitext(self.args[0])[0] + 's.bam'
-            self.kwargs['-o'] = bam_file
+        # We may be given a genome prefix rather than an annotation file.
+        # We need to (a) identify such cases and (b) add the appropriate
+        # extension, defined by the presence of such a file.
 
-        if '-T' not in self.kwargs:
-            t_kw = os.path.splitext(self.kwargs['-o'])[0] + '.tmp'
-            self.kwargs['-T'] = t_kw
+        # TODO: make this a base function
+        def _get_types(flag):
+            for rt in self.REQ_TYPE:
+                if flag in rt[0]:
+                    return rt[1]
+            return None
+
+        # identify extension
+        bed_file = self.kwargs['-bed']
+        bed_types = _get_types('-bed')
+        bed_extn = [extn for extn in bed_types if bed_file.endswith(extn)][0]
+
+        # check for presence of file with expected extension
+        # update with first found match
+        # NOTE: LOGIC ERROR! If multiple exist, e.g., both .bed and .gff,
+        #       only the first found will ever be used.
+        if not bed_extn:
+            for extn in bed_types:
+                if os.path.isfile(bed_file + extn):
+                    self.kwargs['-bed'] = bed_file + extn
+                    break
 
     @property
     def output(self):

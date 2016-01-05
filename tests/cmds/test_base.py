@@ -52,6 +52,18 @@ class TestBaseCmds(unittest.TestCase):
     #   Initialization tests
     #
 
+    def test_init_sets_defaults(self):
+        cmd = self.CMD()
+
+        self.assertEqual(cmd.kwargs['-n'], self.CMD.DEFAULTS['-n'])
+
+        def test_init_defaults_overridden_if_args_given(self):
+            kwargs = {'-f': 'req_kwarg', '-n': 8}
+            cmd = self.CMD(**kwargs)
+
+            self.assertNotEqual(cmd.kwargs['-n'], self.CMD.DEFAULTS['-n'])
+            self.assertEqual(cmd.kwargs['-n'], 8)
+
     def test_init_saves_timestamp_if_given(self):
         kw = {'timestamp': '151012-162900'}
         cmd = self.CMD(**kw)
@@ -68,17 +80,17 @@ class TestBaseCmds(unittest.TestCase):
         with self.assertRaises(AttributeError):
             self.CMD(kw)
 
-    def test_defaults_set_on_init(self):
-        cmd = self.CMD()
+    def test_init_raises_AttributeError_if_unrecognized_kwargs_given(self):
+        self.fail()
 
-        self.assertEqual(cmd.kwargs['-n'], self.CMD.DEFAULTS['-n'])
+    def test_init_raises_IndexError_if_too_many_args_given(self):
+        self.fail()
 
-    def test_init_defaults_overridden_if_args_given(self):
-        kwargs = {'-f': 'req_kwarg', '-n': 8}
-        cmd = self.CMD(**kwargs)
+    def test_init_raises_ArgumentError_if_unrecognized_flag_given(self):
+        self.fail()
 
-        self.assertNotEqual(cmd.kwargs['-n'], self.CMD.DEFAULTS['-n'])
-        self.assertEqual(cmd.kwargs['-n'], 8)
+    def test_init_sets_unrecognized_arguments_if_open_eq_True(self):
+        self.fail()
 
     def test_init_adds_hyphens_to_kwargs_if_omitted_during(self):
 
