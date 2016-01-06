@@ -2,6 +2,8 @@
 import os.path
 import time
 
+from remsci.lib.utility import path
+
 from libpipe.cmds.base import BaseCmd
 
 import logging
@@ -49,6 +51,22 @@ class HisatCmd(BaseCmd):
         [('-U', ), ('.fastq', '.fq', '.fastq', '.fa'), False],
         [('-S', ), ('sam', )],
     ]
+
+    #
+    #   Custom Exceptions
+    #
+
+    class GenomeIndexError(FileNotFoundError):
+        ERRMSG = {
+            'missing': 'Expected index files for {} not found',
+        }
+
+        def __init__(self, msg, *args, genome='', **kwargs):
+            try:
+                msg = self.ERRMSG[msg].format(genome)
+            except KeyError:
+                pass
+            super().__init__(msg, *args, **kwargs)
 
     #
     #   Magic methods
@@ -139,6 +157,46 @@ class HisatCmd(BaseCmd):
         unal = os.path.splitext(self.kwargs['-S'])[0] + '.unal.fastq'
         self.kwargs.update({unal_key: unal})
 
+    def _additional_requirements(
+            self, expected_file_count=10, extension='.bt2'):
+        '''Additional command requirements
+
+        Index check:
+            expect 10 files: *.[1-6].bt2, *.rev.[1,2,5,6].bt2
+        '''
+
+        # ensure the index exists
+        genome_dir, genome_base = os.path.split(self.kwargs['-x'])
+
+        index_pattern = r'{}\..*{}'.format(genome_base, extension)
+        index_files = path.walk_file(genome_dir, pattern=index_pattern)
+
+        if len(index_files) != expected_file_count:
+            raise self.GenomeIndexError('missing', genome=genome_base)
+
+
+class Hisat2Cmd(HisatCmd):
+
+    '''Hisat 2 Aligner
+
+    Current version uses the same parameters as hisat
+    '''
+
+    NAME = 'hisat2'
+    INVOKE_STR = 'hisat2'
+
+    def _additional_requirements(
+            self, expected_file_count=8, extension='.ht2'):
+        '''Additional command requirements
+
+        Index check:
+            expect 8 files: *.[1-8].bt2
+        '''
+        super()._additional_requirements(
+            expected_file_count=expected_file_count,
+            extension=extension
+        )
+
 
 class Bowtie2Cmd(HisatCmd):
 
@@ -149,3 +207,15 @@ class Bowtie2Cmd(HisatCmd):
 
     NAME = 'bowtie2'
     INVOKE_STR = 'bowtie2'
+
+    def _additional_requirements(
+            self, expected_file_count=6, extension='.bt2'):
+        '''Additional command requirements
+
+        Index check:
+            expect 8 files: *.[1-4].bt2, *.rev.[1-2].bt2
+        '''
+        super()._additional_requirements(
+            expected_file_count=expected_file_count,
+            extension=extension
+        )

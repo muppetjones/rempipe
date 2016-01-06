@@ -57,6 +57,7 @@ class FastqScripted(SubparserBase):
 
         self.subparser.add_argument(
             '--genome', dest='genome',
+            action='append',
             help='Hisat genome',
         )
 
@@ -118,15 +119,21 @@ class FastqScripted(SubparserBase):
 
         rows = [line.rstrip().split() for line in fh]
         names = [cols[0] for cols in rows]
-        r1 = [path.protect(cols[1]) for cols in rows]
-        r2 = [path.protect(cols[2]) for cols in rows]
-
         if not data_dir:
             data_dir = fh.name
 
-        # HACK
-        r1 = [os.path.join(os.path.dirname(data_dir), r) for r in r1]
-        r2 = [os.path.join(os.path.dirname(data_dir), r) for r in r2]
+        try:
+            r1 = [path.protect(cols[1]) for cols in rows]
+            r2 = [path.protect(cols[2]) for cols in rows]
+
+            # HACK
+            r1 = [os.path.join(os.path.dirname(data_dir), r) for r in r1]
+            r2 = [os.path.join(os.path.dirname(data_dir), r) for r in r2]
+        except IndexError:
+            r1 = [path.protect(cols[1]) for cols in rows]
+
+            # HACK
+            r1 = [os.path.join(os.path.dirname(data_dir), r) for r in r1]
 
         # check for valid paired end in third column
         # try:

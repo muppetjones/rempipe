@@ -8,17 +8,16 @@ sys.path.append("../remsci/")
 
 import remsci.scripted.base as base
 from remsci.lib.utility import path
-from libpipe.pipes.base import BasePipe
+from libpipe.pipes.genomics import NestedGenomicsPipe
 from libpipe.parsers.fastq import FastqScripted
-from libpipe.cmds import (
-    SkewerCmd, HisatCmd, Bowtie2Cmd, FastqcCmd,
-    SamtoolsSortCmd, SamtoolsIndexCmd
-)
+# from libpipe.cmds import (
+#     SkewerCmd, HisatCmd, Bowtie2Cmd, FastqcCmd,
+#     SamtoolsSortCmd, SamtoolsIndexCmd, BedtoolsMulticovCmd,
+# )
 
 
-ROOT_DIR = path.protect('~/data/rempipe')
+ROOT_DIR = path.protect('~/work/projects')
 PIPE_PBS_TEMPLATE = ''
-DO_RUN = lambda x: not _has_output(x)
 
 
 def add_subparsers():
@@ -28,154 +27,16 @@ def add_subparsers():
     fastq_parser.setup()
 
 
-def pipe(file_list, genome, project_dir, force=False):
-
-    timestamp = time.strftime("%y%m%d-%H%M%S")
-
-    for f in file_list:
-        name = f[0]
-        files = f[1:]
-        out_dir = os.path.join(project_dir, name)
-        path.makedirs(out_dir)
-
-        # 1st fast qc
-        fastqc_1 = FastqcCmd(*files, o=out_dir)
-
-        # trimming
-        out_prefix = os.path.join(out_dir, name)
-        trim = SkewerCmd(*files, o=out_prefix)
-        trimmed_fastq = trim.output
-
-        # 2nd fastqc
-        fastqc_2 = FastqcCmd(*trimmed_fastq, o=out_dir)
-
-        # setup alignment
-        # NOTE: need to check for encoding
-        align_kwargs = {
-            'x': genome,
-            'S': '{}_{}.sam'.format(
-                out_prefix,
-                os.path.basename(genome),
-            ),
-            'p': 3,  # set for local (should use pbs paramters on qsub)
-        }
-        if len(trimmed_fastq) == 1:
-            align_kwargs['U'] = trimmed_fastq[0]
-        else:
-            align_kwargs['1'], align_kwargs['2'] = trimmed_fastq
-        align = HisatCmd(timestamp=timestamp, **align_kwargs)
-        # human_kw = [m for m in ['human', 'sapien', 'G37RCh'] if m in genome]
-        # if human_kw:
-        #     align = HisatCmd(timestamp=timestamp, **align_kwargs)
-        # else:
-        #     align = Bowtie2Cmd(timestamp=timestamp, **align_kwargs)
-
-        # samtools
-        sam_sort = SamtoolsSortCmd(*(align.output))
-        sam_index = SamtoolsIndexCmd(*(sam_sort.output))
-
-        # Setup pipe
-        # NOTE: This is the alpha test of the pipe class.
-        pipe = BasePipe(force=force)
-        pipe.cmds.extend([
-            fastqc_1, trim, fastqc_2, align, sam_sort, sam_index,
-        ])
-
-        # write pbs file & run
-        pbs_file = '{}_pipe_{}_{}.pbs'.format(
-            out_prefix, timestamp, os.path.basename(genome))
-        pipe.write_script(pbs_file=pbs_file)
-        pipe.run(job_name=name, pbs_file=pbs_file)
-        # cmds = [fastqc_1, trim, fastqc_2, align, sam_sort, sam_index]
-        # _write_pbs(pbs_file, cmds)
-
-        # run pbs in qsub
-        # qid = _run_pbs(name, pbs_file)
-        # log.debug("Running as '{}'".format(qid))
-
-
-def _write_pbs(pbs_file, cmds):
-    global PIPE_PBS_TEMPLATE
-    if not PIPE_PBS_TEMPLATE:
-        with open('./template.pbs', 'r') as ih:
-            PIPE_PBS_TEMPLATE = ih.read()
-
-    # write pbs file
-    with open(pbs_file, 'w') as oh:
-        oh.write(PIPE_PBS_TEMPLATE + "\n")
-
-        omit_msg = '# Output found. Skip.\n# '
-        comment_str = 'echo "Running {}..."\n'
-
-        for cmd in cmds:
-            cmd_str = str(cmd) + "\n\n"
-            if DO_RUN(cmd):
-                oh.write(comment_str.format(cmd.name))
-                oh.write(cmd_str)
-            else:
-                oh.write(omit_msg + cmd_str)
-
-
-def _run_pbs(job_name, pbs_file, log_file=''):
-
-    qid_file = pbs_file.replace('pbs', 'qid')
-    if not log_file:
-        log_file = pbs_file.replace('pbs', 'log')
-
-    # run pbs file
-    qsub_command = ['qsub', '-N', job_name, '-o', log_file, pbs_file, ]
-    with open(qid_file, 'w') as qid_fh:
-        log.debug(' '.join(qsub_command))
-        retcode = subprocess.check_call(qsub_command, stdout=qid_fh)
-        log.debug('retcode: {}'.format(retcode))
-
-    # get the qsub job id
-    with open(qid_file, 'r') as qid_fh:
-        qid = qid_fh.read()
-
-    # link the log file (last run)
-    link_base = os.path.join(os.path.dirname(pbs_file), job_name)
-    _renew_link(link_base + '.log', log_file)
-    _renew_link(link_base + '.pbs', pbs_file)
-    _renew_link(link_base + '.qid', qid_file)
-
-    return qid
-
-
-def _renew_link(link_name, src_file):
-    if os.path.isfile(link_name):
-        os.unlink(link_name)
-    os.symlink(src_file, link_name)
-
-
-def _has_output(cmd):
-    '''Checks for expected output from a command
-
-    Arguments:
-        cmd     Command object.
-    Returns:
-        True if ALL output is found.
-        False otherwise
-    '''
-
-    for f in cmd.output:
-        if not os.path.isfile(f):
-            return False
-    return True
-
-
-def main():
-    pass
-
-
-if __name__ == '__main__':
-
+def setup_logger():
     # setup logger
     import logging
     from remsci.lib.utility import customLogging
     customLogging.config()
     log = logging.getLogger(__name__)
+    return log
 
+
+def parse_args():
     # setup the parser
     add_subparsers()
     parser = base.get_parser()
@@ -191,19 +52,88 @@ if __name__ == '__main__':
     except AttributeError:
         pass
 
-    # call the default function
-    try:
-        file_list = args.func(args)
-    except AttributeError:
-        raise
-        pass
+    # protect file names
+    protect = ['summary', 'root_dir', 'data_dir']
+    for p in protect:
+        try:
+            setattr(args, p, path.protect(getattr(args, p)))
+        except TypeError:
+            pass  # arg might not be set (is None)
 
-    # update root directory
+    return args
+
+
+def read_summary(args):
+    '''Reads a summary file and returns a list of names and files
+
+    Expected format:
+            <name>  <file>  [<file> ...]
+        The first two columns should be the name of the sample
+        and the file. Paired-end should be listed on the same line.
+    '''
+
+    with open(args.summary, 'r') as fh:
+        rows = [line.rstrip().split() for line in fh]
+        data_dir = (args.data_dir
+                    if args.data_dir else os.path.dirname(fh.name))
+
+    # add and protect path to second (and third) columns in rows
+    for row in rows:
+        row[1:] = [
+            path.protect(os.path.join(data_dir, col))
+            for col in row[1:]
+        ]
+
+    return rows
+
+
+def run_pipe(summary, genome, project_dir, force=False):
+
+    # initialize all pipes
+    pipes = []
+    for row in summary:
+
+        job_name = row[0]
+        files = row[1:]
+        log.info('Processing "{}"'.format(job_name))
+
+        sample_dir = os.path.join(project_dir, job_name)
+        path.makedirs(sample_dir)
+
+        pipe = NestedGenomicsPipe(
+            job_name=job_name,
+            odir=sample_dir,
+            input_list=files,
+            force=force,
+            genome=genome,
+        )
+        pipe.write_script(directory=sample_dir)
+        pipes.append(pipe)
+
+    # execute each pipe in turn
+    for pipe in pipes:
+        relpath = os.path.relpath(pipe.pbs_file, ROOT_DIR)
+        log.info('Running pbs script: "{}"'.format(relpath))
+        pipe.run()
+
+
+def main():
+    global ROOT_DIR
+    args = parse_args()
+    summary = read_summary(args)
+    force = args.force
+
     if args.root_dir:
         ROOT_DIR = path.protect(args.root_dir)
 
-    if args.force:
-        DO_RUN = lambda x: True
+    genome = args.genome
+    project_name = args.project if args.project else 'new_project'
+    project_dir = os.path.join(ROOT_DIR, project_name, 'samples')
 
-    project_dir = os.path.join(ROOT_DIR, args.project, 'samples')
-    pipe(file_list, args.genome, project_dir, force=args.force)
+    run_pipe(summary, genome, project_dir, force=force)
+
+
+if __name__ == '__main__':
+
+    log = setup_logger()
+    main()

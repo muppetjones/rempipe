@@ -6,6 +6,7 @@ import subprocess
 import time
 
 from remsci.lib.utility import path
+from remsci.lib.decorators import file_or_handle
 
 import libpipe.templates
 
@@ -124,24 +125,26 @@ class BasePipe(object):
 
     def __write_pbs(self):
 
+        # write pbs file
+        with open(self.pbs_file, 'w') as oh:
+            oh.write(self.pbs_template + "\n")
+            self._write_commands(oh)
+        return
+
+    @file_or_handle(mode='w')
+    def _write_commands(self, fh):
         # static text
         omit_msg = '# Output found. Skip.\n# '
         comment_str = 'echo "Running {}..."\n'
 
-        # write pbs file
-        with open(self.pbs_file, 'w') as oh:
-            # write template (e.g., script header)
-            oh.write(self.pbs_template + "\n")
-
-            for cmd in self.cmds:
-                cmd_str = str(cmd)
-                if self._do_run(cmd):
-                    prefix = comment_str.format(cmd.name)
-                else:
-                    prefix = omit_msg
-                    cmd_str = cmd_str.replace('\n', '\n#')
-                oh.write('{}{}\n\n'.format(prefix, cmd_str))
-
+        for i, cmd in enumerate(self.cmds):
+            cmd_str = str(cmd)
+            if self._do_run(cmd):
+                prefix = comment_str.format(cmd.name)
+            else:
+                prefix = omit_msg
+                cmd_str = cmd_str.replace('\n', '\n#')
+            fh.write('{}{}\n\n'.format(prefix, cmd_str))
         return
 
     def __load_template(self):
@@ -212,10 +215,6 @@ class BasePipe(object):
 
         # update the link to reflect latest run
         self.output = [qid_file, log_file]
-        # link_base = os.path.join(os.path.dirname(self.pbs_file), self.job_name)
-        # self._renew_link(link_base + '.log', log_file)
-        # self._renew_link(link_base + '.pbs', self.pbs_file)
-        # self._renew_link(link_base + '.qid', qid_file)
 
         return
 
@@ -284,7 +283,7 @@ class BasePipe(object):
             False otherwise
         '''
 
-        for f in cmd.output:
+        for f in cmd.output():
             if not os.path.isfile(f):
                 return False
         return True

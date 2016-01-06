@@ -43,4 +43,6 @@ else
     echo 'Running job locally.'
 fi
 
+set -e
+
 # directories

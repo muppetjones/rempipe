@@ -4,6 +4,9 @@ import libpipe.templates
 
 from libpipe.cmds.base import BaseCmd
 
+import logging
+log = logging.getLogger(__name__)
+
 
 class SkewerCmd(BaseCmd):
 
@@ -53,6 +56,8 @@ class SkewerCmd(BaseCmd):
             self.flags.append('--quiet')
 
     def _prepcmd(self):
+        log.debug(self.args)
+
         # ensure the '-o' option is given
         # -- use the common prefix of the two input files
         # -- or the basename of the the first file otherwise

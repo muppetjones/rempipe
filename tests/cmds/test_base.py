@@ -235,7 +235,7 @@ class TestBaseCmds(unittest.TestCase):
         b.cmd()  # should not raise
         self.assertEqual(b.kwargs['-f'], a.output()[0])
 
-    def test_cmd_raises_AttributeError_if_req_not_fulfiled_by_link(self):
+    def test_cmd_raises_TypeError_if_req_not_fulfiled_by_link(self):
         self.CMD.REQ_KWARGS = ['-f']
         self.CMD.REQ_TYPE = [
             [('-f', ), ('.txt', )],
@@ -245,10 +245,10 @@ class TestBaseCmds(unittest.TestCase):
         b = self.CMD()
         a.link(b)
 
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(TypeError):
             b.cmd()
 
-    def test_cmd_raises_ValueError_if_unable_to_use_linked_input(self):
+    def test_cmd_raises_TypeError_if_unable_to_use_linked_input(self):
         self.CMD.REQ_KWARGS = ['-f']
         self.CMD.REQ_TYPE = [
             [('-f', ), ('.txt', )],
@@ -259,10 +259,10 @@ class TestBaseCmds(unittest.TestCase):
         b = self.CMD()
         a.link(b)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             b.cmd()
 
-    def test_cmd_raises_ValueError_if_linked_input_unused_w_exact_match(self):
+    def test_cmd_raises_TypeError_if_linked_input_unused_w_exact_match(self):
         self.CMD.REQ_KWARGS = ['-1']
         self.CMD.REQ_TYPE = [
             [('-1', '-2'), ('.txt', ), False],
@@ -273,7 +273,7 @@ class TestBaseCmds(unittest.TestCase):
         b = self.CMD()
         a.link(b)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             b.cmd()
 
     def test_cmd_sets_linked_input_to_correct_flag_if_not_match_any(self):
@@ -320,6 +320,21 @@ class TestBaseCmds(unittest.TestCase):
         self.assertEqual(b.kwargs, {'-1': 'file.txt', '-2': 'file2.txt'})
         self.assertIn('file.1', b.args)
 
+    def test_cmd_sets_linked_input_to_pos_arg_if_given(self):
+        self.CMD.REQ_ARGS = 0
+        self.CMD.DEFAULTS = []
+        self.CMD.REQ_TYPE = [
+            [(0, ), ('.txt', )],
+        ]
+
+        a = self.CMD()
+        b = self.CMD()
+        a.output = lambda: ['file.txt', 'file.1', 'file2.txt']
+        a.link(b)
+
+        b.cmd()  # should not raise
+        self.assertEqual(b.args, ['file.txt'])
+
     #
     #   Required argument tests
     #
@@ -346,6 +361,14 @@ class TestBaseCmds(unittest.TestCase):
         with self.assertRaises(AttributeError):
             cmd.cmd()
 
+    def test_cmd_reqAND_does_not_raise_if_none_of_group_are_given(self):
+        self.CMD.REQ_KWARGS = [('-f', '-o', '-n')]  # req all three
+        self.CMD.DEFAULTS = {}
+        kw = {'-x': 'something different'}
+
+        cmd = self.CMD(**kw)  # should not raise
+        cmd.cmd()  # should NOT raise!!
+
     def test_cmd_raises_AttributeError_if_missing_req_AND_args(self):
         self.CMD.REQ_KWARGS = [('-f', '-o', '-n')]  # req all three
         self.CMD.DEFAULTS = {}
@@ -371,6 +394,14 @@ class TestBaseCmds(unittest.TestCase):
         cmd = self.CMD(**kw)
         with self.assertRaises(AttributeError):
             cmd.cmd()
+
+    def test_cmd_checks_for_additional_requirements_defined_by_child(self):
+        m = Mock()
+        self.CMD._additional_requirements = m
+        cmd = self.CMD()
+        cmd.cmd()
+
+        m.assert_called_once_with()
 
     #
     #   File type tests

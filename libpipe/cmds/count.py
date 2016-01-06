@@ -17,14 +17,8 @@ class BedtoolsMulticovCmd(BaseCmd):
 
     DEFAULTS = {}
 
-    attributes = {
-        '-o': 'Output file.',
-        '-O': 'Output format.',
-        '-T': 'Temp file prefix.',
-    }
-
     REQ_KWARGS = ['-bed', '-bams']
-    REQ_ARGS = 1
+    REQ_ARGS = 0
     REQ_TYPE = [
         [('-bams', ), ('.bam', )],
         [('-bed', ), ('.bed', '.gff', '.gtf')],
@@ -47,18 +41,34 @@ class BedtoolsMulticovCmd(BaseCmd):
         # identify extension
         bed_file = self.kwargs['-bed']
         bed_types = _get_types('-bed')
-        bed_extn = [extn for extn in bed_types if bed_file.endswith(extn)][0]
-
-        # check for presence of file with expected extension
-        # update with first found match
-        # NOTE: LOGIC ERROR! If multiple exist, e.g., both .bed and .gff,
-        #       only the first found will ever be used.
-        if not bed_extn:
+        try:
+            bed_extn = [
+                extn for extn in bed_types
+                if bed_file.endswith(extn)
+            ][0]
+        except IndexError:
+            # check for presence of file with expected extension
+            # update with first found match
+            # NOTE: LOGIC ERROR! If multiple exist, e.g., both .bed and .gff,
+            #       only the first found will ever be used.
             for extn in bed_types:
                 if os.path.isfile(bed_file + extn):
-                    self.kwargs['-bed'] = bed_file + extn
+                    bed_extn = extn
+                    # self.kwargs['-bed'] = bed_file + extn
                     break
+            try:
+                self.kwargs['-bed'] = bed_file + bed_extn
+            except UnboundLocalError:
+                msg = 'Unable to find an annotation file {} for "{}" genome'
+                raise FileNotFoundError(msg.format(
+                    bed_types, os.path.basename(bed_file)))
 
-    @property
+    def _prepcmd(self):
+
+        extn = os.path.splitext(self.kwargs['-bed'])[1]
+        output = self.kwargs['-bams'].replace('.bam', '.count' + extn)
+        self.redirect = '> {}'.format(output)
+        self.count_file = output
+
     def output(self):
-        return (self.kwargs['-o'],)
+        return (self.count_file,)

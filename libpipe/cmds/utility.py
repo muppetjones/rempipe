@@ -29,22 +29,22 @@ class FastqcCmd(BaseCmd):
 
     def output(self):
 
-        files = []
+        log.debug(self.args)
+        files = list(self.args)
         for f in self.args:
             file_base = os.path.splitext(f)[0] + '_fastqc'
+            try:
+                # update the path if '-o' was given
+                file_base = os.path.join(
+                    self.kwargs['-o'], os.path.basename(file_base))
+            except KeyError:
+                pass
             files.extend([
                 file_base + '.html',
                 file_base + '.zip',
             ])
 
-        # update the path if 'o' was given
-        try:
-            files = [
-                os.path.join(self.kwargs['-o'], os.path.basename(f))
-                for f in files
-            ]
-        except KeyError:
-            pass
+        log.debug(files)
 
         return files
 
@@ -101,7 +101,6 @@ class SamtoolsSortCmd(BaseCmd):
             t_kw = os.path.splitext(self.kwargs['-o'])[0] + '.tmp'
             self.kwargs['-T'] = t_kw
 
-    @property
     def output(self):
         return [self.kwargs['-o'], ]
 

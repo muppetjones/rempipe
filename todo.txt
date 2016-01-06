@@ -1,0 +1,9 @@
+### Wed, Jan. 6, 2016
+>   write module to parse software help output
+>   write module to create a new command from the help output
+    -   do NOT update cmd.__init__
+    -   new module: cmd.custom with import all init?
+>   allow default commands to be set for software types
+    -   e.g., set 'hisat' as default 'align' command
+>   allow specific command selection from command line
+    -   e.g., allow 'hisat' to be specified for 'align'

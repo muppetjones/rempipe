@@ -52,12 +52,19 @@ class BaseCmd(metaclass=ABCMeta):
                     linked fastq files would not be used at all.
                     See '__match_input' and '_check_type' for more details.
 
-    Class Methods:
-        _prepreq()   Use to setup any last minute details before
-                        requirements are checked, such as handling the
-                        results of linking.
-        _prepcmd()   Use to setup any last minute details before cmd
-                        is called, such as setting up redirect
+    Class Methods for override (in call order):
+        _prepreq()  Use to setup any last minute details before
+                    requirements are checked, such as handling the
+                    results of linking.
+                    NOTE: Call parent to ensure intended functionality.
+        _additional_requirements():
+                    Use to define additional requirements related
+                    to successful command execution. This should raise
+                    an exception if conditions are not met.
+                    NOTE: This method is not implemented in BaseCmd.
+        _prepcmd()  Use to setup any last minute details before cmd
+                    is called, such as setting up redirect.
+                    NOTE: This method is not implemented in BaseCmd.
 
     SEE ALSO:
         HelpCmd
@@ -95,14 +102,31 @@ class BaseCmd(metaclass=ABCMeta):
     #   Custom Exceptions
     #
 
-    class CmdLinkError(ValueError):
-        pass
+    class CmdLinkError(TypeError):
+        CMDLINKERROR = {
+            'input': 'Bad link: no input given or input not callable',
+            'mismatch': 'Bad link: unexpected input type',
+        }
+
+        def __init__(self, key, *args, **kwargs):
+            try:
+                super().__init__(self.CMDLINKERROR[key], *args, **kwargs)
+            except KeyError:
+                super().__init__(key, *args, **kwargs)
 
     class PositionalArgError(IndexError):
         pass
 
+    POSITIONALARGERROR = {
+        'missing': '{}: Missing {} of {} required positional parameters',
+    }
+
     class KeywordArgError(AttributeError):
         pass
+
+    KEYWORDARGERROR = {
+        'missing': '{}: Missing required keyword arguments: {}',
+    }
 
     class FileTypeError(TypeError):
         pass
@@ -223,10 +247,7 @@ class BaseCmd(metaclass=ABCMeta):
 
         # run requirements prep, if provided by child
         # -- use for ensuring the requirements are met
-        try:
-            self._prepreq()
-        except AttributeError:
-            pass  # may not be set on child class
+        self._prepreq()
 
         # ensure we can create the command as expected
         try:
@@ -238,6 +259,13 @@ class BaseCmd(metaclass=ABCMeta):
         ):
             log.error(self.help())
             raise
+
+        # additional requirements defined by the child class
+        # for the purpose of ensuring successful command execution
+        try:
+            self._additional_requirements()
+        except AttributeError:
+            pass  # ignore if it's not defined
 
         # run command prep, if provided by child
         # -- use to ensure all data is ready for the command
@@ -277,17 +305,17 @@ class BaseCmd(metaclass=ABCMeta):
         # Ensure we have valid, linked input
         try:
             args = self.input()
+            n_args = len(args)
         except AttributeError:
-            raise AttributeError('Attribute "input" is not set (no link)')
+            return None
+            # raise AttributeError('Attribute "input" is not set (no link)')
         except TypeError:
-            raise TypeError('Bad link: "input" is not callable')
-        else:
-            if not args:
-                raise AttributeError('No linked input found')
-            else:
-                n_args = len(args)
+            raise self.CmdLinkError('input')
+        # else:
+            # if n_args == 0:
+            #     raise self.CmdLinkError('no_input')
 
-        # match with required type
+            # match with required type
         for req_type in self.REQ_TYPE:
             try:
                 flag_list, type_list, match_any = req_type
@@ -305,6 +333,13 @@ class BaseCmd(metaclass=ABCMeta):
             # remove used
             args = [a for a in args if a not in filtered]
 
+        # if a positional argument was defined in REQ_TYPES,
+        # it is now stored in kwargs -- move it to args and clean kwargs
+        pos_kw = [k for k in self.kwargs.keys() if isinstance(k, int)]
+        self.args.extend([self.kwargs[pos] for pos in sorted(pos_kw)])
+        for pos in pos_kw:
+            del self.kwargs[pos]  # delete instead of dict comp
+
         # otherwise, use as required args IFF expected
         if len(self.args) < self.REQ_ARGS:
             n_still_required = self.REQ_ARGS - len(self.args)
@@ -313,7 +348,7 @@ class BaseCmd(metaclass=ABCMeta):
         # finally, if we haven't used ANY of the input, raise CmdLinkError
         else:
             if len(args) == n_args:
-                raise self.CmdLinkError('Unable to use linked input')
+                raise self.CmdLinkError('mismatch')
 
         return
 
@@ -379,17 +414,17 @@ class BaseCmd(metaclass=ABCMeta):
             raise  # > 1 XOR option given
         else:
             if missing:
-                msg = 'Missing required keyword arguments: {}'
-                raise self.KeywordArgError(msg.format(
-                    ', '.join(str(m) for m in missing)
-                ))
+                msg = self.KEYWORDARGERROR['missing'].format(
+                    self.name, ', '.join(str(m) for m in missing))
+                raise self.KeywordArgError(msg)
 
         # check for expected number of args
         if len(self.args) < self.REQ_ARGS:
-            msg = 'Missing {} of {} required positional parameters'
-            raise self.PositionalArgError(msg.format(
-                self.REQ_ARGS - len(self.args), self.REQ_KWARGS
-            ))
+            msg = self.POSITIONALARGERROR['missing'].format(
+                self.__class__.__name__,
+                self.REQ_ARGS - len(self.args), self.REQ_ARGS,
+            )
+            raise self.PositionalArgError(msg)
 
         # check for expected file types
         try:
@@ -455,18 +490,16 @@ class BaseCmd(metaclass=ABCMeta):
         simple = [kw for kw in self.REQ_KWARGS if isinstance(kw, str)]
         missing = [kw for kw in simple if kw not in self.kwargs]
 
-        # log.debug('in __check_kwargs: {} vs {}'.format(
-        #     self.REQ_KWARGS, self.kwargs))
-
         # compound requirement -- require all or none of args in the tuple
         compound = [kw for kw in self.REQ_KWARGS if kw not in simple]
         for cmpd in compound:
 
             # tuple indicates all or nothing
             if isinstance(cmpd, tuple):
-                # log.debug('{}: AND'.format(cmpd))
                 missed = [kw for kw in cmpd if kw not in self.kwargs]
-                missing.extend(missed)
+                # log.debug('{}: AND {}'.format(cmpd, missed))
+                if len(missed) != len(cmpd):  # remember, nothing is fine!
+                    missing.extend(missed)
 
             # a list indicates one and only one
             elif isinstance(cmpd, list):

@@ -75,14 +75,14 @@ class TestHistatCmd(unittest.TestCase):
         with self.assertRaises(AttributeError):
             hc.cmd()
 
-    def test_prepreq_raises_ValueError_if_linked_input_not_used(self):
+    def test_prepreq_raises_TypeError_if_linked_input_not_used(self):
         with patch.object(
                 HisatCmd, 'output', autospec=True, return_value=['seq.txt']):
             ohc = self.sample_cmd()
             ihc = self.sample_cmd()
             ohc.link(ihc)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             ihc._prepreq()
 
     def test_prepreq_sets_single_link_input_to_U_kwarg(self):
