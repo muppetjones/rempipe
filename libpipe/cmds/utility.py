@@ -28,8 +28,14 @@ class FastqcCmd(BaseCmd):
     REQ_ARGS = 1
 
     def output(self):
+        '''FastQC output
 
-        log.debug(self.args)
+        Returns:
+            A list containing: (1-n) The original fastq files given,
+            followed by ((n+2) * n) the html and zip file produced for
+            each given fastq file.
+        '''
+
         files = list(self.args)
         for f in self.args:
             file_base = os.path.splitext(f)[0] + '_fastqc'
@@ -43,8 +49,6 @@ class FastqcCmd(BaseCmd):
                 file_base + '.html',
                 file_base + '.zip',
             ])
-
-        log.debug(files)
 
         return files
 
