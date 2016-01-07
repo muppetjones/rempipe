@@ -31,6 +31,10 @@ class TestHistatCmd(unittest.TestCase):
         }
         return HisatCmd(**kw)
 
+    #
+    #   Test _prepcmd
+    #
+
     def test_prepcmd_sets_S_if_not_given(self):
         hc = self.sample_cmd()
         del hc.kwargs['-S']
@@ -68,12 +72,30 @@ class TestHistatCmd(unittest.TestCase):
         self.assertIn('--un', hc.kwargs)
         self.assertEqual(hc.kwargs['--un'], expected_file)
 
+    #
+    #   Test cmd
+    #
+
     def test_cmd_raises_AttributeError_if_only_one_ppe_given(self):
         hc = self.sample_cmd()
         hc.kwargs['-1'] = hc.kwargs['-U']
         del hc.kwargs['-U']
         with self.assertRaises(AttributeError):
             hc.cmd()
+
+    def test_addreq_raises_FileNotFoundError_if_n_idx_ne_expected(self):
+
+        with patch('remsci.lib.utility.path.walk_file') as m:
+            for i in [0, 100]:
+                with self.subTest(n_indx=i):
+                    m.return_value = [0] * i
+                    hc = self.sample_cmd()
+                    with self.assertRaises(FileNotFoundError):
+                        hc._additional_requirements()
+
+    #
+    #   Test _prepreq
+    #
 
     def test_prepreq_raises_TypeError_if_linked_input_not_used(self):
         with patch.object(
@@ -113,3 +135,7 @@ class TestHistatCmd(unittest.TestCase):
         ihc._prepreq()
 
         self.assertEqual(ihc.kwargs['-U'], 'upath/seq.fa')
+
+
+if __name__ == '__main__':
+    unittest.main()

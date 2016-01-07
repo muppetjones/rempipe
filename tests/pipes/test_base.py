@@ -112,7 +112,7 @@ class TestBasePipe(TestBasePipe_setup):
 
     def test_init_saves_a_timestamp_if_not_given(self):
         cmd = BasePipe()
-        self.assertRegexpMatches(cmd.timestamp, '\d{6}-\d{6}')
+        self.assertRegex(cmd.timestamp, '\d{6}-\d{6}')
 
     def test_init_defaults_job_name_to_None(self):
         cmd = BasePipe()

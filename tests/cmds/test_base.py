@@ -71,7 +71,7 @@ class TestBaseCmds(unittest.TestCase):
 
     def test_init_saves_a_timestamp_if_not_given(self):
         cmd = self.CMD()
-        self.assertRegexpMatches(cmd.timestamp, '\d{6}-\d{6}')
+        self.assertRegex(cmd.timestamp, '\d{6}-\d{6}')
 
     def test_init_raises_AttributeError_if_keyword_args_not_expanded(self):
         '''Test for common mistake of passing keyword dict directly'''
