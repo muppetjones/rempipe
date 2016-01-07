@@ -30,6 +30,10 @@ class TestBasePipe_IntegrationWith_BaseCmd(unittest.TestCase):
 
         class Cmd(BaseCmd):
 
+            ARGUMENTS = [
+                ('-foo', 'FILE', 'fill'),
+            ]
+
             INVOKE_STR = 'test cmd'
             REQ_TYPE = [
                 [('-foo', ), ('.txt', )]

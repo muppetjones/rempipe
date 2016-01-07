@@ -18,11 +18,11 @@ class FastqcCmd(BaseCmd):
     NAME = 'fastqc'
     INVOKE_STR = 'fastqc'
 
+    ARGUMENTS = [
+        (None, 'FILE', 'One or more FASTQ files'),
+        ('-o', 'DIR', 'Output directory'),
+    ]
     DEFAULTS = {}
-
-    attributes = {
-        '-o': "output directory",
-    }
 
     REQ_KWARGS = []
     REQ_ARGS = 1
@@ -36,6 +36,10 @@ class FastqcCmd(BaseCmd):
             each given fastq file.
         '''
 
+        out_extn = ['.html', ]
+        if '--extract' not in self.flags:
+            out_extn.append('.zip')
+
         files = list(self.args)
         for f in self.args:
             file_base = os.path.splitext(f)[0] + '_fastqc'
@@ -46,8 +50,7 @@ class FastqcCmd(BaseCmd):
             except KeyError:
                 pass
             files.extend([
-                file_base + '.html',
-                file_base + '.zip',
+                file_base + extn for extn in out_extn
             ])
 
         return files

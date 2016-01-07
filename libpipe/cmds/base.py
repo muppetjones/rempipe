@@ -103,14 +103,14 @@ class BaseCmd(metaclass=ABCMeta):
     #
 
     class CmdLinkError(TypeError):
-        CMDLINKERROR = {
+        ERRMSG = {
             'input': 'Bad link: no input given or input not callable',
             'mismatch': 'Bad link: unexpected input type',
         }
 
         def __init__(self, key, *args, **kwargs):
             try:
-                super().__init__(self.CMDLINKERROR[key], *args, **kwargs)
+                super().__init__(self.ERRMSG[key], *args, **kwargs)
             except KeyError:
                 super().__init__(key, *args, **kwargs)
 
@@ -122,11 +122,17 @@ class BaseCmd(metaclass=ABCMeta):
     }
 
     class KeywordArgError(AttributeError):
-        pass
+        ERRMSG = {
+            'missing': '{}: Missing required keyword arguments: {}',
+            'unknown': 'Unrecognized keyword argument given: "{}"',
+        }
 
-    KEYWORDARGERROR = {
-        'missing': '{}: Missing required keyword arguments: {}',
-    }
+        def __init__(self, key, *args, val=[], ** kwargs):
+            try:
+                super().__init__(
+                    self.ERRMSG[key].format(*val), *args, **kwargs)
+            except KeyError:
+                super().__init__(key, *args, **kwargs)
 
     class FileTypeError(TypeError):
         pass
@@ -135,20 +141,16 @@ class BaseCmd(metaclass=ABCMeta):
     #   Magic methods
     #
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, strict=True, timestamp=None, ** kwargs):
         '''Initialize command object
 
         Create a command object using given paramters.
         Flags, e.g., '-v', should be given as positional parameters.
         '''
 
-        # save a timestamp, if passed
-        try:
-            self.timestamp = kwargs['timestamp']
-            del kwargs['timestamp']
-        except KeyError:
-            self.timestamp = time.strftime("%y%m%d-%H%M%S")
-            # self.timestamp = None
+        # save a timestamp, given or generated
+        self.timestamp = (timestamp if timestamp
+                          else time.strftime("%y%m%d-%H%M%S"))
 
         # ensure the expected kwarg hyphens are in place
         # NOTE: Gives flags with len > 1 a double hyphen, e.g., '--',
@@ -170,6 +172,22 @@ class BaseCmd(metaclass=ABCMeta):
             msg = 'Make sure to expand keyword args, e.g., Cmd(**kwargs)'
             raise AttributeError(msg)
         args = [v for v in args if v not in flags]
+
+        if strict:
+            # check for unknown kwargs
+            # NOTE: We MUST have removed timestamp AND
+            #       ensured hyphens BEFORE this
+            try:
+                known_flags = [v[0] for v in self.ARGUMENTS if v[0]]
+            except TypeError:
+                raise NotImplementedError(
+                    'ARGUMENTS must be set on child class')
+            unknown_flags = [
+                k for k in flags + list(kwargs.keys())
+                if k not in known_flags
+            ]
+            if unknown_flags:
+                raise self.KeywordArgError('unknown', val=unknown_flags)
 
         # make sure we deep copy defaults and args
         self.redirect = None  # self.REDIRECT
@@ -414,9 +432,9 @@ class BaseCmd(metaclass=ABCMeta):
             raise  # > 1 XOR option given
         else:
             if missing:
-                msg = self.KEYWORDARGERROR['missing'].format(
-                    self.name, ', '.join(str(m) for m in missing))
-                raise self.KeywordArgError(msg)
+                raise self.KeywordArgError('missing', val=[
+                    self.name, ', '.join(str(m) for m in missing)
+                ])
 
         # check for expected number of args
         if len(self.args) < self.REQ_ARGS:

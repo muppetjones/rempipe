@@ -21,6 +21,7 @@ class CmdSample(BaseCmd):
         ('-f', 'FILE', 'Better to be explicit'),
         ('-o', 'FILE', 'Output file'),
         ('-n', 'INT', 'A number'),
+        ('--foo', 'FILE', 'verbose arg'),
         ('v', None, 'A random flag'),
     ]
 
@@ -52,6 +53,15 @@ class TestBaseCmds(unittest.TestCase):
     #   Initialization tests
     #
 
+    def test_init_raises_NotImplementedError_if_ARGUMENTS_not_set(self):
+        '''ID10T error'''
+
+        class Id10tCmd(BaseCmd):
+            pass
+
+        with self.assertRaisesRegex(NotImplementedError, 'ARGUMENTS'):
+            Id10tCmd()
+
     def test_init_sets_defaults(self):
         cmd = self.CMD()
 
@@ -81,27 +91,32 @@ class TestBaseCmds(unittest.TestCase):
             self.CMD(kw)
 
     def test_init_raises_AttributeError_if_unrecognized_kwargs_given(self):
-        self.fail()
+        kw = {'-p': 'unknown kwarg'}
+        with self.assertRaises(AttributeError):
+            self.CMD(**kw)
 
+    @unittest.skip('Need to upgrade positional arg handling first')
     def test_init_raises_IndexError_if_too_many_args_given(self):
-        self.fail()
+        with self.assertRaises(IndexError):
+            self.CMD('file.txt')
 
     def test_init_raises_ArgumentError_if_unrecognized_flag_given(self):
-        self.fail()
+        with self.assertRaises(AttributeError):
+            self.CMD('--bar')
 
-    def test_init_sets_unrecognized_arguments_if_open_eq_True(self):
-        self.fail()
+    def test_init_sets_unrecognized_kwarg_if_strict_eq_False(self):
+        kw = {'--unknown_flag': 'haha'}
+        cmd = self.CMD(strict=False, **kw)  # should not raise
 
     def test_init_adds_hyphens_to_kwargs_if_omitted_during(self):
 
-        kwargs = {'f': 'req_kwarg', 'n': 8, 'a': 'foo'}
+        kwargs = {'f': 'req_kwarg', 'n': 8}
         cmd = self.CMD(**kwargs)
 
         kwargs = {'-' + k: v for k, v in kwargs.items()}
         self.assertDictEqual(kwargs, cmd.kwargs)
 
     def test_init_adds_double_hyphens_to_str_kwargs_if_omitted(self):
-
         kwargs = {'f': 'req_kwarg', 'foo': 'bar'}
         cmd = self.CMD(**kwargs)
 
@@ -361,10 +376,10 @@ class TestBaseCmds(unittest.TestCase):
         with self.assertRaises(AttributeError):
             cmd.cmd()
 
-    def test_cmd_reqAND_does_not_raise_if_none_of_group_are_given(self):
+    def test_cmd_reqAND_does_not_raise_if_non_members_are_given(self):
         self.CMD.REQ_KWARGS = [('-f', '-o', '-n')]  # req all three
         self.CMD.DEFAULTS = {}
-        kw = {'-x': 'something different'}
+        kw = {'--foo': 'something different'}
 
         cmd = self.CMD(**kw)  # should not raise
         cmd.cmd()  # should NOT raise!!
@@ -382,7 +397,7 @@ class TestBaseCmds(unittest.TestCase):
         self.CMD.REQ_KWARGS = [['-f', '-o', '-n']]
         self.CMD.DEFAULTS = {}
 
-        cmd = self.CMD(**{'-h': 1})
+        cmd = self.CMD(**{'--foo': 1})
         with self.assertRaises(AttributeError):
             cmd.cmd()
 
