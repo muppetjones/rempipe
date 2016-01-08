@@ -127,16 +127,22 @@ class TestBasePipe(TestBasePipe_setup):
     #   Do / Force run checks
     #
 
+    def test_do_run_calls_has_output_cmd(self):
+        self.mock_cmd._has_output = Mock(return_value=True)
+        bp = BasePipe()
+        bp._do_run(self.mock_cmd)
+
+        self.mock_cmd._has_output.assert_called_once_with()
+
     def test_do_run_returns_false_if_cmd_output_exists(self):
         self.mock_cmd._has_output = Mock(return_value=True)
         bp = BasePipe()
         self.assertFalse(bp._do_run(self.mock_cmd))
 
     def test_do_run_returns_true_if_cmd_output_does_not_exist(self):
-        self.mock_cmd = Mock()
-        with patch.object(BasePipe, '_has_output', return_value=False):
-            bp = BasePipe()
-            self.assertTrue(bp._do_run(self.mock_cmd), 'Will not run cmd')
+        self.mock_cmd._has_output = Mock(return_value=False)
+        bp = BasePipe()
+        self.assertTrue(bp._do_run(self.mock_cmd), 'Will not run cmd')
 
     def test_do_run_returns_true_if_force_is_true_even_if_no_output(self):
         self.mock_cmd._has_output = Mock(return_value=True)
@@ -195,13 +201,139 @@ class TestBasePipe(TestBasePipe_setup):
         self.assertEqual(bp.timestamp, a.timestamp)
         self.assertEqual(bp.timestamp, b.timestamp)
 
-    #
-    #   Write tests
-    #
+
+class TestBasePipe_CmdInterface(TestBasePipe_setup):
+
+    '''Test BasePipe Cmd Interface for usage within another pipe'''
+
+    class CmdPipe(BasePipe):
+
+        NAME = 'cmdpipe'
+
+    def setUp(self):
+        super().setUp()
+
+        a = self.mock_cmd()
+        b = self.mock_cmd()
+        cmd = BasePipe()
+        cmd.add(a, b)
+
+        self.cmd = cmd
+
+    def sample_pipe(self):
+        a = self.mock_cmd()
+        b = self.mock_cmd()
+        pipe = BasePipe()
+        pipe.add(a, b)
+        return pipe
+
+    def test_pipe_may_be_used_as_command(self):
+        a = self.mock_cmd()
+        b = self.mock_cmd()
+        subpipe = BasePipe()
+        subpipe.add(a, b)
+
+        pipe = BasePipe()
+        pipe.add(a, subpipe)  # should not raise
+
+    def test_subpipe_should_return_expected_output(self):
+        a = Mock(output=lambda: list('abc'))
+        b = Mock(output=lambda: list('def'))
+        c = Mock(output=lambda: list('beg'))
+
+        subpipe = BasePipe()
+        subpipe.add(a, b)
+
+        pipe = BasePipe()
+        pipe.add(c, subpipe)  # should not raise
+
+        self.assertEqual(pipe.output(), subpipe.output())
+
+    def test_subpipe_input_set_as_expected(self):
+        a = Mock(output=lambda: list('abc'))
+        b = Mock(output=lambda: list('def'))
+        c = Mock(output=lambda: list('beg'))
+
+        def ugh(x):
+            x.input = c.output
+        c.link = Mock(side_effect=ugh)
+
+        subpipe = BasePipe()
+        subpipe.add(a, b)
+
+        pipe = BasePipe()
+        pipe.add(c, subpipe)  # should not raise
+
+        c.link.assert_called_once_with(subpipe)
+        self.assertEqual(subpipe.input(), c.output())
 
     #
-    #   Run tests
+    #   Output tests
     #
+
+    def test_output_returns_output_list_from_last_command(self):
+        cmd = self.mock_cmd()
+        cmd.output = lambda: list('abc')
+
+        pipe = self.sample_pipe()
+        pipe.add(cmd)
+
+        self.assertEqual(pipe.output(), cmd.output())
+
+    def test_output_returns_unique_combined_list_from_all_if_passed_true(self):
+
+        pipe = BasePipe()
+
+        a = Mock(output=lambda: list('abc'))
+        b = Mock(output=lambda: list('def'))
+        c = Mock(output=lambda: list('beg'))
+
+        pipe.add(a, b, c)
+
+        self.assertEqual(pipe.output(from_all=True), list('abcdefg'))
+
+    #
+    #   Link tests
+    #
+
+    def test_link_sets_dest_input_to_src_output(self):
+        a = self.sample_pipe()
+        b = self.sample_pipe()
+        a.link(b)
+
+        self.assertEqual(a.output, b.input)
+
+    def test_link_returns_dest_object(self):
+        a = self.sample_pipe()
+        b = self.sample_pipe()
+        c = a.link(b)
+
+        self.assertNotEqual(a, b)
+        self.assertNotEqual(a, c)
+        self.assertEqual(b, c)
+
+    def test_link_chaining(self):
+        a = self.sample_pipe()
+        b = self.sample_pipe()
+        c = self.sample_pipe()
+        d = a.link(b).link(c)
+
+        self.assertEqual(b.output, c.input)
+        self.assertEqual(d, c)
+
+    #
+    #   Command tests
+    #
+
+    def test_cmd_passes_all_execptions_from_self_cmds(self):
+        pipe = self.sample_pipe()
+        pipe.cmds[-1].cmd.side_effect = TabError('catch me')
+
+        with self.assertRaises(TabError):
+            pipe.cmd()
+
+    def test_cmd_returns_string_of_all_cmds(self):
+        self.fail()
 
 
 class TestBasePipe_Write(TestBasePipe_setup):

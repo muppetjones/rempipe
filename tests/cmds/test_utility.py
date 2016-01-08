@@ -54,3 +54,24 @@ class TestFastqcCmd(unittest.TestCase):
         # REMEMBER: fastqc adds it's own name!
         output = [o for o in cmd.output() if o.endswith('.zip')]
         self.assertEqual(output, [])
+
+    def test_output_noninput_items_use_input_directory(self):
+        args = ['~/tmp/' + v + '.fq' for v in list('abcd')]
+        cmd = FastqcCmd(*args)
+        output_html = [o for o in cmd.output() if o.endswith('.html')]
+
+        self.assertEqual(
+            [os.path.dirname(o) for o in output_html],
+            ['~/tmp'] * len(args)
+        )
+
+    def test_output_noninput_items_use_o_flag_directory_when_given(self):
+        args = ['~/tmp/' + v + '.fq' for v in list('abcd')]
+        kwargs = {'-o': '~/work'}
+        cmd = FastqcCmd(*args, **kwargs)
+        output_html = [o for o in cmd.output() if o.endswith('.html')]
+
+        self.assertEqual(
+            [os.path.dirname(o) for o in output_html],
+            [kwargs['-o']] * len(args)
+        )

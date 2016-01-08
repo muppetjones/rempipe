@@ -32,6 +32,9 @@ class CmdSample(BaseCmd):
     REQ_KWARGS = []  # ['-f']
     REQ_ARGS = 0
 
+    def output(self):
+        return ['file.txt']
+
 
 class TestBaseCmds(unittest.TestCase):
 
@@ -106,7 +109,7 @@ class TestBaseCmds(unittest.TestCase):
 
     def test_init_sets_unrecognized_kwarg_if_strict_eq_False(self):
         kw = {'--unknown_flag': 'haha'}
-        cmd = self.CMD(strict=False, **kw)  # should not raise
+        self.CMD(strict=False, **kw)  # should not raise
 
     def test_init_adds_hyphens_to_kwargs_if_omitted_during(self):
 
@@ -145,6 +148,16 @@ class TestBaseCmds(unittest.TestCase):
     #
     #   Misc
     #
+
+    def test_has_output_returns_True_if_output_file_exists(self):
+        with patch('os.path.isfile', return_value=True):
+            cmd = self.sample()
+            self.assertTrue(cmd._has_output())
+
+    def test_has_output_returns_False_if_output_file_does_not_exist(self):
+        with patch('os.path.isfile', return_value=False):
+            cmd = self.sample()
+            self.assertFalse(cmd._has_output())
 
     def test_trubase_returns_path_wo_dir_or_extn(self):
 
@@ -253,7 +266,7 @@ class TestBaseCmds(unittest.TestCase):
     def test_cmd_raises_TypeError_if_req_not_fulfiled_by_link(self):
         self.CMD.REQ_KWARGS = ['-f']
         self.CMD.REQ_TYPE = [
-            [('-f', ), ('.txt', )],
+            [('-f', ), ('.csv', )],
         ]
 
         a = self.CMD()
@@ -263,19 +276,18 @@ class TestBaseCmds(unittest.TestCase):
         with self.assertRaises(TypeError):
             b.cmd()
 
-    def test_cmd_raises_TypeError_if_unable_to_use_linked_input(self):
-        self.CMD.REQ_KWARGS = ['-f']
-        self.CMD.REQ_TYPE = [
-            [('-f', ), ('.txt', )],
-        ]
-
-        a = self.CMD()
-        a.output = lambda: ['file.csv']
-        b = self.CMD()
-        a.link(b)
-
-        with self.assertRaises(TypeError):
-            b.cmd()
+    # def test_cmd_raises_TypeError_if_unable_to_use_linked_input(self):
+    #     self.CMD.REQ_KWARGS = ['-f']
+    #     self.CMD.REQ_TYPE = [
+    #         [('-f', ), ('.csv', )],
+    #     ]
+    #
+    #     a = self.CMD()
+    #     b = self.CMD()
+    #     a.link(b)
+    #
+    #     with self.assertRaises(TypeError):
+    #         b.cmd()
 
     def test_cmd_raises_TypeError_if_linked_input_unused_w_exact_match(self):
         self.CMD.REQ_KWARGS = ['-1']
@@ -284,7 +296,6 @@ class TestBaseCmds(unittest.TestCase):
         ]
 
         a = self.CMD()
-        a.output = lambda: ['file.txt']
         b = self.CMD()
         a.link(b)
 
@@ -298,7 +309,6 @@ class TestBaseCmds(unittest.TestCase):
         ]
 
         a = self.CMD()
-        a.output = lambda: ['file.txt']
         b = self.CMD()
         a.link(b)
 
@@ -306,18 +316,11 @@ class TestBaseCmds(unittest.TestCase):
         self.assertEqual(b.kwargs['-U'], a.output()[0])
 
     def test_cmd_raises_TypeError_if_input_not_callable(self):
-        self.CMD.REQ_KWARGS = ['-1']
-        self.CMD.REQ_TYPE = [
-            [('-1', '-2'), ('.txt', ), False],
-        ]
-
         a = self.CMD()
-        a.output = ['file.txt']
-        b = self.CMD()
-        a.link(b)
+        a.input = ['file.txt']
 
         with self.assertRaises(TypeError):
-            b.cmd()
+            a.cmd()
 
     def test_cmd_sets_linked_input_to_pos_arg_if_req(self):
         self.CMD.REQ_ARGS = 1

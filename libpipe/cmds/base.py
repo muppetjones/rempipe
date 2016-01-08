@@ -52,6 +52,20 @@ class BaseCmd(metaclass=ABCMeta):
                     linked fastq files would not be used at all.
                     See '__match_input' and '_check_type' for more details.
 
+    Public Methods:
+        input()     Set after linking to another command. References
+                    the linked command's output method.
+        output()    Return a list of output files.
+        link(CMD)   Link two commands: Set the input of CMD to this object's
+                    output method.
+                    Return the linked command to enable chaining.
+        cmd()       Return the BASH-style command string.
+                    All requirement checking is done here. If linked, the
+                    input method is used to update defined arguments.
+        help()      Returns a usage message. Uses class attributes NAME,
+                    INVOKE_STR, ARGUMENTS, SYNOPSIS, and DESCRIPTION.
+
+
     Class Methods for override (in call order):
         _prepreq()  Use to setup any last minute details before
                     requirements are checked, such as handling the
@@ -295,6 +309,40 @@ class BaseCmd(metaclass=ABCMeta):
 
         return self._cmd(*args, **kwargs)
 
+    def help(self):
+        '''Return usage text
+
+        NOTE: Creates the HelpCmd object iff not found
+        '''
+
+        if self.HELP is None:
+            try:
+                self.HELP_DICT['arguments'] = self.ARGUMENTS
+            except AttributeError:
+                pass  # alias
+            self.HELP_DICT['name'] = self.NAME
+            self.HELP = HelpCmd(**self.HELP_DICT)
+        return str(self.HELP)
+
+    #
+    #   "Private" access
+    #
+
+    def _has_output(self):
+        '''Checks for expected output from a command
+
+        Arguments:
+            cmd     Command object.
+        Returns:
+            True if ALL output is found.
+            False otherwise
+        '''
+
+        for f in self.output():
+            if not os.path.isfile(f):
+                return False
+        return True
+
     def _prepreq(self):
         try:
             self.__match_input()
@@ -394,25 +442,6 @@ class BaseCmd(metaclass=ABCMeta):
         cmd_parts = filter(  # remove missing elements
             None, [self.invoke_str, flags, kwargs, args, self.redirect])
         return sep.join(cmd_parts)
-
-    def help(self):
-        '''Return usage text
-
-        NOTE: Creates the HelpCmd object iff not found
-        '''
-
-        if self.HELP is None:
-            try:
-                self.HELP_DICT['arguments'] = self.ARGUMENTS
-            except AttributeError:
-                pass  # alias
-            self.HELP_DICT['name'] = self.NAME
-            self.HELP = HelpCmd(**self.HELP_DICT)
-        return str(self.HELP)
-
-    #
-    #   "Private" access
-    #
 
     def __check_requirements(self):
         '''Ensure all argument requirements are fulfilled

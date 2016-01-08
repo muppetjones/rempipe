@@ -4,6 +4,7 @@ import os.path
 import stat
 import subprocess
 import time
+from itertools import chain
 
 from remsci.lib.utility import path
 from remsci.lib.decorators import file_or_handle
@@ -19,6 +20,12 @@ DO_RUN = False
 
 
 class BasePipe(object):
+
+    '''Define a group of commands.
+
+    Should interface JUST like a command.
+
+    '''
 
     _PBS_TEMPLATE = None
 
@@ -101,11 +108,41 @@ class BasePipe(object):
         return self
 
     #
+    #   Command Interface
+    #
+
+    def output(self, from_all=False):
+        if not from_all:
+            return self.cmds[-1].output()
+        else:
+            olist_nonuniq = chain.from_iterable(
+                cmd.output() for cmd in self.cmds)
+            olist_uniq = []
+            for output in olist_nonuniq:
+                if output not in olist_uniq:
+                    olist_uniq.append(output)
+            return olist_uniq
+
+    def link(self, cmd):
+        cmd.input = self.output
+        return cmd
+
+    def cmd(self):
+        try:
+            return self._get_cmd_str()
+        except:
+            raise
+
+    def _has_output(self):
+        '''Match BaseCmd Interface -- always return False'''
+        return False
+
+    #
     #   Script Handling
     #
 
     def _do_run(self, cmd):
-        return False if self._has_output(cmd) else True
+        return False if cmd._has_output() else True
 
     def write_script(self, directory=''):
 
@@ -133,19 +170,27 @@ class BasePipe(object):
 
     @file_or_handle(mode='w')
     def _write_commands(self, fh):
+        fh.write(self._get_cmd_str())
+        return
+
+    def _get_cmd_str(self):
         # static text
         omit_msg = '# Output found. Skip.\n# '
         comment_str = 'echo "Running {}..."\n'
 
+        cmd_list = []
         for i, cmd in enumerate(self.cmds):
-            cmd_str = str(cmd)
+            try:
+                cmd_str = cmd.cmd()  # str(cmd)  # must call directly!!
+            except:
+                raise
             if self._do_run(cmd):
                 prefix = comment_str.format(cmd.name)
             else:
                 prefix = omit_msg
                 cmd_str = cmd_str.replace('\n', '\n#')
-            fh.write('{}{}\n\n'.format(prefix, cmd_str))
-        return
+            cmd_list.append(prefix + cmd_str)
+        return '\n\n'.join(cmd_list)
 
     def __load_template(self):
         if not self.pbs_template:
@@ -273,17 +318,18 @@ class BasePipe(object):
             os.unlink(link_name)
         os.symlink(src_file, link_name)
 
-    def _has_output(self, cmd):
-        '''Checks for expected output from a command
 
-        Arguments:
-            cmd     Command object.
-        Returns:
-            True if ALL output is found.
-            False otherwise
-        '''
+class MiniPipe(object):
 
-        for f in cmd.output():
-            if not os.path.isfile(f):
-                return False
-        return True
+    '''A sub-group of commands meant to be used together in a pipeline.
+
+    Define a group of commands that should be run together.
+    Intended for repetative processes, such as align, sort, count.
+    The interface should allow it to act like a command and a pipe.
+
+    Command-like methods:
+        Should behave like a command, acting as an adapter to the first
+        output: Should return a list of output files from its last command.
+        link: Exactly like BaseCmd.link, except the input is used for the
+
+    '''
