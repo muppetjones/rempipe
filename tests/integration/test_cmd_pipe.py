@@ -78,5 +78,5 @@ class TestBasePipe_IntegrationWith_BaseCmd(unittest.TestCase):
         bp.add(a, b)
 
         a.kwargs['-foo'] = 'hehe.txt'
-        self.assertEqual(b.cmd(readable=False), '{} {} {}'.format(
+        self.assertEqual(b.cmd(verbose=False), '{} {} {}'.format(
             self.CMD.INVOKE_STR, '-foo', 'hehe.txt'))

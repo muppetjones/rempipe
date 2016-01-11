@@ -274,7 +274,7 @@ class BaseCmd(metaclass=ABCMeta):
         cmd.input = self.output
         return cmd
 
-    def cmd(self, *args, **kwargs):
+    def cmd(self, *args,  **kwargs):
         '''Run command preprocessing and return command'''
 
         # run requirements prep, if provided by child
@@ -418,7 +418,7 @@ class BaseCmd(metaclass=ABCMeta):
 
         return
 
-    def _cmd(self, readable=True):
+    def _cmd(self, verbose=True):
         '''Create BASH executable string.
 
         Arguments:
@@ -430,7 +430,7 @@ class BaseCmd(metaclass=ABCMeta):
         '''
 
         # put the command on separate lines for human readable version
-        sep = ' \\\n  ' if readable else ' '
+        sep = ' \\\n  ' if verbose else ' '
 
         # make strings from given parameters
         flags = ' '.join(self.flags)  # flags don't need to be separated

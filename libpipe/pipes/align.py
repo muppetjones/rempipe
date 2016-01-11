@@ -1,17 +1,83 @@
 
 import os
 
-from libpipe.pipes.base import BasePipe
+from libpipe.pipes.base import BasePipe, PresetPipe
+from libpipe.pipes.qc import TrimPipe
 from libpipe.cmds import (
-    SkewerCmd, Hisat2Cmd, FastqcCmd,
+    Hisat2Cmd,
     SamtoolsSortCmd, SamtoolsIndexCmd, BedtoolsMulticovCmd,
 )
+
 
 import logging
 log = logging.getLogger(__name__)
 
 
-class GenomicsPipe(BasePipe):
+class _AlignPipe(PresetPipe):
+
+    '''Execute a basic RNA-Seq pipeline from alignment to counting reads
+
+    NOTE: This pipe is intended for use as a subpipe.
+
+    Pipeline:
+        1. Hisat  (skewered reads, genome)
+        2. Samtools sort (aligned SAM file)
+        3. Samtools index (sorted BAM file)
+        4. Bedtools multicov (sorted BAM file, genome)
+    '''
+
+    def _setup(self, input_list=[], genome='', odir=''):
+        if not isinstance(genome, str):
+            msg = '{} only accepts a single genome. {}'.format(
+                self.__class__.__name__,
+                'Use "NestedGenomicsPipe" for multiple'
+            )
+            raise TypeError(msg)
+
+        # Step 1 -- align trimmed reads
+        # > input: link from previous (fastq)
+        # > output: sam files to given directory
+        args = []
+        kwargs = {'-x': genome, '-p': os.cpu_count() - 1}
+        if kwargs['-p'] is None:
+            del kwargs['-p']
+        hisat = Hisat2Cmd(*args, **kwargs)
+
+        # Standalone usage (vs. linked)
+        if input_list:
+            hisat.input = lambda: list(input_list)
+
+        # Step 2 -- sort sam file
+        # > input: link from previous (sam)
+        # > output: bam files to given directory
+        args = []
+        kwargs = {}
+        st_sort = SamtoolsSortCmd(*args, **kwargs)
+
+        # Step 3 -- index bam file
+        # > input: link from previous (bam)
+        # > output: bam index files to given directory
+        args = []
+        kwargs = {}
+        st_index = SamtoolsIndexCmd(*args, **kwargs)
+
+        # Step 4 -- count index
+        # > input: link from previous (bam)
+        # > output: bam index files to given directory
+        args = []
+        kwargs = {'-bed': genome}
+        bt_multicov = BedtoolsMulticovCmd(*args, **kwargs)
+
+        self.add(
+            hisat,
+            st_sort, st_index,
+            bt_multicov,
+        )
+
+        return
+
+
+class AlignPipe(BasePipe):
 
     '''Execute a basic RNA-Seq pipeline from sequencing to counting reads
 
@@ -25,83 +91,8 @@ class GenomicsPipe(BasePipe):
         7. Bedtools multicov (sorted BAM file, genome)
     '''
 
-    def __init__(self, *args, input_list=[], genome='', odir='', **kwargs):
-        super().__init__(*args, **kwargs)
 
-        try:
-            self._setup(input_list=input_list, genome=genome, odir=odir)
-        except TypeError:
-            raise
-
-    def _setup(self, input_list, genome, odir):
-        if not isinstance(genome, str):
-            msg = '{} only accepts a single genome. {}'.format(
-                self.__class__.__name__,
-                'Use "NestedGenomicsPipe" for multiple'
-            )
-            raise TypeError(msg)
-
-        # Step 1 -- assess quality
-        # > input: given files
-        # > output: to given directory
-        args = input_list
-        kwargs = {'-o': odir}
-        fastqc_raw = FastqcCmd(*args, **kwargs)
-
-        # Step 2 -- trim reads
-        # > input: link from previous (fastq)
-        # > output: trimmed read files
-        args = []
-        kwargs = {'-o': os.path.join(odir, self.job_name)}
-        skewer = SkewerCmd(*args, **kwargs)
-
-        # Step 3 -- assess quality after trim
-        # > input: link from previous (fastq)
-        # > output: to given directory
-        args = []
-        kwargs = {'-o': odir}
-        fastqc_trim = FastqcCmd(*args, **kwargs)
-
-        # Step 4 -- align trimmed reads
-        # > input: link from previous (fastq)
-        # > output: sam files to given directory
-        args = []
-        kwargs = {'-x': genome, '-p': os.cpu_count() - 1}
-        if kwargs['-p'] is None:
-            del kwargs['-p']
-        hisat = Hisat2Cmd(*args, **kwargs)
-
-        # Step 5 -- sort sam file
-        # > input: link from previous (sam)
-        # > output: bam files to given directory
-        args = []
-        kwargs = {}
-        st_sort = SamtoolsSortCmd(*args, **kwargs)
-
-        # Step 6 -- index bam file
-        # > input: link from previous (bam)
-        # > output: bam index files to given directory
-        args = []
-        kwargs = {}
-        st_index = SamtoolsIndexCmd(*args, **kwargs)
-
-        # Step 7 -- count index
-        # > input: link from previous (bam)
-        # > output: bam index files to given directory
-        args = []
-        kwargs = {'-bed': genome}
-        bt_multicov = BedtoolsMulticovCmd(*args, **kwargs)
-
-        self.add(
-            fastqc_raw, skewer, fastqc_trim,
-            hisat, st_sort, st_index,
-            bt_multicov,
-        )
-
-        return
-
-
-class NestedGenomicsPipe(GenomicsPipe):
+class NestedAlignPipe(AlignPipe):
 
     '''Execute a basic RNA-Seq genomics pipeline with multiple genomes
 

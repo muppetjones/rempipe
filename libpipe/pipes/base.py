@@ -1,4 +1,4 @@
-
+import abc
 import os
 import os.path
 import stat
@@ -9,7 +9,9 @@ from itertools import chain
 from remsci.lib.utility import path
 from remsci.lib.decorators import file_or_handle
 
+
 import libpipe.templates
+from libpipe.utility.exceptions import RempipeExceptionMeta
 
 import logging
 log = logging.getLogger(__name__)
@@ -36,11 +38,29 @@ class BasePipe(object):
     class QueueSubmissionError(FileNotFoundError):
         pass
 
+    class GenericPipeError(ValueError):
+        ERRMSG = {
+            'job_name': 'Pipe requires a job_name',
+        }
+
+        def __init__(self, key, *args, **kwargs):
+            try:
+                super().__init__(self.ERRMSG[key], *args, **kwargs)
+            except KeyError:
+                super().__init__(key, *args, **kwargs)
+
     #
     #   Magic methods
     #
 
-    def __init__(self, force=False, template_path=None, **kwargs):
+    def __init__(
+        self, *args,
+        force=False,
+        job_name=None,
+        template_path=None,
+        timestamp=None,
+        **kwargs
+    ):
 
         # replace do_run with dummy function
         if force:
@@ -55,17 +75,16 @@ class BasePipe(object):
         self.pbs_template = None
 
         # save a timestamp, if passed
-        try:
-            self.timestamp = kwargs['timestamp']
-            del kwargs['timestamp']
-        except KeyError:
+        if timestamp:
+            self.timestamp = timestamp
+        else:
             self.timestamp = time.strftime("%y%m%d-%H%M%S")
 
-        try:
-            self.job_name = kwargs['job_name']
-            del kwargs['job_name']
-        except KeyError:
-            self.job_name = None
+        if job_name:
+            self.job_name = job_name
+        else:
+            # raise self.GenericPipeError('job_name')
+            self.job_name = self.__class__.__name__
 
         # initialize commands
         self.cmds = []
@@ -81,6 +100,13 @@ class BasePipe(object):
             return qid
         except OSError:
             return None
+
+    @property
+    def name(self):
+        try:
+            return self.NAME
+        except AttributeError:
+            return self.__class__.__name__
 
     def _create_pbs_file_name(self, dir_str):
 
@@ -127,9 +153,9 @@ class BasePipe(object):
         cmd.input = self.output
         return cmd
 
-    def cmd(self):
+    def cmd(self, verbose=True):
         try:
-            return self._get_cmd_str()
+            return self._get_cmd_str(verbose=verbose)
         except:
             raise
 
@@ -173,15 +199,19 @@ class BasePipe(object):
         fh.write(self._get_cmd_str())
         return
 
-    def _get_cmd_str(self):
+    def _get_cmd_str(self, verbose=True):
         # static text
-        omit_msg = '# Output found. Skip.\n# '
-        comment_str = 'echo "Running {}..."\n'
+        if verbose:
+            omit_msg = '# Output found. Skip.\n# '
+            comment_str = 'echo "Running {}..."\n'
+        else:
+            omit_msg = '# '
+            comment_str = ''
 
         cmd_list = []
         for i, cmd in enumerate(self.cmds):
             try:
-                cmd_str = cmd.cmd()  # str(cmd)  # must call directly!!
+                cmd_str = cmd.cmd(verbose=verbose)  # must call directly!!
             except:
                 raise
             if self._do_run(cmd):
@@ -319,17 +349,25 @@ class BasePipe(object):
         os.symlink(src_file, link_name)
 
 
-class MiniPipe(object):
+class PresetPipe(BasePipe):
 
-    '''A sub-group of commands meant to be used together in a pipeline.
+    '''A pipe object that defines the interface for creating a preset pipe
 
     Define a group of commands that should be run together.
     Intended for repetative processes, such as align, sort, count.
     The interface should allow it to act like a command and a pipe.
-
-    Command-like methods:
-        Should behave like a command, acting as an adapter to the first
-        output: Should return a list of output files from its last command.
-        link: Exactly like BaseCmd.link, except the input is used for the
-
     '''
+
+    __metaclass__ = abc.ABCMeta
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        try:
+            self._setup(*args, **kwargs)
+        except:
+            raise
+
+    @abc.abstractmethod
+    def _setup(self, *args, **kwargs):
+        pass

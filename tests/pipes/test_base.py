@@ -2,6 +2,7 @@
 import os.path
 import builtins
 import sys
+from textwrap import dedent
 sys.path.append("remsci/")
 
 import unittest
@@ -114,14 +115,26 @@ class TestBasePipe(TestBasePipe_setup):
         cmd = BasePipe()
         self.assertRegex(cmd.timestamp, '\d{6}-\d{6}')
 
-    def test_init_defaults_job_name_to_None(self):
-        cmd = BasePipe()
-        self.assertIsNone(cmd.job_name)
-
     def test_init_saves_job_name(self):
         job_name = 'foo'
         cmd = BasePipe(job_name=job_name)
         self.assertEqual(cmd.job_name, job_name)
+
+    def test_init_defaults_job_name_to_PipeName(self):
+        class MehPipe(BasePipe):
+            pass
+        cmd = MehPipe()
+        self.assertEqual(cmd.job_name, 'MehPipe')
+
+    @unittest.skip('alternate test...probably delete')
+    def test_init_defaults_job_name_to_None(self):
+        cmd = BasePipe()
+        self.assertIsNone(cmd.job_name)
+
+    @unittest.skip('alternate test...probably delete')
+    def test_init_raises_ValueError_if_job_name_not_given(self):
+        with self.assertRaises(ValueError):
+            BasePipe()
 
     #
     #   Do / Force run checks
@@ -333,7 +346,24 @@ class TestBasePipe_CmdInterface(TestBasePipe_setup):
             pipe.cmd()
 
     def test_cmd_returns_string_of_all_cmds(self):
-        self.fail()
+        subpipe = BasePipe()
+        a = Mock(cmd=lambda verbose: 'test -a foo', _has_output=lambda: False)
+        b = Mock(cmd=lambda verbose: 'test -b bar', _has_output=lambda: False)
+        c = Mock(cmd=lambda verbose: 'test --foo', _has_output=lambda: False)
+        d = Mock(cmd=lambda verbose: 'test --bar', _has_output=lambda: False)
+        subpipe.add(b, c)
+        pipe = BasePipe()
+        pipe.add(a, subpipe, d)
+
+        self.assertEqual(
+            pipe.cmd(verbose=False),
+            '\n\n'.join([
+                'test -a foo',
+                'test -b bar',
+                'test --foo',
+                'test --bar',
+            ])
+        )
 
 
 class TestBasePipe_Write(TestBasePipe_setup):

@@ -183,7 +183,7 @@ class TestBaseCmds(unittest.TestCase):
         ]))
 
         self.assertEqual(
-            cmd.cmd(readable=False).rstrip(), expected_cmd.rstrip())
+            cmd.cmd(verbose=False).rstrip(), expected_cmd.rstrip())
 
     #
     #   Help tests
