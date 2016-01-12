@@ -150,7 +150,7 @@ class HisatCmd(BaseCmd):
 
         # set log file name
         self.id = '_'.join(
-            [run_name, genome_name, self.timestamp, self.name])
+            [run_name, self.timestamp, self.name])
         log_path = os.path.join(out_dir, self.id + '.log')
 
         # setup stdout redirect
