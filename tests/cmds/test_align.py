@@ -67,7 +67,7 @@ class TestHistatCmd(unittest.TestCase):
         hc = self.sample_cmd()
         hc._prepcmd()
 
-        expected_file = os.path.splitext(hc.kwargs['-S'])[0] + '.unal.fastq'
+        expected_file = os.path.splitext(hc.kwargs['-S'])[0] + '_unal.fastq'
 
         self.assertIn('--un', hc.kwargs)
         self.assertEqual(hc.kwargs['--un'], expected_file)

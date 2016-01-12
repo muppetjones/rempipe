@@ -1,6 +1,6 @@
 import os.path
 import time
-from abc import ABCMeta
+import abc
 
 from libpipe.cmds.help import HelpCmd
 
@@ -8,7 +8,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class BaseCmd(metaclass=ABCMeta):
+class BaseCmd(metaclass=abc.ABCMeta):
 
     '''A base (abstract) class for handling command line calls.
 
@@ -254,6 +254,7 @@ class BaseCmd(metaclass=ABCMeta):
     #   "Public" access
     #
 
+    @abc.abstractmethod
     def output(self):
         '''Return list of created files.
 
@@ -439,8 +440,15 @@ class BaseCmd(metaclass=ABCMeta):
             for k, v in sorted(self.kwargs.items())
         )
         args = sep.join(self.args)
+
+        # redirect may be a tuple ('>', 'logfile.log') or string
+        if not isinstance(self.redirect, str) and self.redirect is not None:
+            redirect = ' '.join(self.redirect)
+        else:
+            redirect = self.redirect
+
         cmd_parts = filter(  # remove missing elements
-            None, [self.invoke_str, flags, kwargs, args, self.redirect])
+            None, [self.invoke_str, flags, kwargs, args, redirect])
         return sep.join(cmd_parts)
 
     def __check_requirements(self):

@@ -100,7 +100,10 @@ class HisatCmd(BaseCmd):
         try:
             out_list.append(self.kwargs['--un'])
         except KeyError:
-            out_list.append(self.kwargs['--un-conc'])
+            out_list.extend([
+                self.kwargs['--un-conc'].replace('.fastq', '.1.fastq'),
+                self.kwargs['--un-conc'].replace('.fastq', '.2.fastq'),
+            ])
         return out_list
 
     #
@@ -129,7 +132,8 @@ class HisatCmd(BaseCmd):
                 # paired-end sequence file
                 out_dir = os.path.dirname(self.kwargs['-1'])
                 run_name = os.path.commonprefix(
-                    self.kwargs['-1'], self.kwargs['-2'])
+                    [self.kwargs['-1'], self.kwargs['-2']]
+                ).rstrip('.')
 
                 # ensure common prefix includes some of the base name
                 if run_name == out_dir:
@@ -154,7 +158,8 @@ class HisatCmd(BaseCmd):
 
         # ensure unaligned reads are written to a file
         unal_key = '--un' if '-U' in self.kwargs else '--un-conc'
-        unal = os.path.splitext(self.kwargs['-S'])[0] + '.unal.fastq'
+        unal_base = os.path.splitext(self.kwargs['-S'])[0].replace('_unal', '')
+        unal = unal_base + '_unal.fastq'
         self.kwargs.update({unal_key: unal})
 
     def _additional_requirements(
@@ -167,6 +172,8 @@ class HisatCmd(BaseCmd):
 
         # ensure the index exists
         genome_dir, genome_base = os.path.split(self.kwargs['-x'])
+        if not genome_dir:
+            genome_dir = './'
 
         index_pattern = r'{}\..*{}'.format(genome_base, extension)
         index_files = path.walk_file(genome_dir, pattern=index_pattern)

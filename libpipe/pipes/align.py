@@ -26,13 +26,18 @@ class _AlignPipe(PresetPipe):
         4. Bedtools multicov (sorted BAM file, genome)
     '''
 
-    def _setup(self, input_list=[], genome='', odir=''):
+    def _setup(self, input_list=[], genome='', odir='', **kwargs):
         if not isinstance(genome, str):
-            msg = '{} only accepts a single genome. {}'.format(
-                self.__class__.__name__,
-                'Use "NestedGenomicsPipe" for multiple'
-            )
-            raise TypeError(msg)
+
+            # could be a size 1 list!
+            if len(genome) != 1:
+                msg = '{} only accepts a single genome. {}'.format(
+                    self.__class__.__name__,
+                    'Use "NestedGenomicsPipe" for multiple'
+                )
+                raise ValueError(msg)
+            else:
+                genome = genome[0]
 
         # Step 1 -- align trimmed reads
         # > input: link from previous (fastq)
@@ -77,7 +82,7 @@ class _AlignPipe(PresetPipe):
         return
 
 
-class AlignPipe(BasePipe):
+class AlignPipe(PresetPipe):
 
     '''Execute a basic RNA-Seq pipeline from sequencing to counting reads
 
@@ -90,6 +95,15 @@ class AlignPipe(BasePipe):
         6. Samtools index (sorted BAM file)
         7. Bedtools multicov (sorted BAM file, genome)
     '''
+
+    REQ_PARAM = ['input_list', 'genome', 'odir']
+
+    def _setup(self, *args, **kwargs):
+        # NOTE: TrimPipe uses 'input_list' to set FastQC input.
+        trim = TrimPipe(*args, **kwargs)
+        align = _AlignPipe(*args, **kwargs)
+
+        self.add(trim, align)
 
 
 class NestedAlignPipe(AlignPipe):
@@ -113,15 +127,29 @@ class NestedAlignPipe(AlignPipe):
         from hisat (step 4).
     '''
 
-    def __init__(self, *args, input_list=[], genome=[], **kwargs):
+    def _setup(self, *args, genome=[], **kwargs):
 
-        # This expects multiple genomes, but Genomics Pipe expects a single
-        # genome
-        if not genome or not isinstance(genome, list):
-            raise TypeError('{} requires more than one genome'.format(
-                self.__class__.__name__))
-        self.secondary_genome = genome[1:]
-        genome = genome[0]
+        if not isinstance(genome, list) or len(genome) < 2:
+            msg = 'Multiple genomes must be given. For a single genome,' + \
+                'use "AlignPipe"'
+            raise ValueError(msg)
 
-        super().__init__(
-            *args, input_list=input_list, genome=genome, **kwargs)
+        kwargs['genome'] = genome[0]
+        secondary_genomes = genome[1:]
+
+        # setup initial trim and alignment
+        # CRITICAL: Must use soft_output to ensure the unaligned fastq
+        #           files from hisat are available as input
+        super()._setup(*args, **kwargs)
+        self.cmds[-1].soft_output = True
+
+        # create subpipe for each genome
+        # CRITICAL: remove the genome from the kwargs before comprehension!!
+        # CRITICAL: each subpipe MUST have soft_output, same as above
+        del kwargs['genome']
+        secondary_alignments = [
+            _AlignPipe(*args, soft_output=True, genome=gen, **kwargs)
+            for gen in secondary_genomes
+        ]
+
+        self.add(*secondary_alignments)

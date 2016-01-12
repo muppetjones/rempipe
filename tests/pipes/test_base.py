@@ -24,7 +24,10 @@ class TestBasePipe_setup(unittest.TestCase):
     def setUp(self):
 
         # avoid testing command objects
-        patcher = patch('libpipe.cmds.base.BaseCmd')
+        patcher = patch(
+            'libpipe.cmds.base.BaseCmd',
+            new=MagicMock(link=Mock(), cmd=Mock(return_value='cmd --foo')),
+        )
         self.mock_cmd = patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -240,49 +243,52 @@ class TestBasePipe_CmdInterface(TestBasePipe_setup):
         pipe.add(a, b)
         return pipe
 
-    def test_pipe_may_be_used_as_command(self):
-        a = self.mock_cmd()
-        b = self.mock_cmd()
-        subpipe = BasePipe()
-        subpipe.add(a, b)
+    def setup_link(self):
+        def fake_link(x):
+            x.input = c.output
 
-        pipe = BasePipe()
-        pipe.add(a, subpipe)  # should not raise
+        def fake_output(extended=True):
+            return list('abc')
 
-    def test_subpipe_should_return_expected_output(self):
-        a = Mock(output=lambda: list('abc'))
-        b = Mock(output=lambda: list('def'))
-        c = Mock(output=lambda: list('beg'))
+        a = Mock(output=fake_output, link=Mock(side_effect=fake_link))
+        b = Mock(output=fake_output, link=Mock(side_effect=fake_link))
+        c = Mock(output=fake_output, link=Mock(side_effect=fake_link))
 
         subpipe = BasePipe()
         subpipe.add(a, b)
-
         pipe = BasePipe()
         pipe.add(c, subpipe)  # should not raise
 
-        self.assertEqual(pipe.output(), subpipe.output())
+        return pipe, subpipe, [a, b, c]
+
+    #
+    #   Input tests
+    #
 
     def test_subpipe_input_set_as_expected(self):
-        a = Mock(output=lambda: list('abc'))
-        b = Mock(output=lambda: list('def'))
-        c = Mock(output=lambda: list('beg'))
-
-        def ugh(x):
-            x.input = c.output
-        c.link = Mock(side_effect=ugh)
-
-        subpipe = BasePipe()
-        subpipe.add(a, b)
-
-        pipe = BasePipe()
-        pipe.add(c, subpipe)  # should not raise
-
+        pipe, subpipe, (a, b, c) = self.setup_link()
         c.link.assert_called_once_with(subpipe)
         self.assertEqual(subpipe.input(), c.output())
+
+    def test_input_raises_AttributeError_if_not_linked(self):
+        pipe = BasePipe()
+        cmd = self.mock_cmd()
+        cmd.input.side_effect = AttributeError()
+        pipe.add(self.mock_cmd())
+        with self.assertRaises(AttributeError):
+            pipe.input()
+
+    def test_input_matches_input_from_first_command(self):
+        pipe, subpipe, (a, b, c) = self.setup_link()
+        self.assertEqual(subpipe.input(), subpipe.cmds[0].input())
 
     #
     #   Output tests
     #
+
+    def test_subpipe_should_return_expected_output(self):
+        pipe, subpipe, cmds = self.setup_link()
+        self.assertEqual(pipe.output(), subpipe.output())
 
     def test_output_returns_output_list_from_last_command(self):
         cmd = self.mock_cmd()
@@ -293,17 +299,34 @@ class TestBasePipe_CmdInterface(TestBasePipe_setup):
 
         self.assertEqual(pipe.output(), cmd.output())
 
-    def test_output_returns_unique_combined_list_from_all_if_passed_true(self):
+    # def test_output_returns_unique_combined_list_from_all_if_passed_true(self):
+    #     pipe, subpipe, cmds = self.setup_link()
+    #     cmds[2].output = lambda extended: list('zya')
+    #     cmds[0].output = lambda extended: list('bcd')
+    #     cmds[1].output = lambda extended: list('aed')
+    #
+    #     # should preserve order -- 2, (0, 1)
+    #     self.assertEqual(pipe.output(), list('zyabcde'))
 
-        pipe = BasePipe()
+    def test_output_returns_unique_combined_list_from_all_if_soft_output(self):
+        pipe, subpipe, cmds = self.setup_link()
+        cmds[2].output = lambda: list('zya')
+        cmds[0].output = lambda: list('bcd')
+        cmds[1].output = lambda: list('aed')
 
-        a = Mock(output=lambda: list('abc'))
-        b = Mock(output=lambda: list('def'))
-        c = Mock(output=lambda: list('beg'))
+        # should preserve order -- 2, (0, 1)
+        pipe.soft_output = True
+        self.assertEqual(pipe.output(), list('zyaed'))
 
-        pipe.add(a, b, c)
+    def test_subpipe_soft_output_does_not_affect_main_pipe(self):
+        pipe, subpipe, cmds = self.setup_link()
+        cmds[2].output = lambda: list('zya')
+        cmds[0].output = lambda: list('bcd')
+        cmds[1].output = lambda: list('aed')
 
-        self.assertEqual(pipe.output(from_all=True), list('abcdefg'))
+        # should preserve order -- 2, (0, 1)
+        subpipe.soft_output = True
+        self.assertEqual(pipe.output(), list('bcdae'))
 
     #
     #   Link tests
@@ -372,15 +395,21 @@ class TestBasePipe_Write(TestBasePipe_setup):
         super().setUp()
         self.mock_write = self.setup_mock_write()
 
+    def setup_pipe(self):
+        bp = BasePipe(job_name='foo')
+        cmds = [self.mock_cmd] * 3
+        bp.add(*cmds)
+        return bp
+
     def test_write_script_sets_pbs_file_using_job_name_and_timestamp(self):
 
-        bp = BasePipe(job_name='foo')
+        bp = self.setup_pipe()
         bp.write_script()
         self.assertEqual(bp.pbs_file, 'foo_{}.pbs'.format(bp.timestamp))
 
     def test_write_script_sets_pbs_file_directory(self):
 
-        bp = BasePipe(job_name='foo')
+        bp = self.setup_pipe()
         bp.write_script(directory='~')
         self.assertEqual(
             bp.pbs_file, os.path.join(
@@ -390,7 +419,7 @@ class TestBasePipe_Write(TestBasePipe_setup):
 
     def test_write_loads_pbs_template_on_initial_call(self):
         self.setup_mock_read()
-        bp = BasePipe(job_name='foo')
+        bp = self.setup_pipe()
         bp.write_script('pbs_file')
 
         self.assertIsNotNone(bp.pbs_template)
@@ -398,7 +427,7 @@ class TestBasePipe_Write(TestBasePipe_setup):
 
     def test_write_does_not_load_pbs_template_on_subsequent_calls(self):
         m_open = self.setup_mock_read()
-        bp = BasePipe(job_name='foo')
+        bp = self.setup_pipe()
         with patch.object(bp, '_BasePipe__write_pbs'):
             bp.write_script('pbs_file')
             bp.write_script('pbs_file')
@@ -406,7 +435,7 @@ class TestBasePipe_Write(TestBasePipe_setup):
         self.assertEqual(m_open.call_count, 1, 'PBS template init > 1x')
 
     def test_write_attempts_to_update_permissions_on_pbs_script(self):
-        bp = BasePipe(job_name='foo')
+        bp = self.setup_pipe()
         bp.write_script('pbs_file')
 
         self.mock_oschmod.assert_called_once_with(

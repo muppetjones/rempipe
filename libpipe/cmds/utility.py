@@ -26,6 +26,9 @@ class FastqcCmd(BaseCmd):
 
     REQ_KWARGS = []
     REQ_ARGS = 1
+    REQ_TYPE = [
+        [(0, 1), ('.fastq', '.fq')],
+    ]
 
     def output(self):
         '''FastQC output

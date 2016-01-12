@@ -67,8 +67,7 @@ class BedtoolsMulticovCmd(BaseCmd):
 
         extn = os.path.splitext(self.kwargs['-bed'])[1]
         output = self.kwargs['-bams'].replace('.bam', '.count' + extn)
-        self.redirect = '> {}'.format(output)
-        self.count_file = output
+        self.redirect = ('>', output)
 
     def output(self):
-        return (self.count_file,)
+        return (self.redirect[1],)

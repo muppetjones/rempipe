@@ -60,7 +60,9 @@ class TestBaseCmds(unittest.TestCase):
         '''ID10T error'''
 
         class Id10tCmd(BaseCmd):
-            pass
+
+            def output(self):
+                pass
 
         with self.assertRaisesRegex(NotImplementedError, 'ARGUMENTS'):
             Id10tCmd()
@@ -241,6 +243,9 @@ class TestBaseCmds(unittest.TestCase):
         self.assertEqual(b, c)
 
     def test_link_chaining(self):
+        self.CMD.REQ_TYPE = [
+            [('-f', ), ('.txt', )],
+        ]
         a = self.sample()
         b = self.sample()
         c = self.sample()
@@ -338,7 +343,7 @@ class TestBaseCmds(unittest.TestCase):
         self.assertEqual(b.kwargs, {'-1': 'file.txt', '-2': 'file2.txt'})
         self.assertIn('file.1', b.args)
 
-    def test_cmd_sets_linked_input_to_pos_arg_if_given(self):
+    def test_cmd_sets_linked_input_to_pos_arg_if_REQ_TYPE_set(self):
         self.CMD.REQ_ARGS = 0
         self.CMD.DEFAULTS = []
         self.CMD.REQ_TYPE = [
@@ -352,6 +357,9 @@ class TestBaseCmds(unittest.TestCase):
 
         b.cmd()  # should not raise
         self.assertEqual(b.args, ['file.txt'])
+
+    # def test_cmd_sets_args_from_input_up_to_MAX_ARGS(self):
+        # self.fail()
 
     #
     #   Required argument tests

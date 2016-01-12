@@ -56,8 +56,6 @@ class SkewerCmd(BaseCmd):
             self.flags.append('--quiet')
 
     def _prepcmd(self):
-        log.debug(self.args)
-
         # ensure the '-o' option is given
         # -- use the common prefix of the two input files
         # -- or the basename of the the first file otherwise

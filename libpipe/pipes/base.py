@@ -11,7 +11,6 @@ from remsci.lib.decorators import file_or_handle
 
 
 import libpipe.templates
-from libpipe.utility.exceptions import RempipeExceptionMeta
 
 import logging
 log = logging.getLogger(__name__)
@@ -41,6 +40,7 @@ class BasePipe(object):
     class GenericPipeError(ValueError):
         ERRMSG = {
             'job_name': 'Pipe requires a job_name',
+            'empty': 'Pipe does not contain any commands',
         }
 
         def __init__(self, key, *args, **kwargs):
@@ -59,12 +59,17 @@ class BasePipe(object):
         job_name=None,
         template_path=None,
         timestamp=None,
+        soft_output=False,
         **kwargs
     ):
 
         # replace do_run with dummy function
         if force:
             self._do_run = lambda x: True
+
+        # for linking--soft output will force THIS pipe to return ALL output
+        # by default
+        self.soft_output = soft_output
 
         # initialize template information
         if template_path:
@@ -137,8 +142,26 @@ class BasePipe(object):
     #   Command Interface
     #
 
-    def output(self, from_all=False):
-        if not from_all:
+    @property
+    def input(self):
+        try:
+            return self.cmds[0].input
+        except IndexError:
+            raise self.GenericPipeError('empty')
+        except AttributeError:
+            raise
+
+    @input.setter
+    def input(self, method):
+        try:
+            self.cmds[0].input = method
+        except IndexError:
+            raise self.GenericPipeError('empty')
+        except AttributeError:
+            raise
+
+    def output(self):
+        if not self.soft_output:
             return self.cmds[-1].output()
         else:
             olist_nonuniq = chain.from_iterable(
@@ -200,6 +223,13 @@ class BasePipe(object):
         return
 
     def _get_cmd_str(self, verbose=True):
+
+        # make sure we pass any set input on to our first command
+        try:
+            self.cmds[0].input = self.input
+        except AttributeError:
+            pass
+
         # static text
         if verbose:
             omit_msg = '# Output found. Skip.\n# '
@@ -349,7 +379,7 @@ class BasePipe(object):
         os.symlink(src_file, link_name)
 
 
-class PresetPipe(BasePipe):
+class PresetPipe(BasePipe, metaclass=abc.ABCMeta):
 
     '''A pipe object that defines the interface for creating a preset pipe
 
@@ -358,16 +388,29 @@ class PresetPipe(BasePipe):
     The interface should allow it to act like a command and a pipe.
     '''
 
-    __metaclass__ = abc.ABCMeta
+    # __metaclass__ = abc.ABCMeta  # MUST set in class signature in 3.x
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         try:
+            for param in self.REQ_PARAM:
+                if param not in kwargs:
+                    msg = '{} requires {} parameters'.format(
+                        self.__class__.__name__,
+                        self.REQ_PARAM,
+                    )
+                    raise ValueError(msg)
+        except AttributeError:
+            pass  # REQ_PARAM not set
+
+        try:
+            # log.debug(args)
+            # log.debug(kwargs)
             self._setup(*args, **kwargs)
         except:
             raise
 
     @abc.abstractmethod
-    def _setup(self, *args, **kwargs):
+    def _setup(self, *args, soft_output=False, **kwargs):
         pass
