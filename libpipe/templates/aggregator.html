@@ -1,0 +1,193 @@
+<html>
+    <!-- TODO: Update for Django -->
+    <head>
+        <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+        <meta content="utf-8" http-equiv="encoding">
+
+        <title>{{ name }}</title>
+        <link href="/Users/biiremployee/dev/remsci/remsci/static/semantic-ui-2.1/semantic.min.css"
+            type="text/css"  rel="stylesheet">
+
+        <style>
+            table th, table td {
+                padding: 0.5em !important;
+                border-top: 0px solid !important;
+                padding-right: 2em;
+                text-align: center;
+            }
+            tr:first-child th:last-child {
+                border-left: 0px solid !important;
+            }
+
+            th {
+                border: 0px solid !important;
+            }
+
+            td.rotate_text
+            {
+                text-align: left;
+                border-left: 0px solid !important;
+                font-weight: bold;
+                /*border: 2px solid blue;*/
+            }
+            td.rotate_text > div {
+                display: inline-block;
+                width: 1.5em;
+                line-height: 1.5;
+                height: 9.5em;
+                margin-left: -0.5em; /* match th padding */
+                /*border: 2px solid red;*/
+            }
+            td.rotate_text > div > span {
+                display: inline-block;
+                white-space: nowrap;
+
+                /* Translate Y is div height - line-height */
+                transform: translate(-100%, 8.5em) rotate(45deg);
+                transform-origin: bottom right;
+
+                /*border: 2px solid green;*/
+                border-bottom: 1px solid #ccc;
+            }
+
+            tr.negative th:first-child { border-left: thick solid black !important; }
+            tr.negative td:last-child { border-right: thick solid black; }
+
+            #copy_command .left.floated {
+                margin: 0px;
+                padding: 0px;
+                padding-right: 2em;
+            }
+            #copy_command .clearing {
+                padding-top: 0px;
+                padding-bottom: 0px;
+                padding-left: 0px;
+            }
+
+            #copy_command .copy_msg {
+                vertical-align: middle;
+            }
+        </style>
+
+    </head>
+
+    <body>
+
+        <div id="accordion" style="padding: 2em">
+            <table class="ui selectable celled table">
+                <!-- {# BEGIN TEMPLATE JOIN="</td><td>" -->
+                <tr class="{{ class_name }}">
+                    <th class="center aligned">{{ sample }}</th>
+                    <td class="results">{{ results }}</td>
+                </tr>
+                <!-- END TEMPLATE #} -->
+            </table>
+        </div>
+
+        <div id="copy_command" class="ui bottom attached segment">
+            Created via:
+            <div id="command" class="ui segment">{{ command }}</div>
+            <div class="ui basic clearing segment">
+                <div class="ui basic left floated segment">
+                    <button id="copy_button" class="ui tiny compact button">Copy</button>
+                </div>
+                <div id="copy_msg" class="ui basic left floated segment">
+                </div>
+            </div>
+        </div>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+        <script>
+            var $acc = $( "#accordion" );
+
+            // Rotate text on header row
+            $acc.find("tr:first td").each(function(){
+                if ($(this).text() != '') {
+                    $(this).wrapInner("<div><span></span></div>")
+                    $(this).addClass("rotate_text");
+                }
+            });
+        </script>
+
+        <script>
+            document.getElementById("copy_button").addEventListener(
+                "click", function() {
+                    copyToClipboardMsg(
+                        document.getElementById("command"), "copy_msg");
+            });
+
+
+            function copyToClipboardMsg(elem, msgElem) {
+            	  var succeed = copyToClipboard(elem);
+                var msg;
+                if (!succeed) {
+                    msg = "Copy not supported or blocked.  Press Ctrl+c to copy."
+                } else {
+                    msg = "Text copied to the clipboard."
+                }
+                if (typeof msgElem === "string") {
+                    msgElem = document.getElementById(msgElem);
+                }
+                msgElem.innerHTML = msg;
+                // setTimeout(function() {
+                //     msgElem.innerHTML = "";
+                // }, 2000);
+            }
+
+            function copyToClipboard(elem) {
+            	  // create hidden text element, if it doesn't already exist
+                var targetId = "_hiddenCopyText_";
+                var isInput = elem.tagName === "INPUT" || elem.tagName === "TEXTAREA";
+                var origSelectionStart, origSelectionEnd;
+                if (isInput) {
+                    // can just use the original source element for the selection and copy
+                    target = elem;
+                    origSelectionStart = elem.selectionStart;
+                    origSelectionEnd = elem.selectionEnd;
+                } else {
+                    // must use a temporary form element for the selection and copy
+                    target = document.getElementById(targetId);
+                    if (!target) {
+                        var target = document.createElement("textarea");
+                        target.style.position = "absolute";
+                        target.style.left = "-9999px";
+                        target.style.top = "0";
+                        target.id = targetId;
+                        document.body.appendChild(target);
+                    }
+                    target.textContent = elem.textContent;
+                }
+                // select the content
+                var currentFocus = document.activeElement;
+                target.focus();
+                target.setSelectionRange(0, target.value.length);
+
+                // copy the selection
+                var succeed;
+                try {
+                    succeed = document.execCommand("copy");
+                } catch(e) {
+                    succeed = false;
+                }
+                // restore original focus
+                if (currentFocus && typeof currentFocus.focus === "function") {
+                    currentFocus.focus();
+                }
+
+                if (isInput) {
+                    // restore prior selection
+                    elem.setSelectionRange(origSelectionStart, origSelectionEnd);
+                } else {
+                    // clear temporary content
+                    target.textContent = "";
+                }
+                return succeed;
+            }
+
+        </script>
+
+    </body>
+
+
+
+</html>
