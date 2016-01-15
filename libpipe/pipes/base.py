@@ -3,6 +3,7 @@ import os
 import os.path
 import stat
 import subprocess
+import sys
 import time
 from itertools import chain
 
@@ -214,8 +215,17 @@ class BasePipe(object):
         # write pbs file
         with open(self.pbs_file, 'w') as oh:
             oh.write(self.pbs_template + "\n")
+            oh.write(self.__get_called_by_str(comment=True))
             self._write_commands(oh)
         return
+
+    def __get_called_by_str(self, fmt='\\\n   ', comment=True):
+        intro = '# Script created from:\n'
+        if comment:
+            fmt = fmt.replace('\n', '\n# ')
+            intro = intro + '# '
+        called_by = '{}{}\n\n'.format(intro, fmt.join(sys.argv))
+        return called_by
 
     @file_or_handle(mode='w')
     def _write_commands(self, fh):

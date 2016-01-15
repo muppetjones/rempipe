@@ -49,8 +49,11 @@ class TestHistatCmd(unittest.TestCase):
         hc = self.sample_cmd()
         hc._prepcmd()
 
+        # NOTE: The log filename is created from the output file, so the
+        #       genome name will only be in the file if the user puts it
+        #       or if the user does not provide an output file.
         self.assertTrue(
-            hc.redirect.endswith('path/al_gen_000_hisat.log'),
+            hc.redirect.endswith('path/al_000_hisat.log'),
             'Redirect not set to expected log file ({})'.format(hc.redirect),
         )
 

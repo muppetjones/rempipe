@@ -5,6 +5,75 @@ import logging
 log = logging.getLogger(__name__)
 
 
+class HtseqCountCmd(BaseCmd):
+
+    '''HT-Seq command line invocation
+
+    Install:
+        pip2 install numpy
+        pip2 install scipy
+        pip2 install matplotlib
+        pip2 install htseq
+
+    Versions:
+        numpy 1.10.4
+        scipy 0.16.1
+        matplotlib 1.5.1
+        htseq 0.6.1
+
+    '''
+
+    NAME = 'htseq-count'
+    INVOKE_STR = 'htseq-count'
+
+    ARGUMENTS = {
+        (None, 'FILE', 'Alignment file (BAM or SAM)'),
+        (None, 'FILE', 'Feature file (GFF or GTF)'),
+        ('-f', 'SAMTYPE', 'Type of alignment file (sam or bam)'),
+        ('-r', 'ORDER', 'Alignment sorting order (pos or name) [pe only]'),
+        ('-s', 'STRANDED', 'Specify strand specific (yes, no, reverse)'),
+        ('-a', 'INT', 'Minimum quality value (skip lower than)'),
+        ('-t', 'CHAR', 'Feature type (3rd col) to use. Default: exon'),
+        ('-i', 'CHAR', 'GFF attribute to use as feature id. Default: gene_id'),
+        ('-m', 'MODE', 'Mode for feature overlap. Default: union. ' +
+            'Choices: union, intersection-strict, intersection-nonempty'),
+        ('-o', 'FILE', 'Write new SAM file with feature assignments'),
+        ('-q', None, 'Suppress progress report'),
+    }
+
+    DEFAULTS = {
+        '-r': 'pos',  # set for paired-end data (ignored for single-end)
+        '-s': 'no',  # not strand specific
+    }
+    REQ_KWARGS = []
+    REQ_ARGS = 2
+    REQ_TYPE = [
+        [(0, ), ('.bam', '.sam')],
+        [(1, ), ('.gff', '.gtf', '.gff3')],
+        [('-o',),  ('.sam', )],
+    ]
+
+    def __init__(
+            self, *args,
+            feature_type=None, feature_id=None, mode=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Simpler interface for common functions
+        if feature_type:
+            self.kwargs['-t'] = feature_type
+        if feature_id:
+            self.kwargs['-i'] = feature_id
+        if mode:
+            self.kwargs['-m'] = mode
+
+    def _prepreq(self):
+        super()._prepreq()
+
+        # set correct format flag
+        align_file = os.path.splitext(self.args[0])[0]
+        self.kwargs['-f'] = align_file[1:].lower()  # remove leading dot
+
+
 class BedtoolsMulticovCmd(BaseCmd):
 
     NAME = 'bedtools_multicov'
