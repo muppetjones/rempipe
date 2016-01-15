@@ -1,0 +1,182 @@
+<html>
+    <!-- TODO: Update for Django -->
+    <head>
+        <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+        <meta content="utf-8" http-equiv="encoding">
+
+        <title>{{ name }}</title>
+        <link href="/Users/biiremployee/dev/remsci/remsci/static/semantic-ui-2.1/semantic.min.css"
+            type="text/css"  rel="stylesheet">
+
+        <style>
+            table th {
+                padding: 0.5em;
+            }
+            tr {
+                padding-right: 2em;
+                text-align: center;
+            }
+            tr:first-child th:last-child {
+                border-left: 0px solid !important;
+            }
+
+           th.rotate_text
+           {
+               text-align: left;
+               border-left: 0px solid !important;
+           }
+           th.rotate_text > div {
+               display: inline-block;
+               width: 1.5em;
+               line-height: 1.5;
+               height: 9.5em;
+               margin-left: -0.5rem; /* match th padding */
+            }
+            th.rotate_text > div > span {
+                display: inline-block;
+                white-space: nowrap;
+
+                /* Translate Y is div height - line-height */
+                transform: translate(-100%, 8.5em) rotate(45deg);
+                transform-origin: bottom right;
+
+                border-bottom: 1px solid #ccc;
+            }
+
+            div.loader {
+                position: relative;
+                height: 350px; /* slightly larger than img size */
+                overflow: auto;
+                margin: 0 auto;
+                width: 100%;
+            }
+
+            .loader .module {
+                text-align: left;
+                display: inline-block;
+                padding: 0.5em;
+                padding-bottom: 1em;
+                font-size: 0.8em;
+                vertical-align: top;
+            }
+
+            .loader .module h2 {
+                font-size: 1rem !important;
+                margin-bottom: 0.5em;
+            }
+
+            .loader .module table, .loader .module img.indented {
+                display: inline-block;
+            }
+
+            .loader .module th, .loader .module td {
+                font-size: 0.8rem !important;
+                padding: 0.2em !important;
+            }
+
+            .loader .module h2 img {
+                width: 1em;
+                height: 1em;
+                margin-right: 0.5em;
+            }
+            .loader .module img.indented {
+                margin-left: 2em;
+            }
+        </style>
+
+    </head>
+
+    <body>
+
+        <div id="accordion" style="padding: 2em">
+            <table class="ui selectable celled table">
+                <!-- {# BEGIN TEMPLATE JOIN="</th><th>" -->
+                <tr class="accordion-header">
+                    <th class="center aligned">{{ test }}</th>
+                    <th class="results">{{ results }}</th>
+                </tr>
+                <tr class="accordion-data">
+                    <td colspan="{{ n_results }}" style="padding: 0.75em">{{ data }}</td>
+                </tr>
+                <!-- END TEMPLATE #} -->
+            </table>
+            <div class="ui tiny vertical buttons" style="position: fixed; top: 35px; left: 35px;">
+                <div id="img_grow" class="ui compact inverted green button">+</div>
+                <div id="img_shrink" class="ui compact inverted red button">-</div>
+            </div>
+        </div>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+        <script>
+            $(function() {
+
+                var $acc = $( "#accordion" );
+
+                // Add <thead> around header row
+                var $header_row = $acc.find("tr:first");
+
+                // Rotate text on header row
+                $acc.find("tr:first th").each(function(){
+                    if ($(this).text() != '') {
+                        $(this).addClass("rotate_text");
+                        $(this).wrapInner("<div><span></span></div>")
+                    }
+                });
+
+                // Setup accordion
+                $acc.find("tr").not(".accordion-header").hide();
+                $acc.find("tr.accordion-header").click(function(){
+                    $(this).next().slideToggle(10);
+                });
+
+                // Load FastQC html
+                var $loaders = $acc.find("div.loader");
+                $loaders.each(function(){
+                    $(this).load($(this).data("html") + " div.module", function(){
+                        $("div.module").css("width", 380);
+
+                        var $img = $("img.indented");
+                        $img.attr({width: 330, height: 240, size: "small"});
+
+                        // Remove all empty modules
+                        $("div.module:not(:has(img.indented)):not(:first-child)").remove()
+                    });
+                });
+
+            });
+
+            $(document).ready(function() {
+
+                var $amt = '=15em';
+                $("#img_grow").click(function(){
+                    var $grow_amt = '+' + $amt;
+                    $(".loader").animate({
+                        height: $grow_amt,
+                    }, 10);
+                    $(".module").animate({
+                        width: $grow_amt,
+                        // height:'+=5em',
+                    }, 10);
+                    $("img.indented").animate({
+                        width: $grow_amt,
+                        height:$grow_amt,
+                    }, 10);
+                });
+                $("#img_shrink").click(function(){
+                    var $shrink_amt = '-' + $amt;
+                    $(".loader").animate({
+                        height: $shrink_amt,
+                    }, 10);
+                    $(".module").animate({
+                        width: $shrink_amt,
+                    }, 10);
+                    $("img.indented").animate({
+                        width: $shrink_amt,
+                        height:$shrink_amt,
+                    }, 10);
+                });
+            });
+        </script>
+    </body>
+
+</html>
