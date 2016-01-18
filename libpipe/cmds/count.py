@@ -69,9 +69,58 @@ class HtseqCountCmd(BaseCmd):
     def _prepreq(self):
         super()._prepreq()
 
-        # set correct format flag
-        align_file = os.path.splitext(self.args[0])[0]
+        # CRITICAL: We probably have the args in the wrong order (sam first!)
+        if self.args[1].endswith('am'):
+            self.args.reverse()
+
+        # set correct input format flag
+        align_file = os.path.splitext(self.args[0])[1]
         self.kwargs['-f'] = align_file[1:].lower()  # remove leading dot
+
+        # NOTE: From here down is duplicated in BedtoolsMulticovCmd
+        #       EXCEPT for the line where the genome is added!!
+        # TODO: make this a base function
+        def _get_types(flag):
+            for rt in self.REQ_TYPE:
+                if flag in rt[0]:
+                    return rt[1]
+            return None
+
+        # identify extension
+        bed_file = self.args[1]
+        bed_types = _get_types(1)
+        try:
+            bed_extn = [
+                extn for extn in bed_types
+                if bed_file.endswith(extn)
+            ][0]
+        except IndexError:
+            # check for presence of file with expected extension
+            # update with first found match
+            # NOTE: LOGIC ERROR! If multiple exist, e.g., both .bed and .gff,
+            #       only the first found will ever be used.
+            for extn in bed_types:
+                if os.path.isfile(bed_file + extn):
+                    bed_extn = extn
+                    # self.kwargs['-bed'] = bed_file + extn
+                    break
+            try:
+                self.args[1] = bed_file + bed_extn
+            except UnboundLocalError:
+                msg = 'Unable to find an annotation file {} for "{}" genome'
+                raise FileNotFoundError(msg.format(
+                    bed_types, os.path.basename(bed_file)))
+
+        # CRITICAL: GFF files probably will NOT have a gene_id attribute
+        #           There's not a good, consistant substitute, except
+        #           either 'gene' or 'Name'
+        if not self.args[1].endswith('.gtf'):
+            self.kwargs['-i'] = 'gene'
+
+        self.redirect = ('>', os.path.splitext(self.args[0])[0] + '.count')
+
+    def output(self):
+        return (self.redirect[1])
 
 
 class BedtoolsMulticovCmd(BaseCmd):

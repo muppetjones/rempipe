@@ -5,7 +5,8 @@ from libpipe.pipes.base import BasePipe, PresetPipe
 from libpipe.pipes.qc import TrimPipe
 from libpipe.cmds import (
     Hisat2Cmd,
-    SamtoolsSortCmd, SamtoolsIndexCmd, BedtoolsMulticovCmd,
+    SamtoolsSortCmd, SamtoolsIndexCmd,
+    BedtoolsMulticovCmd, HtseqCountCmd,
 )
 
 
@@ -66,17 +67,24 @@ class _AlignPipe(PresetPipe):
         kwargs = {}
         st_index = SamtoolsIndexCmd(*args, **kwargs)
 
+        # # Step 4 -- count index
+        # # > input: link from previous (bam)
+        # # > output: bam index files to given directory
+        # args = []
+        # kwargs = {'-bed': genome}
+        # bt_multicov = BedtoolsMulticovCmd(*args, **kwargs)
+
         # Step 4 -- count index
         # > input: link from previous (bam)
         # > output: bam index files to given directory
-        args = []
-        kwargs = {'-bed': genome}
-        bt_multicov = BedtoolsMulticovCmd(*args, **kwargs)
+        args = [genome, ]
+        kwargs = {}
+        count_cmd = HtseqCountCmd(*args, **kwargs)
 
         self.add(
             hisat,
             st_sort, st_index,
-            bt_multicov,
+            count_cmd,
         )
 
         return

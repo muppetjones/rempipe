@@ -219,7 +219,7 @@ class BasePipe(object):
             self._write_commands(oh)
         return
 
-    def __get_called_by_str(self, fmt='\\\n   ', comment=True):
+    def __get_called_by_str(self, fmt=' \\\n   ', comment=True):
         intro = '# Script created from:\n'
         if comment:
             fmt = fmt.replace('\n', '\n# ')
