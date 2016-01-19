@@ -255,6 +255,7 @@ class CountAggregator(Aggregator):
         'ambiguous',
         'too_low_aQual',
         'alignment_not_unique',
+        'total_features',
     ]
 
     def aggregate(self):
@@ -281,15 +282,20 @@ class CountAggregator(Aggregator):
             __alignment_not_unique	69314
         '''
 
+        counts = [line for line in fh]
         summary = [
             line.lstrip().rstrip().split()
-            for line in fh if line.startswith('__')
+            for line in counts if line.startswith('__')
         ]
 
         summary_details = {
             k[2:]: v
             for k, v in summary
         }
+
+        log.debug(counts[0:5])
+        summary_details['total_features'] = str(len(counts) - 5)
+        del counts
 
         return summary_details
 
