@@ -1,6 +1,7 @@
 import os.path
 import time
 import abc
+import re
 
 from libpipe.cmds.help import HelpCmd
 
@@ -151,6 +152,18 @@ class BaseCmd(metaclass=abc.ABCMeta):
     class FileTypeError(TypeError):
         pass
 
+    class ConfigError(ValueError):
+        ERRMSG = {
+            'illegal': 'Illegal characters in config file: {}',
+        }
+
+        def __init__(self, key, *args, val=[], ** kwargs):
+            try:
+                super().__init__(
+                    self.ERRMSG[key].format(*val), *args, **kwargs)
+            except KeyError:
+                super().__init__(key, *args, **kwargs)
+
     #
     #   Magic methods
     #
@@ -191,17 +204,8 @@ class BaseCmd(metaclass=abc.ABCMeta):
             # check for unknown kwargs
             # NOTE: We MUST have removed timestamp AND
             #       ensured hyphens BEFORE this
-            try:
-                known_flags = [v[0] for v in self.ARGUMENTS if v[0]]
-            except TypeError:
-                raise NotImplementedError(
-                    'ARGUMENTS must be set on child class')
-            unknown_flags = [
-                k for k in flags + list(kwargs.keys())
-                if k not in known_flags
-            ]
-            if unknown_flags:
-                raise self.KeywordArgError('unknown', val=unknown_flags)
+            to_check = flags + list(kwargs.keys())
+            self._check_for_unknown_flags(to_check)
 
         # make sure we deep copy defaults and args
         self.redirect = None  # self.REDIRECT
@@ -249,6 +253,64 @@ class BaseCmd(metaclass=abc.ABCMeta):
     @classmethod
     def _trubase(self, path_name):
         return os.path.splitext(os.path.basename(path_name))[0]
+
+    @classmethod
+    def _unsafe_char_protect(cls, input_str, strict=True):
+
+        try:
+            # remove unicode control characters
+            input_str = cls.rx_illegal_char.sub('', input_str)
+
+            # remove BASH unsafe characters
+            replacement = 'ESCCHAR\g<unsafe>' if not strict else ''
+            input_str = cls.rx_unsafe_char.sub(replacement, input_str)
+            if replacement:
+                input_str = input_str.replace(replacement[:7], '\\')
+            return input_str.rstrip()
+
+        except AttributeError:
+            # compiile and create these regex only once
+            cls.__init_unsafe_regex()
+            cls.__init_illegal_char_regex()
+            return cls._unsafe_char_protect(input_str, strict=strict)
+
+    @classmethod
+    def __init_unsafe_regex(cls):
+        unsafe = re.escape(';&|><*?`$(){}[]!#')
+        unsafe = r'(?P<unsafe>[{}]\s?)\s*'.format(unsafe)
+        cls.rx_unsafe_char = re.compile(unsafe)
+
+    @classmethod
+    def __init_illegal_char_regex(cls):
+        # From a blog post for removing illegal ASCII control characters
+        # http://chase-seibert.github.io/blog/2011/05/20/stripping-control-characters-in-python.html
+        RE_XML_ILLEGAL = (
+            u'([\u0000-\u0008\u000b-\u000c\u000e-\u001f\ufffe-\uffff])' +
+            u'|' +
+            u'([%s-%s][^%s-%s])|([^%s-%s][%s-%s])|([%s-%s]$)|(^[%s-%s])' %
+            (chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
+             chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
+             chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
+             ))
+        cls.rx_illegal_char = re.compile(RE_XML_ILLEGAL)
+
+    @classmethod
+    def _check_for_unknown_flags(cls, flags):
+        # check for unknown kwargs
+        # NOTE: We MUST have removed timestamp AND
+        #       ensured hyphens BEFORE this
+        # NOTE: We may want to
+        try:
+            known_flags = [v[0] for v in cls.ARGUMENTS if v[0]]
+        except TypeError:
+            raise NotImplementedError(
+                'ARGUMENTS must be set on child class')
+        unknown_flags = [
+            k for k in flags
+            if k not in known_flags
+        ]
+        if unknown_flags:
+            raise cls.KeywordArgError('unknown', val=unknown_flags)
 
     #
     #   "Public" access
@@ -419,7 +481,7 @@ class BaseCmd(metaclass=abc.ABCMeta):
 
         return
 
-    def _cmd(self, verbose=True):
+    def _cmd(self, verbose=True, strict=True):
         '''Create BASH executable string.
 
         Arguments:
@@ -447,9 +509,19 @@ class BaseCmd(metaclass=abc.ABCMeta):
         else:
             redirect = self.redirect
 
+        # NOTE: redirect WILL contain unsafe chars ('>' or '|', likely)
+        #       We should account for this later...or prevent redirect
+        #       from modification
         cmd_parts = filter(  # remove missing elements
-            None, [self.invoke_str, flags, kwargs, args, redirect])
-        return sep.join(cmd_parts)
+            None, [self.invoke_str, flags, kwargs, args])
+
+        cmd = sep.join(cmd_parts)
+        cmd_safe = self._unsafe_char_protect(cmd, strict=strict)
+
+        if redirect:
+            cmd_safe = '{}{}{}'.format(cmd_safe, sep, redirect)
+
+        return cmd_safe
 
     def __check_requirements(self):
         '''Ensure all argument requirements are fulfilled

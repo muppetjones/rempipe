@@ -254,6 +254,34 @@ class TestBaseCmds(unittest.TestCase):
         self.assertEqual(b.output, c.input)
         self.assertEqual(d, c)
 
+    #
+    #   Test cmd
+    #
+
+    def test_cmd_escapes_all_unsafe_char(self):
+        self.CMD.DEFAULTS = {}
+        kwargs = {'-f': '&& rm * &&'}
+        cmd = self.CMD(**kwargs)
+
+        c = cmd.cmd(verbose=False, strict=False)
+        self.assertEqual(c, 'tmp -f \&\& rm \* \&\&')
+
+    def test_cmd_strict_removes_all_unsafe_char(self):
+        self.CMD.DEFAULTS = {}
+        kwargs = {'-f': '&& rm * &&'}
+        cmd = self.CMD(**kwargs)
+
+        c = cmd.cmd(verbose=False, strict=True)
+        self.assertEqual(c, 'tmp -f rm')
+
+    def test_cmd_retains_redirect_after_str_protect(self):
+        self.CMD.DEFAULTS = {}
+        cmd = self.CMD()
+        cmd.redirect = ('>', 'out.txt')
+
+        c = cmd.cmd(verbose=False, strict=True)
+        self.assertEqual(c, 'tmp > out.txt')
+
     def test_cmd_matches_linked_input_without_error(self):
         self.CMD.REQ_KWARGS = ['-f']
         self.CMD.REQ_TYPE = [

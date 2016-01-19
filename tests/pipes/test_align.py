@@ -19,7 +19,7 @@ class Test_AlignPipe(BaseTestCase):
             ap = _AlignPipe(input_list=['test.fq'], genome='hsapiens')
             ap.cmd()
 
-        self.assertEqual(ap.output(), ('test_hsapiens.count.bed', ))
+        self.assertEqual(ap.output(), ('test_hsapiens.count', ))
 
     def test_soft_output_includes_same_number_of_fastq_files_as_input(self):
         self.mock_method(

@@ -1,12 +1,12 @@
 
 import os
 
-from libpipe.pipes.base import BasePipe, PresetPipe
+from libpipe.pipes.base import PresetPipe
 from libpipe.pipes.qc import TrimPipe
 from libpipe.cmds import (
     Hisat2Cmd,
     SamtoolsSortCmd, SamtoolsIndexCmd,
-    BedtoolsMulticovCmd, HtseqCountCmd,
+    HtseqCountCmd,
 )
 
 

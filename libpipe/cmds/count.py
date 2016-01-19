@@ -1,4 +1,5 @@
 import os.path
+import re
 from libpipe.cmds.base import BaseCmd
 
 import logging
@@ -53,6 +54,9 @@ class HtseqCountCmd(BaseCmd):
         [('-o',),  ('.sam', )],
     ]
 
+    # Name of optional config file found in genome directory
+    CONFIG_FILE = 'htseq-count.config'
+
     def __init__(
             self, *args,
             feature_type=None, feature_id=None, mode=None, **kwargs):
@@ -76,6 +80,9 @@ class HtseqCountCmd(BaseCmd):
         # set correct input format flag
         align_file = os.path.splitext(self.args[0])[1]
         self.kwargs['-f'] = align_file[1:].lower()  # remove leading dot
+
+        # update kwargs from config file
+        self._update_from_config_file()
 
         # NOTE: From here down is duplicated in BedtoolsMulticovCmd
         #       EXCEPT for the line where the genome is added!!
@@ -111,13 +118,57 @@ class HtseqCountCmd(BaseCmd):
                 raise FileNotFoundError(msg.format(
                     bed_types, os.path.basename(bed_file)))
 
-        # CRITICAL: GFF files probably will NOT have a gene_id attribute
-        #           There's not a good, consistant substitute, except
-        #           either 'gene' or 'Name'
-        if not self.args[1].endswith('.gtf'):
-            self.kwargs['-i'] = 'gene'
+        # NOTE: This sort of special consideration should be handled
+        #       by adding an htseq-count.config file in the genome dir
+        # # CRITICAL: GFF files probably will NOT have a gene_id attribute
+        # #           There's not a good, consistant substitute, except
+        # #           either 'gene' or 'Name'
+        # if not self.args[1].endswith('.gtf'):
+        #     self.kwargs['-i'] = 'gene'
 
         self.redirect = ('>', os.path.splitext(self.args[0])[0] + '.count')
+
+    def _update_from_config_file(self):
+        feature_file = self.args[1]
+
+        genome_dir = os.path.dirname(feature_file)
+        config_file = os.path.join(genome_dir, self.CONFIG_FILE)
+
+        try:
+            with open(config_file, 'r') as fh:
+
+                config_str = ''.join([
+                    line.lstrip().rstrip()
+                    for line in fh
+                    if not line.startswith('#')
+                ])
+
+        except FileNotFoundError:
+            return  # no config, no problem
+
+        # check for unsafe char
+        # -- DO NOT use config if ANY found
+        config_safe = self._unsafe_char_protect(config_str)
+        if config_safe != config_str:
+            raise self.ConfigError('illegal', val=[config_file])
+
+        # Better method based on regex split
+        # -- split only on spaces followed by a dash!
+        # -- does NOT work with flags!!
+        # TODO: Incorporate into BaseCmd
+        config_dict = dict(
+            re.split(r'[\s=]', item)  # allows for '-f FILE' or '--file=FILE'
+            for item in re.split(r'\s(?=-)', config_str)
+        )
+
+        # throw a fit if we don't recognize the kwargs
+        try:
+            self._check_for_unknown_flags(config_dict)
+        except:
+            raise
+
+        self.kwargs.update(config_dict)
+        return
 
     def output(self):
         return (self.redirect[1], )
