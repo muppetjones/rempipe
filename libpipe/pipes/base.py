@@ -114,17 +114,6 @@ class BasePipe(object):
         except AttributeError:
             return self.__class__.__name__
 
-    def _create_pbs_file_name(self, dir_str):
-
-        try:
-            self.pbs_file = os.path.join(
-                path.protect(dir_str),
-                '_'.join([self.job_name, self.timestamp]) + '.pbs'
-            )
-        except (TypeError, AssertionError):
-            raise AssertionError('Pipe attribute "job_name" is undefined')
-        return
-
     #
     #   Command Handling
     #
@@ -210,6 +199,22 @@ class BasePipe(object):
         except:
             raise
 
+    def _create_pbs_file_name(self, dir_str):
+
+        try:
+            self.pbs_file = os.path.join(
+                path.protect(dir_str),
+                '_'.join([self.job_name, self.timestamp]) + '.pbs'
+            )
+        except (TypeError, AssertionError):
+            raise AssertionError('Pipe attribute "job_name" is undefined')
+        return
+
+    def __load_template(self):
+        if not self.pbs_template:
+            with open(self.pbs_template_path, 'r') as ih:
+                self.pbs_template = ih.read()
+
     def __write_pbs(self):
 
         # write pbs file
@@ -261,11 +266,6 @@ class BasePipe(object):
                 cmd_str = cmd_str.replace('\n', '\n#')
             cmd_list.append(prefix + cmd_str)
         return '\n\n'.join(cmd_list)
-
-    def __load_template(self):
-        if not self.pbs_template:
-            with open(self.pbs_template_path, 'r') as ih:
-                self.pbs_template = ih.read()
 
     def __update_pbs_permissions(self):
         '''Make file executable by all parties

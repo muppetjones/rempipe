@@ -67,7 +67,7 @@ class _AlignPipe(PresetPipe):
         kwargs = {}
         st_index = SamtoolsIndexCmd(*args, **kwargs)
 
-        # # Step 4 -- count index
+        # # Step 4 -- count index [DEPRECATED -- USE HtseqCountCmd]
         # # > input: link from previous (bam)
         # # > output: bam index files to given directory
         # args = []

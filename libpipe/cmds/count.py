@@ -120,7 +120,7 @@ class HtseqCountCmd(BaseCmd):
         self.redirect = ('>', os.path.splitext(self.args[0])[0] + '.count')
 
     def output(self):
-        return (self.redirect[1])
+        return (self.redirect[1], )
 
 
 class BedtoolsMulticovCmd(BaseCmd):
