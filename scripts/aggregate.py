@@ -5,6 +5,7 @@
 '''
 
 import abc
+import numpy
 import os.path
 import re
 import sys
@@ -50,10 +51,14 @@ class Aggregator(metaclass=abc.ABCMeta):
         self._split_headers()
         self._order_cols()
 
-    def combine(self, agg):
+    def combine(self, *args):
+        for agg in args:
+            self._combine(agg)
+        return
+        new_summary = self.summary
         new_summary = [
             [list(rowA[0]), list(rowA[1]) + list(rowB[1])]
-            for rowA, rowB in zip(self.summary, agg.summary)
+            for rowA, rowB in zip(new_summary, agg.summary)
             if rowA[0] == rowB[0]
         ]
 
@@ -62,6 +67,55 @@ class Aggregator(metaclass=abc.ABCMeta):
 
         self.suffix = ''.join(s.capitalize()
                               for s in [self.suffix, agg.suffix])
+
+    def _combine(self, agg):
+
+        for this, that in zip(self.summary, agg.summary):
+            if this[0] == that[0]:
+                this[1].extend(that[1])
+        self.write_order.extend(agg.write_order)
+        self.suffix = '{}{}'.format(
+            self.suffix, agg.suffix.capitalize())
+        return
+
+    def _calc_stats(self):
+
+        unique_grp = sorted(list(set(
+            ' '.join(row[0][1:])
+            for row in self.summary
+        )))
+
+        stats = [numpy.mean, numpy.median]
+        stat_rows = []
+        for stat in stats:
+            stat_rows.extend(self._calc_stat(stat, unique_grp))
+        return stat_rows
+
+    def _calc_stat(self, stat, unique_grp):
+        stats_rows = []
+        for grp in unique_grp:
+
+            # get relevant data
+            # also convert string to number
+            rows = [
+                row[1]
+                for row in self.summary
+                if ' '.join(row[0][1:]) == grp]
+            for i, row in enumerate(rows):
+                row = [
+                    float(cell) if not cell.endswith('%') else float(cell[:-1])
+                    for cell in row
+                ]
+                rows[i] = row
+            mat = numpy.array(rows)
+
+            stat_list = stat(mat, axis=0)
+
+            grp_tup = [stat.__name__] + grp.split()
+            stats_rows.append([
+                grp_tup, ['{:.2f}'.format(v) for v in stat_list]
+            ])
+        return stats_rows
 
     def write_html(self):
 
@@ -83,16 +137,30 @@ class Aggregator(metaclass=abc.ABCMeta):
             if sample_group != previous:
                 color = next(color_cycle)
                 previous = sample_group
-
             row = self._create_row(
                 row[0], row[1], class_name=color
             )
             rows.append(row)
 
+        # log.debug('\n'.join(rows))
+
+        stats_rows = self._calc_stats()
+        for row in stats_rows:
+            sample_group = row[0][0]
+            if sample_group != previous:
+                color = next(color_cycle)
+                previous = sample_group
+            row = self._create_row(
+                row[0], row[1], class_name=color
+            )
+            rows.append(row)
+        # log.debug('\n'.join(rows))
+
         base_html = base_html.replace('{{ template }}', '\n'.join(rows))
 
         with open(html_path, 'w') as fh:
             fh.write(base_html)
+        return html_path
 
     def _parse_html_name(self):
         suffix = '_{}.html'.format(self.suffix)
@@ -180,7 +248,20 @@ class Aggregator(metaclass=abc.ABCMeta):
         if header:
             header_list = header + header_list
 
-        header = '</th><th>'.join(header_list[:self.header_len])
+        try:
+            header = '</th><th>'.join(header_list[:self.header_len])
+        except TypeError:
+            raise
+
+        try:
+            row = [
+                '{:,}'.format(int(cell)) if '.' not in cell else
+                '{:,}'.format(float(cell)) if not cell.endswith('%')
+                else '{:,}'.format(float(cell[:-1]))
+                for cell in row
+            ]
+        except ValueError:
+            pass
 
         return self.template.replace(
             '{{ class_name }}', class_name
@@ -293,9 +374,45 @@ class CountAggregator(Aggregator):
             for k, v in summary
         }
 
-        log.debug(counts[0:5])
         summary_details['total_features'] = str(len(counts) - 5)
         del counts
+
+        return summary_details
+
+
+class CoverageAggregator(Aggregator):
+
+    SUFFIX = 'cov'
+    WRITE_ORDER = [
+        'total_features',
+        'features > 1',
+        'ratio'
+    ]
+
+    def aggregate(self):
+        if len(self.agg_files) > 1:
+            raise ValueError('too many files. only one needed')
+        self.summary = self._parse_summary(self.agg_files[0])
+        super().aggregate()
+        return
+
+    @file_or_handle(mode='r')
+    def _parse_summary(self, fh):
+        '''Parse output of 'coverage.py' to include in aggregate'''
+
+        # lines = [line for line in ]
+        coverage = [
+            line.lstrip().rstrip().split()
+            for line in fh if not line.startswith('#')
+        ]
+
+        summary_details = {
+            line[0].replace('-trimmed_', '_'): {
+                k: v
+                for k, v in zip(self.WRITE_ORDER, line[1:])
+            }
+            for line in coverage
+        }
 
         return summary_details
 
@@ -348,6 +465,16 @@ if __name__ == '__main__':
         aggC.aggregate()
         aggC.write_html()
 
-    if args.alignment_summary and args.count_summary:
+    common_dir = os.path.dirname(os.path.commonprefix(file_list))
+    cov_file = os.path.join(common_dir, 'coverage.txt')
+    if os.path.isfile(cov_file):
+        aggCov = CoverageAggregator([cov_file])
+        aggCov.aggregate()
+        aggCov.write_html()
+
+    try:
         aggA.combine(aggC)
-        aggA.write_html()
+        aggA.combine(aggCov)
+        ofile = aggA.write_html()
+    except UnboundLocalError as e:
+        raise
