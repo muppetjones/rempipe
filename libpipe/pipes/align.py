@@ -14,7 +14,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class _AlignPipe(PresetPipe):
+class AlignPipe(PresetPipe):
 
     '''Execute a basic RNA-Seq pipeline from alignment to counting reads
 
@@ -90,7 +90,7 @@ class _AlignPipe(PresetPipe):
         return
 
 
-class AlignPipe(PresetPipe):
+class RnaSeqPipe(PresetPipe):
 
     '''Execute a basic RNA-Seq pipeline from sequencing to counting reads
 
@@ -109,12 +109,12 @@ class AlignPipe(PresetPipe):
     def _setup(self, *args, **kwargs):
         # NOTE: TrimPipe uses 'input_list' to set FastQC input.
         trim = TrimPipe(*args, **kwargs)
-        align = _AlignPipe(*args, **kwargs)
+        align = AlignPipe(*args, **kwargs)
 
         self.add(trim, align)
 
 
-class NestedAlignPipe(AlignPipe):
+class NestedRnaSeqPipe(RnaSeqPipe):
 
     '''Execute a basic RNA-Seq genomics pipeline with multiple genomes
 
@@ -139,7 +139,7 @@ class NestedAlignPipe(AlignPipe):
 
         if not isinstance(genome, list) or len(genome) < 2:
             msg = 'Multiple genomes must be given. For a single genome,' + \
-                'use "AlignPipe"'
+                'use "RnaSeqPipe"'
             raise ValueError(msg)
 
         kwargs['genome'] = genome[0]
@@ -156,7 +156,7 @@ class NestedAlignPipe(AlignPipe):
         # CRITICAL: each subpipe MUST have soft_output, same as above
         del kwargs['genome']
         secondary_alignments = [
-            _AlignPipe(*args, soft_output=True, genome=gen, **kwargs)
+            AlignPipe(*args, soft_output=True, genome=gen, **kwargs)
             for gen in secondary_genomes
         ]
 

@@ -6,7 +6,7 @@ sys.path.append("../remsci/")
 
 import remsci.scripted.base as base
 from remsci.lib.utility import path
-from libpipe.pipes.align import NestedAlignPipe
+from libpipe.pipes.align import NestedRnaSeqPipe
 from libpipe.parsers.fastq import FastqScripted
 # from libpipe.cmds import (
 #     SkewerCmd, HisatCmd, Bowtie2Cmd, FastqcCmd,
@@ -98,7 +98,7 @@ def run_pipe(summary, genome, project_dir, force=False):
         sample_dir = os.path.join(project_dir, job_name)
         path.makedirs(sample_dir)
 
-        pipe = NestedAlignPipe(
+        pipe = NestedRnaSeqPipe(
             job_name=job_name,
             odir=sample_dir,
             input_list=files,

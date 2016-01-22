@@ -3,7 +3,7 @@ from unittest.mock import patch
 from remsci.lib.tests.base import BaseTestCase
 
 import libpipe
-from libpipe.pipes.align import _AlignPipe, AlignPipe, NestedAlignPipe
+from libpipe.pipes.align import AlignPipe, RnaSeqPipe, NestedRnaSeqPipe
 
 import logging
 log = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ class Test_AlignPipe(BaseTestCase):
             libpipe.cmds.align.HisatCmd, '_additional_requirements')
 
         with patch('os.path.isfile', return_value=True):
-            ap = _AlignPipe(input_list=['test.fq'], genome='hsapiens')
+            ap = AlignPipe(input_list=['test.fq'], genome='hsapiens')
             ap.cmd()
 
         self.assertEqual(ap.output(), ('test_hsapiens.count', ))
@@ -29,7 +29,7 @@ class Test_AlignPipe(BaseTestCase):
         for i in range(2):
             input_list = ['test' + str(j) + '.fq' for j in range(i + 1)]
             with patch('os.path.isfile', return_value=True):
-                ap = _AlignPipe(input_list=input_list, genome='hsapiens')
+                ap = AlignPipe(input_list=input_list, genome='hsapiens')
                 ap.cmd()
 
             ap.soft_output = True
@@ -39,13 +39,13 @@ class Test_AlignPipe(BaseTestCase):
 
     def test_raises_ValueError_if_multiple_genomes_given_during_init(self):
         with self.assertRaises(ValueError):
-            _AlignPipe(genome=['hsapiens', 'mtuberculosis'])
+            AlignPipe(genome=['hsapiens', 'mtuberculosis'])
 
     def test_accepts_genome_list_with_single_genome_given_during_init(self):
-        _AlignPipe(genome=['hsapiens', ])  # no exception!
+        AlignPipe(genome=['hsapiens', ])  # no exception!
 
 
-class TestAlignPipe(BaseTestCase):
+class TestRnaSeqPipe(BaseTestCase):
 
     def setUp(self):
         self.kwargs = {
@@ -56,14 +56,14 @@ class TestAlignPipe(BaseTestCase):
 
     def test_init_raises_ValueError_if_no_input_list_given(self):
         with self.assertRaises(ValueError):
-            AlignPipe(**{'genome': 'hsapiens', })
+            RnaSeqPipe(**{'genome': 'hsapiens', })
 
     def test_init_raises_ValueError_if_no_genome_given(self):
         with self.assertRaises(ValueError):
-            AlignPipe(**{'input_list': ['file_1.fq', 'file_2.fq'], })
+            RnaSeqPipe(**{'input_list': ['file_1.fq', 'file_2.fq'], })
 
     def test_fastqc_args_set_to_input_list_during_init(self):
-        align = AlignPipe(**self.kwargs)
+        align = RnaSeqPipe(**self.kwargs)
         trim = align.cmds[0]
         fastqc = trim.cmds[0]
         self.assertEqual(fastqc.args, self.kwargs['input_list'])
@@ -72,20 +72,20 @@ class TestAlignPipe(BaseTestCase):
         self.mock_method(
             libpipe.cmds.align.HisatCmd, '_additional_requirements')
         self.mock_class('os.path.isfile', return_value=True)
-        align = AlignPipe(**self.kwargs)
+        align = RnaSeqPipe(**self.kwargs)
         align.cmd()
         self.assertEqual(align.cmds[0].output(), align.cmds[1].input())
 
     def test_setup_calls_TrimPipe_and_AlignPipe(self):
         sub1 = self.mock_class('libpipe.pipes.align.TrimPipe')
-        sub2 = self.mock_class('libpipe.pipes.align._AlignPipe')
+        sub2 = self.mock_class('libpipe.pipes.align.AlignPipe')
 
-        AlignPipe(**self.kwargs)
+        RnaSeqPipe(**self.kwargs)
         self.assertEqual(sub1.call_count, 1)
         self.assertEqual(sub2.call_count, 1)
 
 
-class TestNestedAlignPipe(BaseTestCase):
+class TestNestedRnaSeqPipe(BaseTestCase):
 
     def setUp(self):
         self.kwargs = {
@@ -97,14 +97,14 @@ class TestNestedAlignPipe(BaseTestCase):
     def test_raises_ValueError_if_single_genome_given_during_init(self):
         self.kwargs['genome'] = 'hsapiens'
         with self.assertRaises(ValueError):
-            NestedAlignPipe(**self.kwargs)
+            NestedRnaSeqPipe(**self.kwargs)
 
     def test_subsequent_align_pipes_use_unaligned_output_from_prev_pipe(self):
         self.mock_method(
             libpipe.cmds.align.HisatCmd, '_additional_requirements')
         self.mock_class('os.path.isfile', return_value=True)
 
-        pipe = NestedAlignPipe(**self.kwargs)
+        pipe = NestedRnaSeqPipe(**self.kwargs)
         pipe.cmd()  # force input update
 
         subpipe = pipe.cmds[-1]

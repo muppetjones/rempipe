@@ -7,3 +7,9 @@
     -   e.g., set 'hisat' as default 'align' command
 >   allow specific command selection from command line
     -   e.g., allow 'hisat' to be specified for 'align'
+
+### Fri, Jan 22, 2016
+>   Make pipes work in batch; add secondary processing for batches
+    (e.g., DESeq2)
+>   Integrate / test for scripts in dev_spike (Aggregators)
+>   Add WGS pipe
