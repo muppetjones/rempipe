@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 import libpipe
-from libpipe.cmds.utility import FastqcCmd
+from libpipe.cmds.utility import FastqcCmd, SamtoolsViewCmd
 
 import logging
 log = logging.getLogger(__name__)
@@ -75,3 +75,61 @@ class TestFastqcCmd(unittest.TestCase):
             [os.path.dirname(o) for o in output_html],
             [kwargs['-o']] * len(args)
         )
+
+
+class TestSamtoolsViewCmd(unittest.TestCase):
+
+    def test_cmd_ensures_sam_file_comes_before_region(self):
+        region = 'chr1:1-100'
+        sam = 'align.sam'
+        cmd = SamtoolsViewCmd(region, sam)
+        cmd_str = cmd.cmd()
+
+        region_loc = cmd_str.find(region)
+        sam_loc = cmd_str.find(sam)
+
+        self.assertNotEqual(region_loc, -1, 'Region not in command')
+        self.assertNotEqual(sam_loc, -1, 'SAM not in command')
+        self.assertLess(sam_loc, region_loc)
+
+    def test_cmd_prepends_region_given_during_init(self):
+        region = 'chr1:1-100'
+        sam = 'align.sam'
+        cmd = SamtoolsViewCmd(sam, region=region)
+        cmd_str = cmd.cmd()
+
+        region_loc = cmd_str.find(region)
+        sam_loc = cmd_str.find(sam)
+
+        self.assertNotEqual(region_loc, -1, 'Region not in command')
+        self.assertNotEqual(sam_loc, -1, 'SAM not in command')
+        self.assertLess(sam_loc, region_loc)
+
+    def test_cmd_converts_bam_to_sam_output_name_by_default(self):
+        bam = 'align.bam'
+        cmd = SamtoolsViewCmd(bam)
+        cmd.cmd()
+        self.assertTrue(
+            cmd.output()[0].endswith('.sam'), 'Not converted to sam')
+
+    def test_cmd_converts_sam_to_bam_output_name_with_flag(self):
+        sam = 'align.sam'
+        cmd = SamtoolsViewCmd(sam, '-b')
+        cmd.cmd()
+        self.assertTrue(
+            cmd.output()[0].endswith('.bam'),
+            'Not converted to bam ({} to {})'.format(sam, cmd.output()[0]))
+
+    def test_cmd_includes_flags_in_output_name(self):
+        sam = 'align.sam'
+        kwargs = {'-f': 4, '-F': 8}
+        cmd = SamtoolsViewCmd(sam, **kwargs)
+        cmd.cmd()
+        self.assertIn('_f4', cmd.output()[0])
+        self.assertIn('_F8', cmd.output()[0])
+
+    def test_output_name_not_equal_to_input(self):
+        sam = 'align.sam'
+        cmd = SamtoolsViewCmd(sam)
+        cmd.cmd()
+        self.assertNotEqual(sam, cmd.output()[0])

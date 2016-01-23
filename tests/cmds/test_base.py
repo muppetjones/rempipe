@@ -22,7 +22,8 @@ class CmdSample(BaseCmd):
         ('-o', 'FILE', 'Output file'),
         ('-n', 'INT', 'A number'),
         ('--foo', 'FILE', 'verbose arg'),
-        ('v', None, 'A random flag'),
+        ('-v', None, 'A random flag'),
+        ('-x', None, 'A random flag'),
     ]
 
     DEFAULTS = {
@@ -146,6 +147,17 @@ class TestBaseCmds(unittest.TestCase):
         self.assertEqual(self.CMD.DEFAULTS['-n'], defaults['-n'])
         self.assertEqual(self.CMD.DEFAULTS['-n'], cmd.DEFAULTS['-n'])
         self.assertNotEqual(self.CMD.DEFAULTS['-n'], cmd.kwargs['-n'])
+
+    def test_init_adds_args_w_hyphens_as_flags(self):
+
+        args = ['test.txt', '-v', '-x', 'test.xls']
+        cmd = self.CMD(*args)
+
+        expected_flags = [arg for arg in args if arg.startswith('-')]
+        expected_args = [arg for arg in args if arg not in expected_flags]
+
+        self.assertEqual(cmd.flags, expected_flags)
+        self.assertEqual(cmd.args, expected_args)
 
     #
     #   Misc
@@ -336,6 +348,7 @@ class TestBaseCmds(unittest.TestCase):
             b.cmd()
 
     def test_cmd_sets_linked_input_to_correct_flag_if_not_match_any(self):
+        '''CLARIFY--test name is awful'''
         self.CMD.REQ_TYPE = [
             [('-1', '-2'), ('.txt', ), False],
             [('-U', ), ('.txt', ), False],

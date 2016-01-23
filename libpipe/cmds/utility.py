@@ -149,3 +149,87 @@ class SamtoolsIndexCmd(BaseCmd):
 
     def output(self):
         return [self.args[0], ]  # return the given bam file
+
+
+class SamtoolsViewCmd(BaseCmd):
+
+    '''Samtools View
+
+    Prints alignments in SAM format
+
+    Command Usage:
+        samtools view [options...] <in.bam|in.sam|in.cram> [region]
+
+    Command Usage (legacy):
+        samtools sort [options...] <in> <out.prefix>
+    '''
+
+    NAME = 'samtools_view'
+    INVOKE_STR = 'samtools view'
+
+    ARGUMENTS = [
+        (None, 'FILE', 'SAM|BAM|CRAM input file'),
+        (None, 'REGION', 'Region(s) as 1-based RNAME[:STARTPOS[-ENDPOS]]'),
+        ('-o', 'FILE', 'File to write final output to'),
+        ('-f', 'INT',
+         'Output alignments with INT bits set in the FLAG field'),
+        ('-F', 'INT',
+         'Output alignments with INT bits NOT set in the FLAG field'),
+        ('-b', None, 'Output to BAM format'),
+        ('-h', None, 'Include headers in output'),
+    ]
+    DEFAULTS = {}
+
+    REQ_KWARGS = []
+    REQ_ARGS = 1
+    REQ_TYPE = [
+        [(0, ), ('.bam', '.sam')]
+    ]
+
+    def __init__(self, *args, region=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.region = region
+
+    def _prepreq(self):
+        super()._prepreq()
+
+        # CRITICAL: Ensure the SAM file comes BEFORE the region(s)
+        if len(self.args) > 1 and not self.args[0].endswith('am'):
+            self.args = [arg for arg in self.args if arg.endswith(
+                'am')] + [arg for arg in self.args if not arg.endswith('am')]
+
+        # Append any regions given during init
+        if self.region:
+            self.args.append(self.region)
+
+    def _prepcmd(self):
+        if '-o' not in self.kwargs:
+            # sam to bam
+            if self.args[0].endswith('.sam') and '-b' in self.flags:
+                ofile = self.args[0].replace('.sam', '.bam')
+            # bam to sam
+            elif self.args[0].endswith('.bam') and '-b' not in self.flags:
+                ofile = self.args[0].replace('.bam', '.sam')
+            # no type conversion (CRAM not implemented)
+            else:
+                ofile = self.args[0]
+
+            # filter using -f and|or -F
+            base, extn = os.path.splitext(ofile)
+            for flag in ['-f', '-F']:
+                try:
+                    flag_str = '{}{}'.format(flag[1:], self.kwargs[flag])
+                    base = '{}_{}'.format(base, flag_str)
+                except KeyError:
+                    pass
+            ofile = base + extn
+
+            # DO NOT OVERWRITE!! -- if it's the same name, just add SOMETHING
+            if ofile == self.args[0]:
+                ofile = base + '_filt' + extn
+
+            self.kwargs['-o'] = ofile
+
+    def output(self):
+        return [self.kwargs['-o'], ]  # return the given bam file
