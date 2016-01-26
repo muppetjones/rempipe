@@ -92,6 +92,7 @@ class WgsPipe(PresetPipe):
         #   3. Allow for types to be used in req args
         #       -- cmd.output will be able to return those types
         #       -- probably still need better linking...somehow
+        #   NO! Must be 2, as a sub command or something...3 same issue as 1
 
         # 4b. velveth
         args = []
