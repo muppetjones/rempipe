@@ -57,6 +57,11 @@ class TestBaseCmds(unittest.TestCase):
     #   Initialization tests
     #
 
+    def test_BaseCmd_cannot_be_initialized(self):
+
+        with self.assertRaises(TypeError):
+            BaseCmd()
+
     def test_init_raises_NotImplementedError_if_ARGUMENTS_not_set(self):
         '''ID10T error'''
 

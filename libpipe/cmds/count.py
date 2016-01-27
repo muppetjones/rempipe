@@ -150,7 +150,7 @@ class HtseqCountCmd(BaseCmd):
         # -- DO NOT use config if ANY found
         config_safe = self._unsafe_char_protect(config_str)
         if config_safe != config_str:
-            raise self.ConfigError('illegal', val=[config_file])
+            raise self.ConfigError('illegal', details=[config_file])
 
         # Better method based on regex split
         # -- split only on spaces followed by a dash!

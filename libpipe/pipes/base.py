@@ -12,6 +12,8 @@ from remsci.lib.decorators import file_or_handle
 
 
 import libpipe.templates
+from libpipe.cmds.base import CmdInterface
+from libpipe.utility.exceptions import RempipeError
 
 import logging
 log = logging.getLogger(__name__)
@@ -21,7 +23,7 @@ PIPE_PBS_TEMPLATE = ''
 DO_RUN = False
 
 
-class BasePipe(object):
+class BasePipe(CmdInterface):
 
     '''Define a group of commands.
 
@@ -35,20 +37,14 @@ class BasePipe(object):
     #   Custom Exceptions
     #
 
-    class QueueSubmissionError(FileNotFoundError):
+    class QueueSubmissionError(RempipeError, FileNotFoundError):
         pass
 
-    class GenericPipeError(ValueError):
+    class GenericPipeError(RempipeError, ValueError):
         ERRMSG = {
             'job_name': 'Pipe requires a job_name',
             'empty': 'Pipe does not contain any commands',
         }
-
-        def __init__(self, key, *args, **kwargs):
-            try:
-                super().__init__(self.ERRMSG[key], *args, **kwargs)
-            except KeyError:
-                super().__init__(key, *args, **kwargs)
 
     #
     #   Magic methods

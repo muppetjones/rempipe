@@ -4,12 +4,28 @@ import abc
 import re
 
 from libpipe.cmds.help import HelpCmd
+from libpipe.utility.exceptions import RempipeError
 
 import logging
 log = logging.getLogger(__name__)
 
 
-class BaseCmd(metaclass=abc.ABCMeta):
+class CmdInterface(metaclass=abc.ABCMeta):
+
+    @abc.abstractmethod
+    def output(self):
+        pass
+
+    @abc.abstractmethod
+    def link(self, cmd):
+        pass
+
+    @abc.abstractmethod
+    def cmd(self):
+        pass
+
+
+class BaseCmd(CmdInterface):
 
     '''A base (abstract) class for handling command line calls.
 
@@ -117,52 +133,30 @@ class BaseCmd(metaclass=abc.ABCMeta):
     #   Custom Exceptions
     #
 
-    class CmdLinkError(TypeError):
+    class CmdLinkError(RempipeError, TypeError):
         ERRMSG = {
             'input': 'Bad link: no input given or input not callable',
             'mismatch': 'Bad link: unexpected input type',
         }
 
-        def __init__(self, key, *args, **kwargs):
-            try:
-                super().__init__(self.ERRMSG[key], *args, **kwargs)
-            except KeyError:
-                super().__init__(key, *args, **kwargs)
+    class PositionalArgError(RempipeError, IndexError):
+        POSITIONALARGERROR = {
+            'missing': '{}: Missing {} of {} required positional parameters',
+        }
 
-    class PositionalArgError(IndexError):
-        pass
-
-    POSITIONALARGERROR = {
-        'missing': '{}: Missing {} of {} required positional parameters',
-    }
-
-    class KeywordArgError(AttributeError):
+    class KeywordArgError(RempipeError, AttributeError):
         ERRMSG = {
             'missing': '{}: Missing required keyword arguments: {}',
             'unknown': 'Unrecognized keyword argument given: "{}"',
         }
 
-        def __init__(self, key, *args, val=[], ** kwargs):
-            try:
-                super().__init__(
-                    self.ERRMSG[key].format(*val), *args, **kwargs)
-            except KeyError:
-                super().__init__(key, *args, **kwargs)
-
-    class FileTypeError(TypeError):
+    class FileTypeError(RempipeError, TypeError):
         pass
 
-    class ConfigError(ValueError):
+    class ConfigError(RempipeError, ValueError):
         ERRMSG = {
             'illegal': 'Illegal characters in config file: {}',
         }
-
-        def __init__(self, key, *args, val=[], ** kwargs):
-            try:
-                super().__init__(
-                    self.ERRMSG[key].format(*val), *args, **kwargs)
-            except KeyError:
-                super().__init__(key, *args, **kwargs)
 
     #
     #   Magic methods
@@ -310,7 +304,7 @@ class BaseCmd(metaclass=abc.ABCMeta):
             if k not in known_flags
         ]
         if unknown_flags:
-            raise cls.KeywordArgError('unknown', val=unknown_flags)
+            raise cls.KeywordArgError('unknown', details=unknown_flags)
 
     #
     #   "Public" access
@@ -541,17 +535,16 @@ class BaseCmd(metaclass=abc.ABCMeta):
             raise  # > 1 XOR option given
         else:
             if missing:
-                raise self.KeywordArgError('missing', val=[
+                raise self.KeywordArgError('missing', details=[
                     self.name, ', '.join(str(m) for m in missing)
                 ])
 
         # check for expected number of args
         if len(self.args) < self.REQ_ARGS:
-            msg = self.POSITIONALARGERROR['missing'].format(
+            raise self.PositionalArgError('missing', details=[
                 self.__class__.__name__,
                 self.REQ_ARGS - len(self.args), self.REQ_ARGS,
-            )
-            raise self.PositionalArgError(msg)
+            ])
 
         # check for expected file types
         try:
