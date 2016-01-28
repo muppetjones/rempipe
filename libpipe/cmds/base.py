@@ -26,6 +26,10 @@ class CmdInterface(metaclass=abc.ABCMeta):
     def cmd(self):
         pass
 
+    # @abc.abstractmethod
+    # def help(self):
+    #     pass
+
 
 def universal_fall_through_decorator(func):
     '''A fall through decorator using the UFD
@@ -53,140 +57,190 @@ def fall_through_decorator(func):
     return _fall_through_decorator
 
 
-class BaseCmd(CmdInterface):
+class CmdAttributes(object):
 
-    '''A base (abstract) class for handling command line calls.
+    '''Store attributes related to handling command line calls.
 
-    Defines a number of methods and attributes for creating command
-    line, well, commands.
-
-    NOTE: Argument requirements are checked in `cmd`.
-
-    Class Attributes:
-        NAME        A human readable string for identifying the command.
-        INVOKE_STR  The string used to invoke the command.
-        ARGUMENTS   A list of arguments defined by (<flag>, <type>, <descr>).
+    Attributes
+        name        A human readable string for identifying the command.
+        synopsis    [optional] A brief synopsis of the command.
+        description [optional] A description of the command.
+        invoke_str  The string used to invoke the command.
+        arguments   A list of arguments defined by (<flag>, <type>, <descr>).
                     When <flag> is None, the argument is positional, and
                     when <type> is None, the argument is just a flag.
-        DEFAULTS    Default values for keyword arguments. Make sure that
-                    the flags have expected leading hyphens, e.g., '-f'.
-        HELP_DICT   A dict containing elements for creating a HelpCmd object.
-                    More of a reference for the class than anything.
-                    Could be used to type check eventually.
-        HELP        A HelpCmd object (initialized during help call)
+                    Examples:
+                        (None, 'FILE',  'The input file'),
+                        ('-h', None,    'Display the help text'),
+                        ('-o', 'FILE',  'The output file')
+        defaults    Dict of default values for keyword arguments.
+                    Flags have expected leading hyphens, e.g., '-f'.
 
-        REQ_KWARGS  A list of the required keyword args, e.g., ['-f'].
+        req_args    Int denoting how many positional arguments are expected.
+        req_kwargs  A list of the required keyword args, e.g., ['-f'].
                     A tuple indicates required together, e.g., [('-1', '-2')].
                     A list indicates XOR requirement, e.g., [['-U', '-1']].
-        REQ_ARGS    Int denoting how many positional arguments are expected.
-        REQ_TYPE    A list of kwarg flags and their expected extensions.
+        req_type    A list of kwarg flags and their expected extensions.
                     A single requirement will have two to three elements:
-                        <flags tuple>, <extension tuple>, [match any bool]
+                        <flags tuple>, <extension tuple>, [bool match only]
                     For example, the following type requirement would
                     naively define the input required by hisat:
-                        REQ_TYPE = [
-                            [('-1', '-2'), ('.fq', '.fa'), False],
-                            [('-U', ),     ('.fq', '.fa'), False],
+                        req_type = [
+                            [('-1', '-2'), ('.fq', '.fa'), True],
+                            [('-U', ),     ('.fq', '.fa'), True],
                             [('-S', ),     ('sam', )],
                         ]
-                    The 'match_any' bool element is used only for matching
-                    linked command input and is assumed True if ommitted.
-                    If False, the option will not be matched unless the
+                    The 'match_only' bool element is used only for matching
+                    linked command input and is assumed False if ommitted.
+                    If True, the option will not be matched unless the
                     given flags are matched exactly. In the above example,
                     a single linked fastq file would be set to '-U' and three
                     linked fastq files would not be used at all.
-                    See '__match_input' and '_check_type' for more details.
+                    See '_match_input_with_args' & '_check_type' for details.
 
-    Public Methods:
-        input()     Set after linking to another command. References
-                    the linked command's output method.
-        output()    Return a list of output files.
-        link(CMD)   Link two commands: Set the input of CMD to this object's
-                    output method.
-                    Return the linked command to enable chaining.
-        cmd()       Return the BASH-style command string.
-                    All requirement checking is done here. If linked, the
-                    input method is used to update defined arguments.
-        help()      Returns a usage message. Uses class attributes NAME,
-                    INVOKE_STR, ARGUMENTS, SYNOPSIS, and DESCRIPTION.
+    Example:
+        hisat_attr = CmdAttributes(
+            name='hisat2',
+            invoke_str='hisat2'
+        )
 
-
-    Class Methods for override (in call order):
-        _prepreq()  Use to setup any last minute details before
-                    requirements are checked, such as handling the
-                    results of linking.
-                    NOTE: Call parent to ensure intended functionality.
-        _additional_requirements():
-                    Use to define additional requirements related
-                    to successful command execution. This should raise
-                    an exception if conditions are not met.
-                    NOTE: This method is not implemented in BaseCmd.
-        _prepcmd()  Use to setup any last minute details before cmd
-                    is called, such as setting up redirect.
-                    NOTE: This method is not implemented in BaseCmd.
-
-    SEE ALSO:
-        HelpCmd
-
-    NOTE on prefix commands:
-        [SJB] I had once considered allowing for a sort-of sub command
-        whose input was used directly by the following command, e.g.,
-            k=$(velvetk <args>)
-            velveth out_dir $k <args>
-        However, the obvious issue is linking the prefix command to the
-        current command. The linking proves fairly complicated with
-        several use cases, particularly linking variable names, position
-        index, or keyword.
-
-        Instead, I think there are two simpler options:
-            1. Wrapping a command. Pass in a variable name, and wrap the
-                command in a bash variable assignment: X="$(<cmd>)"
-            2. Fall through. A command with fall through will pass ALL
-                input into output (while optionally adding its own output).
-
-        Pros:
-        > Less specialization needed. Wrapping is simple and globally
-            configurable. Fall through is obvious.
-        > Presumably, the argument that would use the prefix may still
-            be used normally (given the value directly rather than relying
-            upon the prefix). This simplifies that.
-        > Presumably, commands that would use a prefix are very closely
-            tied to the prefix--these are not global or common situations.
-            As such, handling via a specific pipe would be better.
-            (Pass responsibility up the chain)
-
-        Cons:
-        > Requires more specific attention for each particular command.
-            Loss of modularity.
     '''
 
-    # command defining attributes
-    NAME = None  # human readable name of command, e.g., 'samtools_sort'
-    INVOKE_STR = None  # string to invoke command, e.g., 'samtools sort'
-    ARGUMENTS = None  # see HELP_DICT['arguments'] for example
-    DEFAULTS = {}  # starting values for kwargs
+    def __init__(
+        self,
+        name='', synopsis='', description='',
+        invoke_str='',
+        arguments=[], defaults={},
+        req_args=0,
+        req_kwargs=[],
+        req_type=[],
+    ):
+        if not invoke_str:
+            invoke_str = name
 
-    # Help related attributes
-    HELP_DICT = {  # help text
-        'synopsis': 'cmd_invoke -f FILE [-n INT, -h] FILE ...',
-        'description': 'A description of the command.',
-        'arguments': [
-            (None, 'FILE', 'Example input one'),
-            (None, 'FILE', 'Example input two'),
-            ('-f|--file', 'FILE', 'Example keyword argument'),
-            ('-n', 'INT', 'Example keyword argument'),
-            ('-v', None, 'Example flag argument'),
-        ],
-    }
-    HELP = None  # instantiated at first call to 'help'
+        # non-mutable
+        self.name = name
+        self.synopsis = synopsis
+        self.description = description
+        self.invoke_str = invoke_str
 
-    # set argument requirements
-    # NOTE: required kwargs is a list of the required argument flags
-    # NOTE: required args is an int of the number of required args
-    # NOTE: flags, by definition, are optional
-    REQ_KWARGS = []
-    REQ_ARGS = 0
-    REQ_TYPE = []
+        # ensure deep copies
+        self.arguments = arguments[:]
+        self.defaults = dict.copy(defaults)
+        self.req_args = req_args
+        self.req_kwargs = req_kwargs[:]
+        self.req_type = req_type[:]
+
+        if not arguments:
+            raise ValueError('No arguments given')
+
+
+class BaseCmd(CmdInterface):
+
+    '''An abstract class for handling command line calls.
+
+    Create a command line string for executing a given program. Children
+    must define certain class attributes that characterize the program
+    requirements. Certain methods may be overridden to allow specific
+    handling and preparation of given arguments.
+
+    TODO:           Implement command attributes using the Strategy pattern.
+    TODO:           Allow ARGUMENTS to accept actual types to allow for
+                    better type checking (instead of just strings)
+
+    Attributes:
+        strict: A boolean indicating whether to use strict arg handling.
+            If true, cmd and init will raise for unknown kwargs and
+            unused link input. Default: True.
+        timestamp: A string indicating the time at initialization.
+        wrap: An optional string variable name. If set, the command will be
+            wrapped in a BASH-style assignment to a var with the given name.
+            Default: None.
+        fall_through: A boolean indicating whether or not the given input
+            should be passed as ("fall through") output. Default: False.
+
+    Interface:
+        output(): Return a list of output files
+        link(CMD): Link the given CMD to use the current CMD's output.
+            Returns the given CMD to allow chaining.
+        cmd(): Return the BASH-style command string. The majority
+            of requirement checking is done here to allow for
+            more dynamic creation of the command string.
+
+    Class Attributes:
+        See CmdAttributes class.
+
+    Class Methods for override (in call order):
+        _prepreq(): Use to setup any last minute details before
+            requirements are checked, such as handling the
+            results of linking.
+            NOTE: Call parent to ensure intended functionality.
+        _additional_requirements(): Use to define additional requirements
+            related to successful command execution. This should raise
+            an exception if conditions are not met.
+            NOTE: This method is not implemented in BaseCmd.
+        _prepcmd(): Use to setup any last minute details before cmd
+            is called, such as setting up redirect.
+            NOTE: This method is not implemented in BaseCmd.
+
+    Custom Exceptions:
+        BaseCmd defines a number of custom exceptions with pre-defined
+        error messages. These messages are meant for internal use ONLY
+        and can be caught w/ specific Python exceptions, e.g., ValueError.
+        Using custom exceptions over custom messages helps to ensure that
+        the error type remains constant for a given type of error:
+            CmdLinkError -> TypeError
+            PositionalArgError -> IndexError
+            KeywordArgError -> AttributeError
+            FileTypeError -> TypeError
+            ConfigError -> ValueError
+
+    Custom Configuration:
+        Some commands may allow for the use of files that contain
+        configuration data for running the command. See the specific
+        child for use case.
+
+    SEE ALSO:
+        HelpCmd, CmdAttributes
+    '''
+
+    # NOTE on prefix commands:
+    #     [SJB] I had once considered allowing for a sort-of sub command
+    #     whose input was used directly by the following command, e.g.,
+    #         k=$(velvetk <args>)
+    #         velveth out_dir $k <args>
+    #     However, the obvious issue is linking the prefix command to the
+    #     current command. The linking proves fairly complicated with
+    #     several use cases, particularly linking variable names, position
+    #     index, or keyword.
+    #
+    #     Instead, I think there are two simpler options:
+    #         1. Wrapping a command. Pass in a variable name, and wrap the
+    #             command in a bash variable assignment: X="$(<cmd>)"
+    #         2. Fall through. A command with fall through will pass ALL
+    #             input into output (while optionally adding its own output).
+    #
+    #     Pros:
+    #     > Less specialization needed. Wrapping is simple and globally
+    #         configurable. Fall through is obvious.
+    #     > Presumably, the argument that would use the prefix may still
+    #         be used normally (given the value directly rather than relying
+    #         upon the prefix). This simplifies that.
+    #     > Presumably, commands that would use a prefix are very closely
+    #         tied to the prefix--these are not global or common situations.
+    #         As such, handling via a specific pipe would be better.
+    #         (Pass responsibility up the chain)
+    #
+    #     Cons:
+    #     > Requires more specific attention for each particular command.
+    #         Loss of modularity.
+
+    #
+    #   Class attributes
+    #
+
+    # Children must set 'attr' to CmdAttributes instance
+    attr = None
 
     #
     #   Custom Exceptions
@@ -201,6 +255,8 @@ class BaseCmd(CmdInterface):
     class PositionalArgError(RempipeError, IndexError):
         POSITIONALARGERROR = {
             'missing': '{}: Missing {} of {} required positional parameters',
+            'str_only': ('Positional args should be strings. ' +
+                         '(Did you expand **kwargs?)')
         }
 
     class KeywordArgError(RempipeError, AttributeError):
@@ -252,8 +308,7 @@ class BaseCmd(CmdInterface):
         try:
             flags = [v for v in args if v.startswith('-')]
         except AttributeError:
-            msg = 'Make sure to expand keyword args, e.g., Cmd(**kwargs)'
-            raise AttributeError(msg)
+            raise self.PositionalArgError('str_only')
         args = [v for v in args if v not in flags]
 
         if strict:
@@ -265,17 +320,11 @@ class BaseCmd(CmdInterface):
         self.strict = strict
 
         # make sure we deep copy defaults and args
-        self.redirect = None  # self.REDIRECT
-
-        self.kwargs = {}
-        self.kwargs.update(self.DEFAULTS)
+        self.redirect = None
+        self.kwargs = dict.copy(self.attr.defaults)
         self.kwargs.update(kwargs)
-
-        self.args = []
-        self.args.extend(args)
-
-        self.flags = []
-        self.flags.extend(flags)
+        self.args = args[:]
+        self.flags = flags[:]
 
         # setup wrap
         self.wrap = wrap  # wrap command in bash assignment statement
@@ -295,97 +344,35 @@ class BaseCmd(CmdInterface):
     @property
     def name(self):
         '''Name property. Do NOT override'''
-        return self.NAME
+        return self.attr.name
 
     @property
     def invoke_str(self):
         '''Invocation string property. Do NOT override (unless necessary)'''
-        return self.INVOKE_STR
-
-    #
-    #   Class methods
-    #
-
-    @classmethod
-    def _filter_by_type(self, args, filt):
-        filtered = [
-            arg for arg in args
-            if os.path.splitext(arg)[1] in filt
-        ]
-        return filtered
-
-    @classmethod
-    def _trubase(self, path_name):
-        return os.path.splitext(os.path.basename(path_name))[0]
-
-    @classmethod
-    def _unsafe_char_protect(cls, input_str, strict=True):
-
-        try:
-            # remove unicode control characters
-            input_str = cls.rx_illegal_char.sub('', input_str)
-
-            # remove BASH unsafe characters
-            replacement = 'ESCCHAR\g<unsafe>' if not strict else ''
-            input_str = cls.rx_unsafe_char.sub(replacement, input_str)
-            if replacement:
-                input_str = input_str.replace(replacement[:7], '\\')
-            return input_str.rstrip()
-
-        except AttributeError:
-            # compiile and create these regex only once
-            cls.__init_unsafe_regex()
-            cls.__init_illegal_char_regex()
-            return cls._unsafe_char_protect(input_str, strict=strict)
-
-    @classmethod
-    def __init_unsafe_regex(cls):
-        unsafe = re.escape(';&|><*?`$(){}[]!#')
-        unsafe = r'(?P<unsafe>[{}]\s?)\s*'.format(unsafe)
-        cls.rx_unsafe_char = re.compile(unsafe)
-
-    @classmethod
-    def __init_illegal_char_regex(cls):
-        # From a blog post for removing illegal ASCII control characters
-        # http://chase-seibert.github.io/blog/2011/05/20/stripping-control-characters-in-python.html
-        RE_XML_ILLEGAL = (
-            u'([\u0000-\u0008\u000b-\u000c\u000e-\u001f\ufffe-\uffff])' +
-            u'|' +
-            u'([%s-%s][^%s-%s])|([^%s-%s][%s-%s])|([%s-%s]$)|(^[%s-%s])' %
-            (chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
-             chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
-             chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
-             ))
-        cls.rx_illegal_char = re.compile(RE_XML_ILLEGAL)
-
-    @classmethod
-    def _check_for_unknown_flags(cls, flags):
-        # check for unknown kwargs
-        # NOTE: We MUST have removed timestamp AND
-        #       ensured hyphens BEFORE this
-        # NOTE: We may want to
-        try:
-            known_flags = [v[0] for v in cls.ARGUMENTS if v[0]]
-        except TypeError:
-            raise NotImplementedError(
-                'ARGUMENTS must be set on child class')
-        unknown_flags = [
-            k for k in flags
-            if k not in known_flags
-        ]
-        if unknown_flags:
-            raise cls.KeywordArgError('unknown', details=unknown_flags)
+        return self.attr.invoke_str
 
     #
     #   "Public" access
     #
 
+    @classmethod
+    def help(cls):
+        '''Return usage text
+
+        NOTE: Creates the HelpCmd object iff not found
+        '''
+        try:
+            return str(cls._help)
+        except AttributeError:
+            cls._help = HelpCmd(**cls.attr.__dict__)
+            return str(cls._help)
+
     @abc.abstractmethod
     def output(self):
         '''Return list of created files.
 
-        Must override. Should at the very least return the input to allow
-        easier chaining.
+        Children must override.
+        Should at the very least return the input to allow easier chaining.
         '''
         return None
 
@@ -402,11 +389,48 @@ class BaseCmd(CmdInterface):
         return cmd
 
     def cmd(self, *args, wrap=None, **kwargs):
-        '''Run command preprocessing and return command'''
+        '''Generate the command string
+
+        Build the command string using the given arguments/inputs.
+        Performs a number of processing steps before actually creating the
+        command string:
+            1. Match up the given input with arguments (uses attr.req_type).
+            2. Process arguments as needed BEFORE checking requirements.
+                > via '_prepreq', defined per child class.
+                > e.g., ensure correct argument order.
+            3. Check that requirements are met (via attr.req_[kw]args).
+            4. Check for any additional requirements.
+                > via '_additional_requirements', defined by child.
+                > e.g., ensure a complete Bowtie index exists.
+            5. Process arguments as needed AFTER checkeing requirements.
+                > via '_prepcmd', as defined per child class.
+                > e.g., defining a redirect based on args.
+            6. Generate the command string.
+            7. Wrap the command string (if given).
+
+        Arguments:
+            *args, **kwargs: Catch (and ignore) anything passed in.
+            wrap: See main docstring. Will wrap command in a BASH-style
+                assignment to a variable with the given name.
+        Return:
+            A BASH executable string.
+        Raises:
+            TypeError if link input is bad/unusable or if wrong file type.
+            AttributeError if bad kwargs.
+            IndexError if bad args.
+        '''
+
+        try:
+            self._match_input_with_args()
+        except self.CmdLinkError:
+            raise  # TypeError!
 
         # run requirements prep, if provided by child
         # -- use for ensuring the requirements are met
-        self._prepreq()
+        try:
+            self._prepreq()
+        except NotImplementedError:
+            pass  # may not be set on child class
 
         # ensure we can create the command as expected
         try:
@@ -423,7 +447,7 @@ class BaseCmd(CmdInterface):
         # for the purpose of ensuring successful command execution
         try:
             self._additional_requirements()
-        except AttributeError:
+        except NotImplementedError:
             pass  # ignore if it's not defined
 
         # run command prep, if provided by child
@@ -431,7 +455,7 @@ class BaseCmd(CmdInterface):
         # -- NOTE: should require the necessary arguments
         try:
             self._prepcmd()
-        except AttributeError:
+        except NotImplementedError:
             pass  # may not be set on child class
 
         cmd_str = self._cmd(*args, **kwargs)
@@ -446,33 +470,31 @@ class BaseCmd(CmdInterface):
         # join all current parts with a new line character
         return cmd_str
 
-    def help(self):
-        '''Return usage text
+    #
+    #   To override
+    #
 
-        NOTE: Creates the HelpCmd object iff not found
-        '''
+    def _prepreq(self):
+        raise NotImplementedError('Implement on child')
 
-        if self.HELP is None:
-            try:
-                self.HELP_DICT['arguments'] = self.ARGUMENTS
-            except AttributeError:
-                pass  # alias
-            self.HELP_DICT['name'] = self.NAME
-            self.HELP = HelpCmd(**self.HELP_DICT)
-        return str(self.HELP)
+    def _prepcmd(self):
+        raise NotImplementedError('Implement on child')
+
+    def _additional_requirements(self):
+        raise NotImplementedError('Implement on child')
 
     #
     #   "Private" access
     #
 
     def _has_output(self):
-        '''Checks for expected output from a command
+        '''Checks for existence of specified output files.
 
         Arguments:
-            cmd     Command object.
+            None.
         Returns:
-            True if ALL output is found.
-            False otherwise
+            True if ALL output files exist.
+            False otherwise.
         '''
 
         for f in self.output():
@@ -480,20 +502,19 @@ class BaseCmd(CmdInterface):
                 return False
         return True
 
-    def _prepreq(self):
-        try:
-            self.__match_input()
-        except AttributeError:
-            return  # nothing to do
+    def _match_input_with_args(self):
+        '''Match linked inputs to arguments according to attr.req_type
 
-    def __match_input(self):
-        '''Match linked inputs to keyword arguments according to REQ_TYPE
+        NOTE: If NOT strict AND the required number of positional args has
+            not been met, linked input will be assigned to args. Any
+            positional arguments set in attr.req_type will be set
+            regardless of attr.req_args if the expected type is found.
 
-        Uses REQ_TYPE to match linked input to a keyword argument or to
-        positional arguments IFF REQ_ARGS > 1, e.g.,
+        Uses attr.req_type to match linked input to a keyword or
+        positional argument, e.g.,
             input: ['a.txt', 'a.fq', 'b.fq']
-            REQ_ARGS = 1
-            REQ_TYPE = [[('-b', '-a'), ('.fq',)]]  <-- notice the order!
+            attr.req_args = 1
+            attr.req_type = [[('-b', '-a'), ('.fq',)]]  <-- notice the order!
         will result in the following argument conditions:
             kwargs: {'-b': 'a.fq', '-a': 'b.fq'}
             args: ['a.txt']
@@ -511,24 +532,20 @@ class BaseCmd(CmdInterface):
             n_args = len(args)
         except AttributeError:
             return None
-            # raise AttributeError('Attribute "input" is not set (no link)')
         except TypeError:
             raise self.CmdLinkError('input')
-        # else:
-            # if n_args == 0:
-            #     raise self.CmdLinkError('no_input')
 
-            # match with required type
-        for req_type in self.REQ_TYPE:
+        # match with required type
+        for req_type in self.attr.req_type:
             try:
-                flag_list, type_list, match_any = req_type
+                flag_list, type_list, match_only = req_type
             except ValueError:
                 flag_list, type_list = req_type
-                match_any = True
+                match_only = False
 
             # find args with matching file type and update kwargs
             filtered = self._filter_by_type(args, type_list)
-            if match_any or len(filtered) == len(flag_list):
+            if not match_only or len(filtered) == len(flag_list):
                 self.kwargs.update(dict(zip(flag_list, filtered)))
             else:
                 continue  # we don't want to remove if we didn't use!!
@@ -536,7 +553,7 @@ class BaseCmd(CmdInterface):
             # remove used
             args = [a for a in args if a not in filtered]
 
-        # if a positional argument was defined in REQ_TYPES,
+        # if a positional argument was defined in attr.req_types,
         # it is now stored in kwargs -- move it to args and clean kwargs
         pos_kw = [k for k in self.kwargs.keys() if isinstance(k, int)]
         self.args.extend([self.kwargs[pos] for pos in sorted(pos_kw)])
@@ -544,8 +561,10 @@ class BaseCmd(CmdInterface):
             del self.kwargs[pos]  # delete instead of dict comp
 
         # otherwise, use as required args IFF expected
-        if len(self.args) < self.REQ_ARGS:
-            n_still_required = self.REQ_ARGS - len(self.args)
+        # i.e., attr.req_args > 1
+        # BUT only if NOT strict
+        if not self.strict and len(self.args) < self.attr.req_args:
+            n_still_required = self.attr.req_args - len(self.args)
             self.args.extend(args[:n_still_required])
 
         # finally, if we haven't used ANY of the input, raise CmdLinkError
@@ -562,11 +581,14 @@ class BaseCmd(CmdInterface):
         '''Create BASH executable string.
 
         Arguments:
-            readable (bool) Denotes whether command should be human readable
+            verbose: A bool indicating whether the command should be easier
+                to read. Currently, that means splitting the command with
+                new lines.
+            strict: CRITICAL: Double check this. Should use from init?
+                A bool indicating whether or not to use strict cleaning
+                of the command string before returning.
         Returns:
             A BASH executable string.
-        Raises:
-            ValueError if argument requirements are not met.
         '''
 
         # put the command on separate lines for human readable version
@@ -623,10 +645,10 @@ class BaseCmd(CmdInterface):
                 ])
 
         # check for expected number of args
-        if len(self.args) < self.REQ_ARGS:
+        if len(self.args) < self.attr.req_args:
             raise self.PositionalArgError('missing', details=[
                 self.__class__.__name__,
-                self.REQ_ARGS - len(self.args), self.REQ_ARGS,
+                self.attr.req_args - len(self.args), self.attr.req_args,
             ])
 
         # check for expected file types
@@ -640,16 +662,16 @@ class BaseCmd(CmdInterface):
     def __check_type(self):
         '''Check specified kwargs to ensure given expected file type.
 
-        NOTE: All extensions in REQ_TYPE should have leading periods.
+        NOTE: All extensions in attr.req_type should have leading periods.
         TODO: Update to use Django model to handle file types.
 
         Returns:
             True if expected file types match given files.
         Raises:
-            TypeError if a given argument has wrong file type.
+            FileTypeError if a given argument has wrong file type.
         '''
 
-        for req in self.REQ_TYPE:
+        for req in self.attr.req_type:
             try:
                 # match_any used for matching only, not checking
                 flags, types, match_any = req
@@ -675,12 +697,12 @@ class BaseCmd(CmdInterface):
     def __check_kwargs(self):
         '''Make sure that the given kwargs contain all required kwargs
 
-        Checks all elements in REQ_KWARGS.
+        Checks all elements in attr.req_kwargs.
         > Strings are simple checks against the kwargs attribute.
         > Lists are XOR required keywords, e.g., one and only one req.
         > Tuples are AND required keywords, e.g., if one, then all.
 
-        Example REQ_KWARGS:
+        Example attr.req_kwargs:
             ['-f', ('-1', '-2'), ['-1', '-U']]
 
         Arguments:
@@ -690,11 +712,11 @@ class BaseCmd(CmdInterface):
         '''
 
         # simple requirement
-        simple = [kw for kw in self.REQ_KWARGS if isinstance(kw, str)]
+        simple = [kw for kw in self.attr.req_kwargs if isinstance(kw, str)]
         missing = [kw for kw in simple if kw not in self.kwargs]
 
         # compound requirement -- require all or none of args in the tuple
-        compound = [kw for kw in self.REQ_KWARGS if kw not in simple]
+        compound = [kw for kw in self.attr.req_kwargs if kw not in simple]
         for cmpd in compound:
 
             # tuple indicates all or nothing
@@ -715,3 +737,109 @@ class BaseCmd(CmdInterface):
                         'More than one arg given: {}'.format(cmpd))
 
         return missing
+
+    #
+    #   Private access class methods
+    #
+
+    @classmethod
+    def _filter_by_type(self, args, filt):
+        '''Filter a list of strings based on a list of extension strings
+
+        Arguments:
+            args: A list of file path strings
+            filt: A list of file extension strings
+        Return:
+            A list of file path strings that match the given extensions.
+        Example:
+            self._filter_by_type(['a.txt', 'b.fq'], ['.fq'])
+        '''
+        filtered = [
+            arg for arg in args
+            if os.path.splitext(arg)[1] in filt
+        ]
+        return filtered
+
+    @classmethod
+    def _trubase(self, path_name):
+        '''A shortcut for splitting the path and the extension'''
+
+        return os.path.splitext(os.path.basename(path_name))[0]
+
+    @classmethod
+    def _unsafe_char_protect(cls, input_str, strict=True):
+        '''Removes unsafe characters from a string
+
+        Checks for unicode control characters and unsafe BASH chars and
+        removes them from the given string. If not strict, unsafe BASH
+        characters are escaped instead. Uses pre-compiled regex for speed.
+
+        Arguments:
+            input_str: The string to clean.
+            strict: A bool indicating whether to remove or escape unsafe
+                BASH characters.
+        Return:
+            The clean string.
+        '''
+
+        try:
+            # remove unicode control characters
+            input_str = cls.rx_illegal_char.sub('', input_str)
+
+            # remove BASH unsafe characters
+            replacement = 'ESCCHAR\g<unsafe>' if not strict else ''
+            input_str = cls.rx_unsafe_char.sub(replacement, input_str)
+            if replacement:
+                input_str = input_str.replace(replacement[:7], '\\')
+            return input_str.rstrip()
+
+        except AttributeError:
+            # compiile and create these regex only once
+            cls.__init_unsafe_regex()
+            cls.__init_illegal_char_regex()
+            return cls._unsafe_char_protect(input_str, strict=strict)
+
+    @classmethod
+    def __init_unsafe_regex(cls):
+        '''Compile the unicode control char regex'''
+        unsafe = re.escape(';&|><*?`$(){}[]!#')
+        unsafe = r'(?P<unsafe>[{}]\s?)\s*'.format(unsafe)
+        cls.rx_unsafe_char = re.compile(unsafe)
+
+    @classmethod
+    def __init_illegal_char_regex(cls):
+        '''Compile the unsafe BASH char regex'''
+        # From a blog post for removing illegal ASCII control characters
+        # http://chase-seibert.github.io/blog/2011/05/20/stripping-control-characters-in-python.html
+        RE_XML_ILLEGAL = (
+            u'([\u0000-\u0008\u000b-\u000c\u000e-\u001f\ufffe-\uffff])' +
+            u'|' +
+            u'([%s-%s][^%s-%s])|([^%s-%s][%s-%s])|([%s-%s]$)|(^[%s-%s])' %
+            (chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
+             chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
+             chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
+             ))
+        cls.rx_illegal_char = re.compile(RE_XML_ILLEGAL)
+
+    @classmethod
+    def _check_for_unknown_flags(cls, flags):
+        '''Check for unknown flags and kwargs
+
+        Arguments:
+            flags: A list of flags, e.g., ['-f', '--verbose'].
+        Return:
+            None.
+        Raises:
+            KeywordArgError if an unknown flag is found.
+        '''
+        try:
+            known_flags = [v[0] for v in cls.attr.arguments if v[0]]
+        except AttributeError:
+            raise NotImplementedError(
+                'attr.arguments must be set on child class')
+        unknown_flags = [
+            k for k in flags
+            if k not in known_flags
+        ]
+        if unknown_flags:
+            raise cls.KeywordArgError('unknown', details=unknown_flags)

@@ -31,10 +31,12 @@ class HelpCmd(object):
         EXAMPLES{sep}{examples}
     ''')
 
-    def __init__(self,
-                 name=None, synopsis=None, description=None,
-                 arguments=None, examples=None,
-                 ):
+    def __init__(
+        self,
+        name=None, synopsis=None, description=None,
+        arguments=None, examples=None,
+        **kwargs
+    ):
         self.dict = {
             'name':  name,
             'synopsis':  synopsis,

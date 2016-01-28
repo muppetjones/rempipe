@@ -127,7 +127,7 @@ class TestHistatCmd(unittest.TestCase):
             ohc = self.sample_cmd()
             ihc = self.sample_cmd()
             ohc.link(ihc)
-        ihc._prepreq()
+        ihc.cmd()
 
         self.assertEqual(ihc.kwargs['-1'], 'seq.1.fq')
         self.assertEqual(ihc.kwargs['-2'], 'seq.2.fq')
