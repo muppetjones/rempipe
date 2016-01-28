@@ -7,6 +7,7 @@ from libpipe.cmds.base import BaseCmd
 
 
 import logging
+from logging import RootLogger
 from remsci.lib.utility import customLogging
 customLogging.config()
 log = logging.getLogger(__name__)
@@ -53,12 +54,18 @@ class TestBaseCmds(unittest.TestCase):
         kwargs = {'-f': 'req_kwarg', '-n': 'a'}
         return self.CMD(**kwargs)
 
+    def linked_samples(self):
+        a = self.CMD()
+        a.output = lambda: ['file.txt']
+        b = self.CMD()
+        a.link(b)
+        return a, b
+
     #
     #   Initialization tests
     #
 
     def test_BaseCmd_cannot_be_initialized(self):
-
         with self.assertRaises(TypeError):
             BaseCmd()
 
@@ -326,18 +333,27 @@ class TestBaseCmds(unittest.TestCase):
         with self.assertRaises(TypeError):
             b.cmd()
 
-    # def test_cmd_raises_TypeError_if_unable_to_use_linked_input(self):
-    #     self.CMD.REQ_KWARGS = ['-f']
-    #     self.CMD.REQ_TYPE = [
-    #         [('-f', ), ('.csv', )],
-    #     ]
-    #
-    #     a = self.CMD()
-    #     b = self.CMD()
-    #     a.link(b)
-    #
-    #     with self.assertRaises(TypeError):
-    #         b.cmd()
+    def test_cmd_raises_TypeError_if_unable_to_use_linked_input(self):
+
+        a = self.CMD()
+        a.output = lambda: ['file.txt']
+        b = self.CMD()
+        a.link(b)
+
+        with self.assertRaises(TypeError):
+            b.cmd()
+
+    def test_cmd_warns_about_unused_linked_input_if_not_strict(self):
+        logger = logging.getLogger('libpipe.cmds.base')
+        with patch.object(logger, 'warning') as mock_warn:
+
+            a = self.CMD()
+            a.output = lambda: ['file.txt']
+            b = self.CMD(strict=False)
+            a.link(b)
+            b.cmd()  # should not raise
+
+        self.assertTrue(mock_warn.called)
 
     def test_cmd_raises_TypeError_if_linked_input_unused_w_exact_match(self):
         self.CMD.REQ_KWARGS = ['-1']
@@ -407,9 +423,30 @@ class TestBaseCmds(unittest.TestCase):
     # def test_cmd_sets_args_from_input_up_to_MAX_ARGS(self):
         # self.fail()
 
-    #
-    #   Required argument tests
-    #
+    def test_cmd_is_wrapped_in_bash_assignment(self):
+        a = self.CMD(wrap='foo')
+        cmd_str = a.cmd()
+
+        self.assertTrue(cmd_str.startswith('foo="$('))
+        self.assertTrue(cmd_str.endswith(')"'))
+
+    def test_fall_through_command_includes_ALL_input_in_output(self):
+        class Cmd2(self.CMD):
+
+            def output(self):
+                return ['ha!']
+
+        a = self.CMD()
+        out = ['something_unexpected', 42]
+        a.output = lambda: out
+        b = Cmd2(fall_through=True)
+        a.link(b)
+
+        self.assertEqual(out + ['ha!'], b.output())
+
+        #
+        #   Required argument tests
+        #
 
     def test_cmd_raises_IndexError_if_missing_req_number_args(self):
         self.CMD.REQ_ARGS = 2

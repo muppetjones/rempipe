@@ -3,6 +3,8 @@ import time
 import abc
 import re
 
+from remsci.lib.decorators import universal_function_decorator
+
 from libpipe.cmds.help import HelpCmd
 from libpipe.utility.exceptions import RempipeError
 
@@ -23,6 +25,32 @@ class CmdInterface(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def cmd(self):
         pass
+
+
+def universal_fall_through_decorator(func):
+    '''A fall through decorator using the UFD
+
+    NOTE: This only seems to work using the @decorator syntax.
+    '''
+
+    @universal_function_decorator
+    def _fall_through_decorator(func, instance, args, kwargs):
+        if instance is None:
+            instance = func.__self__
+        return instance.input() + func()
+    return _fall_through_decorator(func)
+
+
+def fall_through_decorator(func):
+    '''A fall through decorator
+
+    NOTE: This simpler version works without the @decorator syntax.
+    Example:
+        self.func = fall_through_decorator(self.func)
+    '''
+    def _fall_through_decorator():
+        return func.__self__.input() + func()
+    return _fall_through_decorator
 
 
 class BaseCmd(CmdInterface):
@@ -99,6 +127,37 @@ class BaseCmd(CmdInterface):
 
     SEE ALSO:
         HelpCmd
+
+    NOTE on prefix commands:
+        [SJB] I had once considered allowing for a sort-of sub command
+        whose input was used directly by the following command, e.g.,
+            k=$(velvetk <args>)
+            velveth out_dir $k <args>
+        However, the obvious issue is linking the prefix command to the
+        current command. The linking proves fairly complicated with
+        several use cases, particularly linking variable names, position
+        index, or keyword.
+
+        Instead, I think there are two simpler options:
+            1. Wrapping a command. Pass in a variable name, and wrap the
+                command in a bash variable assignment: X="$(<cmd>)"
+            2. Fall through. A command with fall through will pass ALL
+                input into output (while optionally adding its own output).
+
+        Pros:
+        > Less specialization needed. Wrapping is simple and globally
+            configurable. Fall through is obvious.
+        > Presumably, the argument that would use the prefix may still
+            be used normally (given the value directly rather than relying
+            upon the prefix). This simplifies that.
+        > Presumably, commands that would use a prefix are very closely
+            tied to the prefix--these are not global or common situations.
+            As such, handling via a specific pipe would be better.
+            (Pass responsibility up the chain)
+
+        Cons:
+        > Requires more specific attention for each particular command.
+            Loss of modularity.
     '''
 
     # command defining attributes
@@ -162,7 +221,10 @@ class BaseCmd(CmdInterface):
     #   Magic methods
     #
 
-    def __init__(self, *args, strict=True, timestamp=None, ** kwargs):
+    def __init__(
+            self, *args,
+            strict=True, timestamp=None, wrap=None, fall_through=False,
+            ** kwargs):
         '''Initialize command object
 
         Create a command object using given paramters.
@@ -200,6 +262,7 @@ class BaseCmd(CmdInterface):
             #       ensured hyphens BEFORE this
             to_check = flags + list(kwargs.keys())
             self._check_for_unknown_flags(to_check)
+        self.strict = strict
 
         # make sure we deep copy defaults and args
         self.redirect = None  # self.REDIRECT
@@ -213,6 +276,13 @@ class BaseCmd(CmdInterface):
 
         self.flags = []
         self.flags.extend(flags)
+
+        # setup wrap
+        self.wrap = wrap  # wrap command in bash assignment statement
+
+        # setup fall through
+        if fall_through:
+            self.output = fall_through_decorator(self.output)
 
     def __str__(self):
         '''Returns the BASH executable string'''
@@ -323,15 +393,15 @@ class BaseCmd(CmdInterface):
         '''Set dest input to self output
 
         Arguments:
-        cmd     Another command object.
+            cmd     Another command object.
         Return:
-        The given command object (for chaining)
+            The given command object (for chaining)
         '''
 
         cmd.input = self.output
         return cmd
 
-    def cmd(self, *args,  **kwargs):
+    def cmd(self, *args, wrap=None, **kwargs):
         '''Run command preprocessing and return command'''
 
         # run requirements prep, if provided by child
@@ -364,7 +434,17 @@ class BaseCmd(CmdInterface):
         except AttributeError:
             pass  # may not be set on child class
 
-        return self._cmd(*args, **kwargs)
+        cmd_str = self._cmd(*args, **kwargs)
+
+        # wrap command
+        # -- from command takes precedence from init
+        if not wrap:
+            wrap = self.wrap
+        if wrap:
+            cmd_str = '{}="$({})"'.format(wrap, cmd_str)
+
+        # join all current parts with a new line character
+        return cmd_str
 
     def help(self):
         '''Return usage text
@@ -469,13 +549,16 @@ class BaseCmd(CmdInterface):
             self.args.extend(args[:n_still_required])
 
         # finally, if we haven't used ANY of the input, raise CmdLinkError
-        else:
-            if len(args) == n_args:
+        # BUT, only if we're in strict
+        elif len(args) == n_args:
+            if self.strict:
                 raise self.CmdLinkError('mismatch')
+            else:
+                log.warning(self.CmdLinkError.ERRMSG['mismatch'])
 
         return
 
-    def _cmd(self, verbose=True, strict=True):
+    def _cmd(self, *args, verbose=True, strict=True, **kwargs):
         '''Create BASH executable string.
 
         Arguments:
