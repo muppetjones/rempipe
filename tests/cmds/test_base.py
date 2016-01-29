@@ -82,6 +82,20 @@ class TestCmdAttributes(unittest.TestCase):
                 self.kwargs[k] = 'Something completely different'
                 self.assertNotEqual(getattr(ca, k), self.kwargs[k])
 
+    def test_duplicate_creates_new_object(self):
+        ca = CmdAttributes(**self.kwargs)
+        self.assertNotEqual(ca, ca.duplicate())
+
+    def test_duplicate_deep_copies_object(self):
+        ca = CmdAttributes(**self.kwargs)
+        dup = ca.duplicate()
+
+        for k, v in ca.__dict__.items():
+            with self.subTest(attr=k):
+                self.assertEqual(getattr(ca, k), getattr(dup, k))
+                setattr(ca, k, 'not equal')
+                self.assertNotEqual(getattr(ca, k), getattr(dup, k))
+
 
 class TestBase(unittest.TestCase):
 

@@ -1,6 +1,6 @@
 import os.path
 import re
-from libpipe.cmds.base import BaseCmd
+from libpipe.cmds.base import BaseCmd, CmdAttributes
 
 import logging
 log = logging.getLogger(__name__)
@@ -24,35 +24,38 @@ class HtseqCountCmd(BaseCmd):
 
     '''
 
-    NAME = 'htseq-count'
-    INVOKE_STR = 'htseq-count'
+    attr = CmdAttributes(
+        name='htseq-count',
+        invoke_str='htseq-count',
 
-    ARGUMENTS = {
-        (None, 'FILE', 'Alignment file (BAM or SAM)'),
-        (None, 'FILE', 'Feature file (GFF or GTF)'),
-        ('-f', 'SAMTYPE', 'Type of alignment file (sam or bam)'),
-        ('-r', 'ORDER', 'Alignment sorting order (pos or name) [pe only]'),
-        ('-s', 'STRANDED', 'Specify strand specific (yes, no, reverse)'),
-        ('-a', 'INT', 'Minimum quality value (skip lower than)'),
-        ('-t', 'CHAR', 'Feature type (3rd col) to use. Default: exon'),
-        ('-i', 'CHAR', 'GFF attribute to use as feature id. Default: gene_id'),
-        ('-m', 'MODE', 'Mode for feature overlap. Default: union. ' +
-            'Choices: union, intersection-strict, intersection-nonempty'),
-        ('-o', 'FILE', 'Write new SAM file with feature assignments'),
-        ('-q', None, 'Suppress progress report'),
-    }
+        arguments=[
+            (None, 'FILE', 'Alignment file (BAM or SAM)'),
+            (None, 'FILE', 'Feature file (GFF or GTF)'),
+            ('-f', 'SAMTYPE', 'Type of alignment file (sam or bam)'),
+            ('-r', 'ORDER', 'Alignment sorting order (pos or name) [pe only]'),
+            ('-s', 'STRANDED', 'Specify strand specific (yes, no, reverse)'),
+            ('-a', 'INT', 'Minimum quality value (skip lower than)'),
+            ('-t', 'CHAR', 'Feature type (3rd col) to use. Default: exon'),
+            ('-i', 'CHAR',
+             'GFF attribute to use as feature id. Default: gene_id'),
+            ('-m', 'MODE', 'Mode for feature overlap. Default: union. ' +
+             'Choices: union, intersection-strict, intersection-nonempty'),
+            ('-o', 'FILE', 'Write new SAM file with feature assignments'),
+            ('-q', None, 'Suppress progress report'),
+        ],
 
-    DEFAULTS = {
-        '-r': 'pos',  # set for paired-end data (ignored for single-end)
-        '-s': 'no',  # not strand specific
-    }
-    REQ_KWARGS = []
-    REQ_ARGS = 2
-    REQ_TYPE = [
-        [(0, ), ('.bam', '.sam')],
-        [(1, ), ('.gff', '.gtf', '.gff3')],
-        [('-o',),  ('.sam', )],
-    ]
+        defaults={
+            '-r': 'pos',  # set for paired-end data (ignored for single-end)
+            '-s': 'no',  # not strand specific
+        },
+        req_kwargs=[],
+        req_args=2,
+        req_type=[
+            [(0, ), ('.bam', '.sam')],
+            [(1, ), ('.gff', '.gtf', '.gff3')],
+            [('-o',),  ('.sam', )],
+        ],
+    )
 
     # Name of optional config file found in genome directory
     CONFIG_FILE = 'htseq-count.config'
@@ -71,8 +74,6 @@ class HtseqCountCmd(BaseCmd):
             self.kwargs['-m'] = mode
 
     def _prepreq(self):
-        super()._prepreq()
-
         # CRITICAL: We probably have the args in the wrong order (sam first!)
         if self.args[1].endswith('am'):
             self.args.reverse()
@@ -88,7 +89,7 @@ class HtseqCountCmd(BaseCmd):
         #       EXCEPT for the line where the genome is added!!
         # TODO: make this a base function
         def _get_types(flag):
-            for rt in self.REQ_TYPE:
+            for rt in self.attr.req_type:
                 if flag in rt[0]:
                     return rt[1]
             return None
@@ -176,22 +177,24 @@ class HtseqCountCmd(BaseCmd):
 
 class BedtoolsMulticovCmd(BaseCmd):
 
-    NAME = 'bedtools_multicov'
-    INVOKE_STR = 'bedtools multicov'
+    attr = CmdAttributes(
+        name='bedtools_multicov',
+        invoke_str='bedtools multicov',
 
-    ARGUMENTS = {
-        ('-bams', 'FILE', 'The bam file'),
-        ('-bed', 'FILE', 'The bed file'),
-    }
+        arguments=[
+            ('-bams', 'FILE', 'The bam file'),
+            ('-bed', 'FILE', 'The bed file'),
+        ],
 
-    DEFAULTS = {}
+        defaults={},
 
-    REQ_KWARGS = ['-bed', '-bams']
-    REQ_ARGS = 0
-    REQ_TYPE = [
-        [('-bams', ), ('.bam', )],
-        [('-bed', ), ('.bed', '.gff', '.gtf')],
-    ]
+        req_kwargs=['-bed', '-bams'],
+        req_args=0,
+        req_type=[
+            [('-bams', ), ('.bam', )],
+            [('-bed', ), ('.bed', '.gff', '.gtf')],
+        ],
+    )
 
     def _prepreq(self):
         super()._prepreq()

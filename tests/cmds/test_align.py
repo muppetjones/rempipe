@@ -100,7 +100,14 @@ class TestHistatCmd(unittest.TestCase):
     #   Test _prepreq
     #
 
-    def test_prepreq_raises_TypeError_if_linked_input_not_used(self):
+    def test_cmd_raises_TypeError_if_1_and_U_set(self):
+        hc = self.sample_cmd()
+        hc.kwargs['-1'] = 'seq1.fq'
+
+        with self.assertRaises(AttributeError):
+            hc.cmd()
+
+    def test_match_linked_raises_TypeError_if_linked_input_not_used(self):
         with patch.object(
                 HisatCmd, 'output', autospec=True, return_value=['seq.txt']):
             ohc = self.sample_cmd()
@@ -108,34 +115,36 @@ class TestHistatCmd(unittest.TestCase):
             ohc.link(ihc)
 
         with self.assertRaises(TypeError):
-            ihc._prepreq()
+            ihc._match_input_with_args()
 
-    def test_prepreq_sets_single_link_input_to_U_kwarg(self):
+    def test_match_input_sets_single_link_input_to_U_kwarg(self):
 
         with patch.object(HisatCmd, 'output', return_value=['seq.fq']):
             ohc = self.sample_cmd()
             ihc = self.sample_cmd()
             ohc.link(ihc)
-        ihc._prepreq()
+        ihc._match_input_with_args()
 
         self.assertEqual(ihc.kwargs['-U'], 'seq.fq')
 
-    def test_prepreq_sets_double_link_input_to_1_and_2_kwarg(self):
-
-        args = ['seq.1.fq', 'seq.2.fq']
-        with patch.object(HisatCmd, 'output', return_value=args):
-            ohc = self.sample_cmd()
-            ihc = self.sample_cmd()
-            ohc.link(ihc)
-        ihc.cmd()
-
-        self.assertEqual(ihc.kwargs['-1'], 'seq.1.fq')
-        self.assertEqual(ihc.kwargs['-2'], 'seq.2.fq')
-
-    def test_prepreq_preserves_kwargs_if_no_input_given(self):
-
+    def test_match_input_sets_double_link_input_to_1_and_2_kwarg(self):
+        args = ['seq.foo.fq', 'seq.bar.fq']
+        ohc = self.sample_cmd()
+        ohc.output = lambda: args
         ihc = self.sample_cmd()
-        ihc._prepreq()
+        ohc.link(ihc)
+
+        # NOTE: _match_input_with_args does NOT ensure only -1 or -U are set
+        ihc._match_input_with_args()
+        self.assertEqual(ihc.kwargs['-1'], 'seq.foo.fq')
+        self.assertEqual(ihc.kwargs['-2'], 'seq.bar.fq')
+
+    def test_cmd_preserves_kwargs_if_no_input_given(self):
+
+        with patch(
+                'remsci.lib.utility.path.walk_file', return_value=([''] * 10)):
+            ihc = self.sample_cmd()
+            ihc.cmd()
 
         self.assertEqual(ihc.kwargs['-U'], 'upath/seq.fa')
 

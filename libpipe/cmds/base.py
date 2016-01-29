@@ -125,7 +125,11 @@ class CmdAttributes(object):
         self.invoke_str = invoke_str
 
         # ensure deep copies
-        self.arguments = arguments[:]
+        try:
+            self.arguments = arguments[:]
+        except TypeError:
+            log.debug(arguments)
+            raise
         self.defaults = dict.copy(defaults)
         self.req_args = req_args
         self.req_kwargs = req_kwargs[:]
@@ -133,6 +137,21 @@ class CmdAttributes(object):
 
         if not arguments:
             raise ValueError('No arguments given')
+
+    def duplicate(self, **kwargs):
+        '''Deep copy the current object and return the copy.
+
+        Arguments:
+            **kwargs: Values used to update the duplicate.
+        Return:
+            A new CmdAttributes object
+        '''
+
+        new_attr = CmdAttributes(**self.__dict__)
+        filt_dict = {k: v for k, v in kwargs.items() if k in self.__dict__}
+        new_attr.__dict__.update(filt_dict)
+
+        return new_attr
 
 
 class BaseCmd(CmdInterface):
@@ -249,7 +268,7 @@ class BaseCmd(CmdInterface):
     class CmdLinkError(RempipeError, TypeError):
         ERRMSG = {
             'input': 'Bad link: no input given or input not callable',
-            'mismatch': 'Bad link: unexpected input type',
+            'mismatch': 'Bad link: output not matched to input',
         }
 
     class PositionalArgError(RempipeError, IndexError):
@@ -263,6 +282,7 @@ class BaseCmd(CmdInterface):
         ERRMSG = {
             'missing': '{}: Missing required keyword arguments: {}',
             'unknown': 'Unrecognized keyword argument given: "{}"',
+            'xor': 'More than 1 XOR kwarg given: {}',
         }
 
     class FileTypeError(RempipeError, TypeError):
@@ -733,8 +753,7 @@ class BaseCmd(CmdInterface):
                 if not found:
                     missing.extend(cmpd)
                 elif len(found) != 1:
-                    raise self.KeywordArgError(
-                        'More than one arg given: {}'.format(cmpd))
+                    raise self.KeywordArgError('xor', details=cmpd)
 
         return missing
 

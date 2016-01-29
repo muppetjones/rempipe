@@ -5,13 +5,41 @@ sys.path.append("remsci/")
 import unittest
 from unittest.mock import patch  # , Mock, MagicMock, mock_open
 
-from libpipe.cmds.base import BaseCmd
+from libpipe.cmds.base import BaseCmd, CmdAttributes
 from libpipe.pipes.base import BasePipe
 
 import logging
 from remsci.lib.utility import customLogging
 customLogging.config()
 log = logging.getLogger(__name__)
+
+
+sample_attributes = {
+    'name': 'test command',
+    'synopsis': 'Use to test the CmdAttributes class',
+    'description': 'More info about the CmdAttributes class',
+    'invoke_str': 'test_command',
+
+    'arguments': [
+        (None, 'INPUT', 'Something we need'),
+        ('-f', 'FILE', 'Better to be explicit'),
+        ('-o', 'FILE', 'Output file'),
+        ('-n', int, 'A number'),
+        ('--foo', 'FILE', 'verbose arg'),
+        ('-v', None, 'A random flag'),
+        ('-x', None, 'A random flag'),
+        ('-foo', 'FILE', 'fill'),
+    ],
+    'defaults': {
+        '-n': 5,
+    },
+
+    'req_args': 1,
+    'req_kwargs': ['-f', ],
+    'req_type': [
+        [(0, ), ('.txt', '.csv', ), ],
+    ],
+}
 
 
 class TestBasePipe_IntegrationWith_BaseCmd(unittest.TestCase):
@@ -28,25 +56,19 @@ class TestBasePipe_IntegrationWith_BaseCmd(unittest.TestCase):
         self.mock_call = patcher.start()
         self.addCleanup(patcher.stop)
 
-        class Cmd(BaseCmd):
+        ca = CmdAttributes(**sample_attributes)
+        ca.req_args = 0
+        ca.req_kwargs = []
+        ca.req_type = []
+        ca.defaults = {}
 
-            ARGUMENTS = [
-                ('-foo', 'FILE', 'fill'),
-            ]
-
-            INVOKE_STR = 'test cmd'
-            REQ_TYPE = [
-                [('-foo', ), ('.txt', )]
-            ]
-
-            def __init__(self, *args, foo='bar', **kwargs):
-                kwargs['-foo'] = foo
-                super().__init__(*args, **kwargs)
+        class ModSample(BaseCmd):
+            attr = ca
 
             def output(self):
-                return [self.kwargs['-foo']]
+                return ['file.txt']
 
-        self.CMD = Cmd
+        self.CMD = ModSample
 
     def test_add_links_output_of_first_command_to_input_of_next(self):
         bp = BasePipe()
@@ -57,26 +79,17 @@ class TestBasePipe_IntegrationWith_BaseCmd(unittest.TestCase):
 
         self.assertEqual(a.output, b.input)
 
-    def test_add_double_check_link_integrity(self):
+    def test_changes_in_link_maintined_in_cmd_output(self):
+        self.CMD.attr.req_type = sample_attributes['req_type']
         bp = BasePipe()
 
-        a = self.CMD(foo='meh')
+        a = self.CMD()
         b = self.CMD()
+        a.output = lambda: ['hehe.txt']
         bp.add(a, b)
 
-        self.assertEqual(a.output(), ['meh'])
-        self.assertEqual(b.input(), ['meh'])
-
-        a.kwargs['-foo'] = 'hehe'
-        self.assertEqual(b.input(), ['hehe'])
-
-    def test_link_integrity_maintained_through_cmd_output(self):
-        bp = BasePipe()
-
-        a = self.CMD(foo='meh')
-        b = self.CMD()
-        bp.add(a, b)
-
-        a.kwargs['-foo'] = 'hehe.txt'
-        self.assertEqual(b.cmd(verbose=False), '{} {} {}'.format(
-            self.CMD.INVOKE_STR, '-foo', 'hehe.txt'))
+        # NOTE: The type requirement is a first positional *.txt
+        a.kwargs['--foo'] = 'hehe.txt'
+        cmd_str = b.cmd(verbose=False)
+        self.assertEqual(cmd_str, '{} {}'.format(
+            self.CMD.attr.invoke_str, 'hehe.txt'))

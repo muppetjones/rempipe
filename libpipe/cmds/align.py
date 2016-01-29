@@ -4,10 +4,50 @@ import time
 
 from remsci.lib.utility import path
 
-from libpipe.cmds.base import BaseCmd
+from libpipe.utility.exceptions import RempipeError
+from libpipe.cmds.base import BaseCmd, CmdAttributes
 
 import logging
 log = logging.getLogger(__name__)
+
+
+_hisat_attr = CmdAttributes(
+    name='hisat',
+    invoke_str='hisat',
+
+    arguments=[
+        ('-x', 'FILE', 'Hisat reference genome index (base name)'),
+        ('-1', 'FILE[,FILE]',
+         'comma separated list of paired-end 1 files'),
+        ('-2', 'FILE[,FILE]',
+         'comma separated list of paired-end 2 files'),
+        ('-U', 'FILE[,FILE]', 'comma separated list of unpaired reads'),
+        ('-S', 'FILE', 'Output sam file (defaults to read prefix)'),
+        ('-p', 'INT', 'number of processors'),
+        ('-I', 'INT', 'minimum fragment length. Default = 0.'),
+        ('-X', 'INT', 'aximum fragment length. Default = 500.'),
+        ('--un-conc', 'PATH',
+         'Path to write unaligned, paired-end reads to.'),
+        ('--phred33', None, 'Illumina 1.9+ encoding'),
+        ('--phred64', None, 'Illumina 1.8 and earlier encoding'),
+        ('--fr', None, 'Upstream downstream mate orientations'),
+        ('-q', None, 'Reads are FASTQ files'),
+        ('-f', None, 'Reads are FASTA files'),
+    ],
+    defaults={
+        '-p': 3,  # "$(wc -l < $PBS_NODEFILE)",
+        '-I': 0,
+        '-X': 500,
+    },
+
+    req_kwargs=['-x', ('-1', '-2'), ['-1', '-U']],
+    req_args=0,
+    req_type=[
+        [('-1', '-2'), ('.fastq', '.fq', '.fastq', '.fa'), True],
+        [('-U', ), ('.fastq', '.fq', '.fastq', '.fa'), True],
+        [('-S', ), ('.sam', )],
+    ],
+)
 
 
 class HisatCmd(BaseCmd):
@@ -19,54 +59,16 @@ class HisatCmd(BaseCmd):
 
     '''
 
-    NAME = 'hisat'
-    INVOKE_STR = 'hisat'
-
-    ARGUMENTS = [
-        ('-x', 'FILE', 'Hisat reference genome index (base name)'),
-        ('-1', 'FILE[,FILE]', 'comma separated list of paired-end 1 files'),
-        ('-2', 'FILE[,FILE]', 'comma separated list of paired-end 2 files'),
-        ('-U', 'FILE[,FILE]', 'comma separated list of unpaired reads'),
-        ('-S', 'FILE', 'Output sam file (defaults to read prefix)'),
-        ('-p', 'INT', 'number of processors'),
-        ('-I', 'INT', 'minimum fragment length. Default = 0.'),
-        ('-X', 'INT', 'aximum fragment length. Default = 500.'),
-        ('--un-conc', 'PATH', 'Path to write unaligned, paired-end reads to.'),
-        ('--phred33', None, 'Illumina 1.9+ encoding'),
-        ('--phred64', None, 'Illumina 1.8 and earlier encoding'),
-        ('--fr', None, 'Upstream downstream mate orientations'),
-        ('-q', None, 'Reads are FASTQ files'),
-        ('-f', None, 'Reads are FASTA files'),
-    ]
-    DEFAULTS = {
-        '-p': 3,  # "$(wc -l < $PBS_NODEFILE)",
-        '-I': 0,
-        '-X': 500,
-    }
-
-    REQ_KWARGS = ['-x', ('-1', '-2'), ['-1', '-U']]
-    REQ_ARGS = 0
-    REQ_TYPE = [
-        [('-1', '-2'), ('.fastq', '.fq', '.fastq', '.fa'), False],
-        [('-U', ), ('.fastq', '.fq', '.fastq', '.fa'), False],
-        [('-S', ), ('sam', )],
-    ]
+    attr = _hisat_attr
 
     #
     #   Custom Exceptions
     #
 
-    class GenomeIndexError(FileNotFoundError):
+    class GenomeIndexError(RempipeError, FileNotFoundError):
         ERRMSG = {
-            'missing': 'Expected index files for {} not found',
+            'missing': 'Expected index files for genome not found',
         }
-
-        def __init__(self, msg, *args, genome='', **kwargs):
-            try:
-                msg = self.ERRMSG[msg].format(genome)
-            except KeyError:
-                pass
-            super().__init__(msg, *args, **kwargs)
 
     #
     #   Magic methods
@@ -179,7 +181,7 @@ class HisatCmd(BaseCmd):
         index_files = path.walk_file(genome_dir, pattern=index_pattern)
 
         if len(index_files) != expected_file_count:
-            raise self.GenomeIndexError('missing', genome=genome_base)
+            raise self.GenomeIndexError('missing')
 
 
 class Hisat2Cmd(HisatCmd):
@@ -189,8 +191,10 @@ class Hisat2Cmd(HisatCmd):
     Current version uses the same parameters as hisat
     '''
 
-    NAME = 'hisat2'
-    INVOKE_STR = 'hisat2'
+    attr = _hisat_attr.duplicate(
+        name='hisat2',
+        invoke_str='hisat2'
+    )
 
     def _additional_requirements(
             self, expected_file_count=8, extension='.ht2'):
@@ -211,9 +215,10 @@ class Bowtie2Cmd(HisatCmd):
 
     Current version uses the same parameters as hisat
     '''
-
-    NAME = 'bowtie2'
-    INVOKE_STR = 'bowtie2'
+    attr = _hisat_attr.duplicate(
+        name='bowtie2',
+        invoke_str='bowtie2'
+    )
 
     def _additional_requirements(
             self, expected_file_count=6, extension='.bt2'):

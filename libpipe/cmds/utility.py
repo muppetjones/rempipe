@@ -1,6 +1,6 @@
 
 import os.path
-from libpipe.cmds.base import BaseCmd
+from libpipe.cmds.base import BaseCmd, CmdAttributes
 
 import logging
 log = logging.getLogger(__name__)
@@ -15,20 +15,22 @@ class FastqcCmd(BaseCmd):
                [-c contaminant file] seqfile1 .. seqfileN
     '''
 
-    NAME = 'fastqc'
-    INVOKE_STR = 'fastqc'
+    attr = CmdAttributes(
+        name='fastqc',
+        invoke_str='fastqc',
 
-    ARGUMENTS = [
-        (None, 'FILE', 'One or more FASTQ files'),
-        ('-o', 'DIR', 'Output directory'),
-    ]
-    DEFAULTS = {}
+        arguments=[
+            (None, 'FILE', 'One or more FASTQ files'),
+            ('-o', 'DIR', 'Output directory'),
+        ],
+        defaults={},
 
-    REQ_KWARGS = []
-    REQ_ARGS = 1
-    REQ_TYPE = [
-        [(0, 1), ('.fastq', '.fq')],
-    ]
+        req_kwargs=[],
+        req_args=1,
+        req_type=[
+            [(0, 1), ('.fastq', '.fq')],
+        ],
+    )
 
     def output(self):
         '''FastQC output
@@ -82,21 +84,23 @@ class SamtoolsSortCmd(BaseCmd):
         samtools sort [options...] <in> <out.prefix>
     '''
 
-    NAME = 'samtools_sort'
-    INVOKE_STR = 'samtools sort'
+    attr = CmdAttributes(
+        name='samtools_sort',
+        invoke_str='samtools sort',
 
-    ARGUMENTS = [
-        ('-o', 'FILE', 'File to write final output to'),
-        ('-O', 'FORMAT', 'Write output as FORMAT (sam/bam/cram)'),
-        ('-T', 'PREFIX', 'Write temporary files to PREFIX.nnn.bam'),
-    ]
-    DEFAULTS = {}
+        arguments=[
+            ('-o', 'FILE', 'File to write final output to'),
+            ('-O', 'FORMAT', 'Write output as FORMAT (sam/bam/cram)'),
+            ('-T', 'PREFIX', 'Write temporary files to PREFIX.nnn.bam'),
+        ],
+        defaults={},
 
-    REQ_KWARGS = []
-    REQ_ARGS = 1
-    REQ_TYPE = [
-        [(0, ), ('.bam', '.sam')]
-    ]
+        req_kwargs=[],
+        req_args=1,
+        req_type=[
+            [(0, ), ('.bam', '.sam')]
+        ],
+    )
 
     def _prepcmd(self):
         # if we were only given a single file, make the prefix
@@ -123,22 +127,24 @@ class SamtoolsIndexCmd(BaseCmd):
         samtools index [-bc] [-m INT] <in.bam>
     '''
 
-    NAME = 'samtools_index'
-    INVOKE_STR = 'samtools index'
+    attr = CmdAttributes(
+        name='samtools_index',
+        invoke_str='samtools index',
 
-    ARGUMENTS = [
-        (None, 'FILE', 'BAM file to index'),
-        ('-b', None, 'Generate BAI-format index for BAM files [default]'),
-        ('-c', None, 'Generate CAI-format index for BAM files'),
-        ('-m', 'INT', 'Set min interval size for CSI indices to 2^INT'),
-    ]
-    DEFAULTS = {}
+        arguments=[
+            (None, 'FILE', 'BAM file to index'),
+            ('-b', None, 'Generate BAI-format index for BAM files [default]'),
+            ('-c', None, 'Generate CAI-format index for BAM files'),
+            ('-m', 'INT', 'Set min interval size for CSI indices to 2^INT'),
+        ],
+        defaults={},
 
-    REQ_KWARGS = []
-    REQ_ARGS = 1
-    REQ_TYPE = [
-        [(0, ), ('.bam')]
-    ]
+        req_kwargs=[],
+        req_args=1,
+        req_type=[
+            [(0, ), ('.bam')]
+        ],
+    )
 
     def __init__(self, *args, fmt='-b', **kwargs):
         super().__init__(*args, **kwargs)
@@ -164,27 +170,29 @@ class SamtoolsViewCmd(BaseCmd):
         samtools sort [options...] <in> <out.prefix>
     '''
 
-    NAME = 'samtools_view'
-    INVOKE_STR = 'samtools view'
+    attr = CmdAttributes(
+        name='samtools_view',
+        invoke_str='samtools view',
 
-    ARGUMENTS = [
-        (None, 'FILE', 'SAM|BAM|CRAM input file'),
-        (None, 'REGION', 'Region(s) as 1-based RNAME[:STARTPOS[-ENDPOS]]'),
-        ('-o', 'FILE', 'File to write final output to'),
-        ('-f', 'INT',
-         'Output alignments with INT bits set in the FLAG field'),
-        ('-F', 'INT',
-         'Output alignments with INT bits NOT set in the FLAG field'),
-        ('-b', None, 'Output to BAM format'),
-        ('-h', None, 'Include headers in output'),
-    ]
-    DEFAULTS = {}
+        arguments=[
+            (None, 'FILE', 'SAM|BAM|CRAM input file'),
+            (None, 'REGION', 'Region(s) as 1-based RNAME[:STARTPOS[-ENDPOS]]'),
+            ('-o', 'FILE', 'File to write final output to'),
+            ('-f', 'INT',
+             'Output alignments with INT bits set in the FLAG field'),
+            ('-F', 'INT',
+             'Output alignments with INT bits NOT set in the FLAG field'),
+            ('-b', None, 'Output to BAM format'),
+            ('-h', None, 'Include headers in output'),
+        ],
+        defaults={},
 
-    REQ_KWARGS = []
-    REQ_ARGS = 1
-    REQ_TYPE = [
-        [(0, ), ('.bam', '.sam')]
-    ]
+        req_kwargs=[],
+        req_args=1,
+        req_type=[
+            [(0, ), ('.bam', '.sam')]
+        ],
+    )
 
     def __init__(self, *args, region=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -192,8 +200,6 @@ class SamtoolsViewCmd(BaseCmd):
         self.region = region
 
     def _prepreq(self):
-        super()._prepreq()
-
         # CRITICAL: Ensure the SAM file comes BEFORE the region(s)
         if len(self.args) > 1 and not self.args[0].endswith('am'):
             self.args = [arg for arg in self.args if arg.endswith(
