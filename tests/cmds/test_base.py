@@ -640,3 +640,23 @@ class TestBaseCmd_cmd(TestBase):
 
         self.assertTrue(cmd_str.startswith('foo="$('))
         self.assertTrue(cmd_str.endswith(')"'))
+
+    def test_cmd_puts_priority_args_before_kwargs(self):
+        self.CMD.attr.n_priority_args = 2
+        args = list('abc')
+        kwargs = {'-x': '1', }
+        cmd = self.CMD(*args, **kwargs)
+
+        cmd_str = cmd.cmd(verbose=False)
+        expected_str = '{} a b -x 1 c'.format(cmd.invoke_str)
+        self.assertEqual(cmd_str, expected_str)
+
+    def test_cmd_priority_args_neg_one_puts_all_args_first(self):
+        self.CMD.attr.n_priority_args = -1
+        args = list('abc')
+        kwargs = {'-x': '1', }
+        cmd = self.CMD(*args, **kwargs)
+
+        cmd_str = cmd.cmd(verbose=False)
+        expected_str = '{} a b c -x 1'.format(cmd.invoke_str)
+        self.assertEqual(cmd_str, expected_str)

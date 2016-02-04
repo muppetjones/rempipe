@@ -97,6 +97,9 @@ class CmdAttributes(object):
                     a single linked fastq file would be set to '-U' and three
                     linked fastq files would not be used at all.
                     See '_match_input_with_args' & '_check_type' for details.
+        n_priority_args
+                    The number of arguments to put before keyword arguments
+                    and flags. Set to -1 to put ALL args first. Default: 0.
 
     Example:
         hisat_attr = CmdAttributes(
@@ -114,6 +117,7 @@ class CmdAttributes(object):
         req_args=0,
         req_kwargs=[],
         req_type=[],
+        n_priority_args=0,
     ):
         if not invoke_str:
             invoke_str = name
@@ -134,6 +138,7 @@ class CmdAttributes(object):
         self.req_args = req_args
         self.req_kwargs = req_kwargs[:]
         self.req_type = req_type[:]
+        self.n_priority_args = n_priority_args
 
         if not arguments:
             raise ValueError('No arguments given')
@@ -273,7 +278,7 @@ class BaseCmd(CmdInterface):
 
     class PositionalArgError(RempipeError, IndexError):
         POSITIONALARGERROR = {
-            'missing': '{}: Missing {} of {} required positional parameters',
+            'missing': 'Missing {} of {} required positional parameters',
             'str_only': ('Positional args should be strings. ' +
                          '(Did you expand **kwargs?)')
         }
@@ -286,7 +291,9 @@ class BaseCmd(CmdInterface):
         }
 
     class FileTypeError(RempipeError, TypeError):
-        pass
+        ERRMSG = {
+            'missing': 'Expected file or file type not found',
+        }
 
     class ConfigError(RempipeError, ValueError):
         ERRMSG = {
@@ -620,7 +627,12 @@ class BaseCmd(CmdInterface):
             "{} {}".format(k, v)
             for k, v in sorted(self.kwargs.items())
         )
-        args = sep.join(self.args)
+
+        # setup priority arguments (args that should come BEFORE kwargs)
+        priority = (len(self.args) if self.attr.n_priority_args == -1
+                    else self.attr.n_priority_args)
+        priority_args = sep.join(self.args[:priority])
+        args = sep.join(self.args[priority:])
 
         # redirect may be a tuple ('>', 'logfile.log') or string
         if not isinstance(self.redirect, str) and self.redirect is not None:
@@ -632,7 +644,7 @@ class BaseCmd(CmdInterface):
         #       We should account for this later...or prevent redirect
         #       from modification
         cmd_parts = filter(  # remove missing elements
-            None, [self.invoke_str, flags, kwargs, args])
+            None, [self.invoke_str, priority_args, flags, kwargs, args])
 
         cmd = sep.join(cmd_parts)
         cmd_safe = self._unsafe_char_protect(cmd, strict=strict)
@@ -667,7 +679,6 @@ class BaseCmd(CmdInterface):
         # check for expected number of args
         if len(self.args) < self.attr.req_args:
             raise self.PositionalArgError('missing', details=[
-                self.__class__.__name__,
                 self.attr.req_args - len(self.args), self.attr.req_args,
             ])
 

@@ -8,6 +8,10 @@ from libpipe.cmds import (
     HtseqCountCmd,
 )
 
+from libpipe.cmds.assemble import (
+    VelvetkCmd, VelvethCmd, VelvetgCmd,
+)
+
 
 import logging
 log = logging.getLogger(__name__)
@@ -19,12 +23,33 @@ class AssemblePipe(PresetPipe):
 
     NOTE: This pipe is intended for use as a subpipe.
 
-    Pipeline:
-        1. Hisat  (skewered reads, genome)
-        2. Samtools sort (aligned SAM file)
-        3. Samtools index (sorted BAM file)
-        4. Bedtools multicov (sorted BAM file, genome)
+    Velvet Pipeline:
+        a. Velvetk
+        b. Velveth
+        c. Velvetg
     '''
+
+    REQ_PARAM = ['input_list', 'genome']
+
+    def _setup(self, *pipe_args, input_list=[], genome='', **pipe_kwargs):
+
+        # 1. velvetk
+        args = input_list[:]
+        kwargs = {'--genome': genome}
+        velvetk = VelvetkCmd(*args, wrap='k', **kwargs)
+
+        # 2. velveth
+        args = []
+        kwargs = {'k': '${k}'}
+        velveth = VelvethCmd(*args, **kwargs)
+
+        # 3. velvetg
+        args = []
+        kwargs = {}
+        velvetg = VelvetgCmd(*args, **kwargs)
+
+        # add 'em to the pipe
+        self.add(velvetk, velveth, velvetg)
 
 
 class WgsPipe(PresetPipe):
