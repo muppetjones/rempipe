@@ -158,6 +158,12 @@ class CmdAttributes(object):
 
         return new_attr
 
+    def get_types(self, flag):
+        for rt in self.req_type:
+            if flag in rt[0]:
+                return rt[1]
+        return None
+
 
 class BaseCmd(CmdInterface):
 
@@ -281,6 +287,7 @@ class BaseCmd(CmdInterface):
             'missing': 'Missing {} of {} required positional parameters',
             'str_only': ('Positional args should be strings. ' +
                          '(Did you expand **kwargs?)')
+            'unknown': 'Unknown positional parameters.',
         }
 
     class KeywordArgError(RempipeError, AttributeError):
@@ -873,3 +880,56 @@ class BaseCmd(CmdInterface):
         ]
         if unknown_flags:
             raise cls.KeywordArgError('unknown', details=unknown_flags)
+
+    @classmethod
+    def _ensure_file_and_extension(cls, file_name, extn_list):
+        '''Check that a given file or file prefix has an extension
+
+        Check that the filename ends with one of the expected extensions.
+        If not, assume the file_name is actually a file prefix and look
+        for existing files matching the prefix + extension.
+
+        Arguments:
+            file_name   The file name or file prefix.
+            extn_list   A list of expected file endings.
+        Return:
+            The filename with the valid extension (unchanged if already
+            had an expected extension).
+        Raises:
+            FileTypeError if no extension given and no existing file found.
+        '''
+
+        # check that filename ends with given list
+        # INSTEAD of checking filename extension against list
+        # -- provides some flexiblity, e.g., checking for '_1.fasta'
+        file_extn = [
+            extn for extn in extn_list
+            if file_name.endswith(extn)
+        ]
+
+        # the file has one of the expected extensions
+        if file_extn:
+            return file_name
+
+        # check for presence of file with expected extension
+        # -- assume the given file_name is a prefix!
+        # -- update with first found match
+        # NOTE: LOGIC ERROR! If multiple exist, e.g., both .bed and .gff,
+        #       only the first found will be used.
+        for extn in extn_list:
+            if os.path.isfile(file_name + extn):
+                file_extn = extn
+                # self.kwargs['-bed'] = bed_file + extn
+                break
+
+        # update the file name
+        try:
+            file_name = file_name + file_extn
+
+        # file_extn not updated in loop (still a list from before)
+        except TypeError:
+            raise cls.FileTypeError('missing')
+
+        # otherwise, return the new filename
+        else:
+            return file_name

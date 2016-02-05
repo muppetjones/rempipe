@@ -404,6 +404,46 @@ class TestBaseCmd_misc(TestBase):
         self.assertEqual(
             cmd.cmd(verbose=False).rstrip(), expected_cmd.rstrip())
 
+    def test_extn_check_does_not_check_isfile_if_extn_given(self):
+
+        with patch('os.path.isfile') as m:
+            m.return_value = False
+
+            # should not raise
+            BaseCmd._ensure_file_and_extension(
+                '~/foo.bar',
+                ['.bar', ]
+            )
+
+        self.assertEqual(m.call_count, 0)
+
+    def test_extn_check_allows_for_file_endings_too(self):
+
+        with patch('os.path.isfile') as m:
+            m.return_value = False
+
+            # should not raise
+            BaseCmd._ensure_file_and_extension(
+                '~/foo.bar',
+                ['o.bar', ]
+            )
+
+        self.assertEqual(m.call_count, 0)
+
+    def test_extn_check_raises_TypeError_if_cannot_detect_extension(self):
+        with patch('os.path.isfile') as m:
+            m.return_value = False
+
+            # should not raise
+            with self.assertRaises(TypeError):
+                BaseCmd._ensure_file_and_extension(
+                    '~/foo',
+                    ['.bar', '.hello', '.world']
+                )
+
+        # isfile should be called once for each extension
+        self.assertEqual(m.call_count, 3)
+
     #
     #   Help tests
     #

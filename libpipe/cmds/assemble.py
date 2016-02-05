@@ -293,3 +293,67 @@ class VelvetgCmd(BaseCmd):
             for f in ('contigs.fa', 'stats.txt')
         ]
         return [self.args[0]] + output_files
+
+
+class ContigSummaryCmd(BaseCmd):
+
+    '''Write contig size summary
+
+    Command:
+        grep ">" "$f" |awk -F '_' '{print $4}' |sort -rn > "${contigsize}"
+
+    NOTE: BASH one-liner.
+
+    Arguments:
+        filename: Contig file from velvet
+        outfile: The file to write to. Default: <dirname>/contig_sizes.txt
+            (on init only)
+
+    Output:
+        1) A file with all contig names and sizes (contig_sizes.txt)
+        2) [fall_through] The input fasta file.
+    '''
+
+    attr = CmdAttributes(
+        name='contig_summary',
+        synopsis='De Bruijn graph assembly for de novo genome assembly',
+        invoke_str='grep ">"',
+
+        arguments=[
+            (0, 'FILE', 'The contig file'),
+        ],
+
+        req_args=1,
+        req_type=[
+            [(0, ), ('.fa', '.fasta', )],
+        ],
+    )
+
+    def __init__(self, *args, outfile=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if outfile:
+            self.redirect = ('>', outfile)
+
+        if len(self.args > 1):
+            raise self.PositionalArgError('unknown')
+
+        # second part of one liner
+        # -- get the fourth column and sort
+        self.args.append("|awk -F '_' '{print $4}' |sort -rn")
+
+    def _prepcmd(self):
+
+        # ensure double quotes around input file
+        if not self.args[0].startswith('"'):
+            self.args[0] = '"{}"'.format(self.args[0])
+
+        if not self.redirect:
+            outfile = os.path.join(
+                os.path.dirname(self.args[0]),
+                'contig_sizes.txt',
+            )
+            self.redirect = ('>', outfile)
+
+    def output(self):
+        return [self.args[0], self.redirect[1]]

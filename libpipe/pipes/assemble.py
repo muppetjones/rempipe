@@ -9,7 +9,11 @@ from libpipe.cmds import (
 )
 
 from libpipe.cmds.assemble import (
-    VelvetkCmd, VelvethCmd, VelvetgCmd,
+    VelvetkCmd, VelvethCmd, VelvetgCmd, ContigSummaryCmd
+)
+
+from libpipe.cmds.utility import (
+    AbacasCmd,
 )
 
 
@@ -23,19 +27,25 @@ class AssemblePipe(PresetPipe):
 
     NOTE: This pipe is intended for use as a subpipe.
 
-    Velvet Pipeline:
-        a. Velvetk
-        b. Velveth
-        c. Velvetg
+    Velvet Pipeline
+        1. Velvetk
+        2. Velveth
+        3. Velvetg
+    Post processing
+        4. Summarize contig sizes (BASH one-liner)
+        5. abacas (order contigs according to reference genome)
+
+    NOTE: We could move the post processing into another pipe, but
+        both of these commands are fairly crucial to each assembly.
     '''
 
-    REQ_PARAM = ['input_list', 'genome']
+    REQ_PARAM = ['input_list', 'reference']
 
-    def _setup(self, *pipe_args, input_list=[], genome='', **pipe_kwargs):
+    def _setup(self, *pipe_args, input_list=[], reference='', **pipe_kwargs):
 
         # 1. velvetk
         args = input_list[:]
-        kwargs = {'--genome': genome}
+        kwargs = {'--genome': reference}
         velvetk = VelvetkCmd(*args, wrap='k', **kwargs)
 
         # 2. velveth
@@ -48,8 +58,18 @@ class AssemblePipe(PresetPipe):
         kwargs = {}
         velvetg = VelvetgCmd(*args, **kwargs)
 
+        # 4. contig size summary
+        args = []
+        kwargs = {}
+        contig_sizes = ContigSummaryCmd(*args, **kwargs)
+
+        # 5. abacas
+        args = []
+        kwargs = {'-r': reference}
+        abacas = AbacasCmd(*args, **kwargs)
+
         # add 'em to the pipe
-        self.add(velvetk, velveth, velvetg)
+        self.add(velvetk, velveth, velvetg, contig_sizes, abacas, )
 
 
 class WgsPipe(PresetPipe):
@@ -71,11 +91,12 @@ class WgsPipe(PresetPipe):
             b. velveth
             c. velvetg
         5. Assembly statistics
+            > MUST FIRST implement batch handling
 
 
     '''
 
-    REQ_PARAM = ['input_list', 'odir']
+    REQ_PARAM = ['input_list', 'odir', 'reference', ]
 
     def _setup(self, *pipe_args, **pipe_kwargs):
         # NOTE: TrimPipe uses 'input_list' to set FastQC input.
@@ -88,9 +109,11 @@ class WgsPipe(PresetPipe):
         # 2. (optional) Filter through reference genome
         # > input: link from previous (fastq)
         # > output: sam files to given directory (+ the unaligned fastq)
-        if 'genome' in pipe_kwargs:
+        if 'filter' not in pipe_kwargs:
+            hisat = None
+        else:
             args = []
-            kwargs = {'-x': pipe_kwargs['genome'], '-p': os.cpu_count()}
+            kwargs = {'-x': pipe_kwargs['filter'], '-p': os.cpu_count()}
             if kwargs['-p'] is None:
                 del kwargs['-p']
             else:
@@ -100,39 +123,12 @@ class WgsPipe(PresetPipe):
         # 3. Determine Insertion length
         # ** SKIP **
 
-        # 4a. velvetk -- find hash length!
-        args = []
-        kwargs = {}
+        # 4. Assemble
+        # > input: link from previous (unaligned fastq)
+        # > output: static files in child directory (contigs.fa)
+        assemble = AssemblePipe(*pipe_args, **pipe_kwargs)
 
-        # CRITICAL!! This will be a problem
-        # we need to get the value returned from here and use it in
-        # velveth -- as a value, not a file!!
-        # two options:
-        #   1. Add a special _prep_cmd in velveth to retrieve it
-        #       -- BUT the data may not exist to calculate at that point
-        #   2. Add a special *pre-cmd* cmd
-        #       -- i.e., velveth.cmd will return something like:
-        #           k="$(velvetk.pl ....)
-        #           velveth $k
-        #   3. Allow for types to be used in req args
-        #       -- cmd.output will be able to return those types
-        #       -- probably still need better linking...somehow
-        #   NO! Must be 2, as a sub command or something...3 same issue as 1
-
-        # 4b. velveth
-        args = []
-        kwargs = {}
-        velveth = VelvethCmd(*args, **kwargs)
-
-        # 4c. velvetg
-        args = []
-        kwargs = {}
-        velvetg = VelvetgCmd(*args, **kwargs)
-
-        # 5. Assembly statistics
-
-        # Add 'em all up
-        try:
-            self.add(trim, hisat, velveth, velvetg)
-        except UnboundLocalError:
-            self.add(trim, velveth, velvetg)
+        # add all valid commands
+        cmd_list = filter(
+            None, [trim, hisat, assemble])
+        self.add(*cmd_list)

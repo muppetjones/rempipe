@@ -85,47 +85,13 @@ class HtseqCountCmd(BaseCmd):
         # update kwargs from config file
         self._update_from_config_file()
 
-        # NOTE: From here down is duplicated in BedtoolsMulticovCmd
-        #       EXCEPT for the line where the genome is added!!
-        # TODO: make this a base function
-        def _get_types(flag):
-            for rt in self.attr.req_type:
-                if flag in rt[0]:
-                    return rt[1]
-            return None
-
         # identify extension
-        bed_file = self.args[1]
-        bed_types = _get_types(1)
         try:
-            bed_extn = [
-                extn for extn in bed_types
-                if bed_file.endswith(extn)
-            ][0]
-        except IndexError:
-            # check for presence of file with expected extension
-            # update with first found match
-            # NOTE: LOGIC ERROR! If multiple exist, e.g., both .bed and .gff,
-            #       only the first found will ever be used.
-            for extn in bed_types:
-                if os.path.isfile(bed_file + extn):
-                    bed_extn = extn
-                    # self.kwargs['-bed'] = bed_file + extn
-                    break
-            try:
-                self.args[1] = bed_file + bed_extn
-            except UnboundLocalError:
-                msg = 'Unable to find an annotation file {} for "{}" genome'
-                raise FileNotFoundError(msg.format(
-                    bed_types, os.path.basename(bed_file)))
-
-        # NOTE: This sort of special consideration should be handled
-        #       by adding an htseq-count.config file in the genome dir
-        # # CRITICAL: GFF files probably will NOT have a gene_id attribute
-        # #           There's not a good, consistant substitute, except
-        # #           either 'gene' or 'Name'
-        # if not self.args[1].endswith('.gtf'):
-        #     self.kwargs['-i'] = 'gene'
+            self.args[1] = self._ensure_file_and_extension(
+                self.args[1], self.attr.get_types(1))
+        except self.FileTypeError:
+            # No extn given OR unable to find a file with an expected extn
+            raise
 
         self.redirect = ('>', os.path.splitext(self.args[0])[0] + '.count')
 
