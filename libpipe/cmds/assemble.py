@@ -207,8 +207,18 @@ class VelvethCmd(BaseCmd):
         flag = '-long' if read_len > 200 else '-short'
         if len(input_seq) > 1:
             flag = flag + 'Paired -separate'
+        flag = flag.split()
 
-        self.flags.extend(flag.split())
+        # add flag for type!
+        extn = os.path.splitext(input_seq[0])[1]
+        if extn in ['.fa', '.fasta']:
+            flag.append('-fasta')
+        elif extn in ['.fq', '.fastq']:
+            flag.append('-fastq')
+        else:
+            flag.append('-fmtAuto')
+
+        self.flags.extend(flag)
 
     @file_or_handle(mode='r')
     def _estimate_read_len(self, fh, n=10):
