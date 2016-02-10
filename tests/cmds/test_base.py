@@ -363,6 +363,38 @@ class TestBaseCmd_requirements(TestBase):
         a.kwargs = kwargs
         a.cmd()  # should not raise
 
+    #
+    #   Other requirement tests
+    #
+
+    def test_type_req_accepts_basic_types(self):
+
+        for t, v in zip([int, float, str], [0, 1.2, 'foo']):
+            with self.subTest(type=t):
+                self.CMD.attr.req_type = [
+                    [('-f', ), (t, )],
+                ]
+
+                kwargs = {'-f': v}
+                a = self.sample()
+                a.kwargs = kwargs
+                a.cmd()  # should not raise
+
+    def test_cmd_raises_ValueError_if_arg_has_wrong_type(self):
+
+        for t, v in zip([int, float], [0.5, 'bar']):
+            with self.subTest(type=t):
+                self.CMD.attr.req_type = [
+                    [('-f', ), (t, )],
+                ]
+
+                kwargs = {'-f': v}
+                a = self.sample()
+                a.kwargs = kwargs
+
+                with self.assertRaises(ValueError):
+                    a.cmd()  # should not raise
+
 
 class TestBaseCmd_misc(TestBase):
 
@@ -700,3 +732,59 @@ class TestBaseCmd_cmd(TestBase):
         cmd_str = cmd.cmd(verbose=False)
         expected_str = '{} a b c -x 1'.format(cmd.invoke_str)
         self.assertEqual(cmd_str, expected_str)
+
+    def test_expected_bash_variables_not_stripped_in_cmd(self):
+        '''Test that expected BASH variables have not been stripped.
+
+        Example:
+            k=$(velvetk.pl ...)
+            velveth odir ${k}
+
+        During command creation, the "${k}" would be stripped to "k".
+        However, the use of the bash variable is crucial. There's not
+        an easy way around this in most cases.
+        '''
+        self.CMD.attr.allow_bash_var = True
+        args = ['${k}', ]
+        kwargs = {'-x': '1', }
+        cmd = self.CMD(*args, **kwargs)
+
+        cmd_str = cmd.cmd(verbose=False)
+        log.debug(cmd_str)
+        self.assertIn("${k}", cmd_str)
+
+    def test_unexpected_bash_variables_stripped_in_cmd(self):
+        '''Test that unexpected BASH variables have been stripped.
+
+        Example:
+            k=$(velvetk.pl ...)
+            velveth odir ${k}
+
+        During command creation, the "${k}" would be stripped to "k".
+        '''
+        self.CMD.attr.allow_bash_var = False
+        args = ['${k}', ]
+        kwargs = {'-x': '1', }
+        cmd = self.CMD(*args, **kwargs)
+
+        cmd_str = cmd.cmd(verbose=False)
+        log.debug(cmd_str)
+        self.assertNotIn("${k}", cmd_str)
+
+    def test_only_alphanum_bash_var_allowed(self):
+        '''Test that unexpected BASH variables have been stripped.
+
+        Example:
+            k=$(velvetk.pl ...)
+            velveth odir ${k}
+
+        During command creation, the "${k}" would be stripped to "k".
+        '''
+        self.CMD.attr.allow_bash_var = True
+        args = ['${rm -rf ./*}', ]
+        kwargs = {'-x': '1', }
+        cmd = self.CMD(*args, **kwargs)
+
+        cmd_str = cmd.cmd(verbose=False)
+        log.debug(cmd_str)
+        self.assertNotIn("${rm -rf ./*}", cmd_str)

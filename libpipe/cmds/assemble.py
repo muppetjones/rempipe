@@ -4,8 +4,12 @@ import re
 
 from remsci.lib.decorators import file_or_handle
 
-import libpipe.scripts
+import libpipe
 from libpipe.cmds.base import BaseCmd, CmdAttributes
+
+
+import logging
+log = logging.getLogger(__name__)
 
 
 class VelvetkCmd(BaseCmd):
@@ -29,7 +33,8 @@ class VelvetkCmd(BaseCmd):
         name='velvetk',
         synopsis='Script to calculate optimal k-mer value for velvet assembly',
         invoke_str=os.path.join(
-            os.path.dirname(libpipe.scripts.__file__),
+            os.path.dirname(os.path.dirname(libpipe.__file__)),
+            'scripts',
             'velvetk.pl'),
 
         arguments=[
@@ -44,7 +49,7 @@ class VelvetkCmd(BaseCmd):
         req_kwargs=[['--size', '--genome'], ],
         req_type=[
             [('--genome', ), ('.fa', '.fna')],
-            [(0, 1), ('.fa', '.fna', )],
+            [(0, 1), ('.fa', '.fna', '.fq', '.fastq')],
         ],
     )
 
@@ -147,18 +152,15 @@ class VelvethCmd(BaseCmd):
         arguments=[
             (0, 'DIR', 'The output directory'),
             (1, 'INT', 'Hash length. May also pass in a BASH variable'),
-            ('--size', 'CHAR', 'The estimated genome size, e.g., 4.4M'),
-            ('--genome', 'FASTA', 'A genome sequence file.'),
-            ('--best', None, 'Just print the best k-mer to stdout.'),
             (None, 'FILE', 'The input fast[aq] file(s).'),
         ],
         defaults={},
 
         req_args=3,
-        req_kwargs=[['--size', '--genome'], ],
+        req_kwargs=[],
         req_type=[
             [('--genome', ), ('.fa', '.fna')],
-            [(2, 3), ('.fa', '.fna', )],
+            [(2, 3), ('.fa', '.fna', '.fasta', '.fq', '.fastq')],
         ],
         n_priority_args=2,  # output directory and k hash length FIRST!
     )
@@ -224,7 +226,7 @@ class VelvethCmd(BaseCmd):
             line = line.rstrip()
             if line[0] in ['@', '>', '+']:
                 continue  # fasta or fastq header
-            if rx_alphanum(line) is None:
+            if rx_alphanum.search(line) is None:
                 continue  # not a sequence (propably a quality score)
             if len(line_len) > n:
                 break
@@ -335,18 +337,26 @@ class ContigSummaryCmd(BaseCmd):
         if outfile:
             self.redirect = ('>', outfile)
 
-        if len(self.args > 1):
+        if len(self.args) > 1:
             raise self.PositionalArgError('unknown')
 
         # second part of one liner
         # -- get the fourth column and sort
         self.args.append("|awk -F '_' '{print $4}' |sort -rn")
 
+    def _prepreq(self):
+
+        # ensure file is first, rest of cmd is second
+        if self.args[0].startswith('|awk'):
+            self.args.reverse()
+            log.debug(self.args)
+
     def _prepcmd(self):
 
         # ensure double quotes around input file
-        if not self.args[0].startswith('"'):
-            self.args[0] = '"{}"'.format(self.args[0])
+        # BREAKS EVERYTHING!
+        # if not self.args[0].startswith('"'):
+        #     self.args[0] = '"{}"'.format(self.args[0])
 
         if not self.redirect:
             outfile = os.path.join(

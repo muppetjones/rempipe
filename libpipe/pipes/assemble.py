@@ -39,7 +39,7 @@ class AssemblePipe(PresetPipe):
         both of these commands are fairly crucial to each assembly.
     '''
 
-    REQ_PARAM = ['input_list', 'reference']
+    REQ_PARAM = ['reference']
 
     def _setup(self, *pipe_args, input_list=[], reference='', **pipe_kwargs):
 
@@ -101,7 +101,9 @@ class WgsPipe(PresetPipe):
     def _setup(self, *pipe_args, **pipe_kwargs):
         # NOTE: TrimPipe uses 'input_list' to set FastQC input.
 
-        # check for filter genome input
+        # get cpu count
+        # NOTE: this does NOT work with qsub -- needs update!
+        cpu_count = os.cpu_count()
 
         # 1. TrimPipe
         trim = TrimPipe(*pipe_args, **pipe_kwargs)
@@ -109,16 +111,19 @@ class WgsPipe(PresetPipe):
         # 2. (optional) Filter through reference genome
         # > input: link from previous (fastq)
         # > output: sam files to given directory (+ the unaligned fastq)
-        if 'filter' not in pipe_kwargs:
-            hisat = None
-        else:
-            args = []
-            kwargs = {'-x': pipe_kwargs['filter'], '-p': os.cpu_count()}
-            if kwargs['-p'] is None:
-                del kwargs['-p']
-            else:
-                kwargs['-p'] = kwargs['-p'] - 1
-            hisat = Hisat2Cmd(*args, **kwargs)
+        hisat_list = []
+        try:
+            for filter_genome in pipe_kwargs['filter']:
+                args = []
+                kwargs = {'-x': filter_genome, '-p': cpu_count}
+                if kwargs['-p'] is None:
+                    del kwargs['-p']
+                else:
+                    kwargs['-p'] = kwargs['-p'] - 1
+                hisat = Hisat2Cmd(*args, **kwargs)
+                hisat_list.append(hisat)
+        except KeyError:
+            pass  # no filter genomes -- no problem!
 
         # 3. Determine Insertion length
         # ** SKIP **
@@ -126,9 +131,11 @@ class WgsPipe(PresetPipe):
         # 4. Assemble
         # > input: link from previous (unaligned fastq)
         # > output: static files in child directory (contigs.fa)
+        # -- remove input_list: don't accidently pass on untrimmed reads!
+        del pipe_kwargs['input_list']
         assemble = AssemblePipe(*pipe_args, **pipe_kwargs)
 
         # add all valid commands
         cmd_list = filter(
-            None, [trim, hisat, assemble])
+            None, [trim] + hisat_list + [assemble])
         self.add(*cmd_list)

@@ -441,6 +441,16 @@ class TestBasePipe_Write(TestBasePipe_setup):
         self.mock_oschmod.assert_called_once_with(
             bp.pbs_file, self.mock_osstat().st_mode.__or__())
 
+    def test_command_commented_if_its_output_exists(self):
+        self.mock_cmd._has_output = Mock(side_effect=[True, False, False])
+        bp = self.setup_pipe()
+        bp.write_script('pbs_file')
+
+        args, kwargs = self.mock_write().write.call_args
+        cmd = args[0]
+        self.assertEqual(
+            cmd.count('# cmd'), 1, 'Command not commented as expected')
+
 
 class TestBasePipe_Run(TestBasePipe_setup):
 

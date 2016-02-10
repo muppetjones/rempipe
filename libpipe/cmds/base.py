@@ -100,6 +100,12 @@ class CmdAttributes(object):
         n_priority_args
                     The number of arguments to put before keyword arguments
                     and flags. Set to -1 to put ALL args first. Default: 0.
+        allow_bash_var
+                    A bool indicating whether the command should allow
+                    BASH-stype variables. If False, any variables will be
+                    stripped: ${var_name} => var_name. Default: False.
+                    It is not recommended to allow BASH-style variables
+                    unless it is known that they will be used.
 
     Example:
         hisat_attr = CmdAttributes(
@@ -118,6 +124,7 @@ class CmdAttributes(object):
         req_kwargs=[],
         req_type=[],
         n_priority_args=0,
+        allow_bash_var=False,
     ):
         if not invoke_str:
             invoke_str = name
@@ -139,6 +146,7 @@ class CmdAttributes(object):
         self.req_kwargs = req_kwargs[:]
         self.req_type = req_type[:]
         self.n_priority_args = n_priority_args
+        self.allow_bash_var = allow_bash_var
 
         if not arguments:
             raise ValueError('No arguments given')
@@ -282,11 +290,16 @@ class BaseCmd(CmdInterface):
             'mismatch': 'Bad link: output not matched to input',
         }
 
+    class ArgError(RempipeError, ValueError):
+        ERRMSG = {
+            'type': 'Bad argument type. "{} != {}"',
+        }
+
     class PositionalArgError(RempipeError, IndexError):
-        POSITIONALARGERROR = {
+        ERRMSG = {
             'missing': 'Missing {} of {} required positional parameters',
             'str_only': ('Positional args should be strings. ' +
-                         '(Did you expand **kwargs?)')
+                         '(Did you expand **kwargs?)'),
             'unknown': 'Unknown positional parameters.',
         }
 
@@ -690,6 +703,7 @@ class BaseCmd(CmdInterface):
             ])
 
         # check for expected file types
+        # NOTE: Do this LAST to avoid unnecessary errors
         try:
             self.__check_type()
         except self.FileTypeError:
@@ -698,7 +712,7 @@ class BaseCmd(CmdInterface):
         return
 
     def __check_type(self):
-        '''Check specified kwargs to ensure given expected file type.
+        '''Check specified kwargs and args to ensure given expected data type.
 
         NOTE: All extensions in attr.req_type should have leading periods.
         TODO: Update to use Django model to handle file types.
@@ -706,6 +720,7 @@ class BaseCmd(CmdInterface):
         Returns:
             True if expected file types match given files.
         Raises:
+            ValueError if not expected data type
             FileTypeError if a given argument has wrong file type.
         '''
 
@@ -716,21 +731,115 @@ class BaseCmd(CmdInterface):
             except ValueError:
                 flags, types = req
 
-            # flags = [f for f in flags if f in self.kwargs]
-            for f in flags:
+            # convert "flags" to values
+            # NOTE: the "flags" may be arg indices, too
+            vals = self.__get_values_from_flags(flags)
+            if not vals:
+                continue  # no relevant values
+
+            # check for explicit types, e.g., int
+            try:
+                self.__check_basic_type(vals, types)
+            except self.ArgError:
+                raise  # invalid type!
+
+            # Expected error: 'str' object not callable
+            # check vals for file type
+            except TypeError:
                 try:
-                    extn = os.path.splitext(self.kwargs[f])[1]
+                    self.__check_file_type(vals, types)
+                except AttributeError:
+                    # the given object is probably not a string
+                    # -- mising 'rfind'
+                    raise
 
-                except KeyError:
-                    try:
-                        extn = os.path.splitext(self.args[f])[1]
-                    except (TypeError, IndexError):
-                        continue  # we don't have the flag, so skip check
-
-                if extn not in types:
-                    msg = 'Invalid file type "{}" given for argument {}'
-                    raise self.FileTypeError(msg.format(extn, f))
         return True
+
+    def __get_values_from_flags(self, flags):
+        '''Return a list of values for the given flags
+
+        Arguments:
+            flags: A list of kwarg flags or arg positions
+        Return:
+            A list of values for the given flags
+        '''
+
+        indices = [f for f in flags if isinstance(f, int)]
+        flags = [f for f in flags if f not in indices]
+        vals = [
+            self.kwargs[flg]
+            for flg in flags
+            if flg in self.kwargs
+        ]
+        vals.extend(
+            self.args[index] for index in indices
+            if index < len(self.args)
+        )
+
+        return vals
+
+    def __check_basic_type(self, vals, types):
+        '''Check given values have expected data type
+
+        Check that given values can be coerced into specific types.
+        Compares string value after conversion to ensure no information loss.
+        For example, int(0.5) is a valid statement that returns 0, but
+        if the expected type is int, 0.5 is NOT a valid value.
+        Unfortunately, the value may not be given as an int, so we cannot
+        rely on isinstance. Therefore, we convert the final result to a
+        string and compare the string of the original value:
+            str(int(0.5)) == str(val)
+        And raise a ValueError if they're not equal.
+
+        NOTE: Profile efficiency of this function.
+        NOTE: Will not handle multiple types well. For example,
+            [int, float] will raise for [1.1].
+
+        Arguments:
+            vals: A list of values to check
+            types: A list of type callables, eg., int
+        Return:
+            None
+        Raises:
+            ArgError [ValueError] if the value is not of the expected type.
+            TypeError if the type is not callable.
+        '''
+
+        for val in vals:
+            for typ in types:
+                try:
+                    if str(typ(val)) != str(val):
+                        raise ValueError
+                except ValueError:
+                    raise self.ArgError('type', details=[val, typ])
+                except TypeError:
+                    raise
+
+    @classmethod
+    def __check_file_type(cls, vals, types):
+        '''Check given values to ensure given expected file type.
+
+        NOTE: All extensions in attr.req_type should have leading periods.
+        TODO: Update to use Django model to handle file types.
+
+        Arguments:
+            vals: A list of argument values
+            types: A list of file extensions
+        Returns:
+            None
+        Raises:
+            FileTypeError [TypeError] if a given val has wrong file type.
+        '''
+
+        for v in vals:
+            try:
+                extn = os.path.splitext(v)[1]
+            except:
+                raise
+
+            if extn not in types:
+                msg = 'Invalid file type "{}" given for argument {}'
+                raise cls.FileTypeError(msg.format(extn, v))
 
     def __check_kwargs(self):
         '''Make sure that the given kwargs contain all required kwargs
@@ -804,7 +913,7 @@ class BaseCmd(CmdInterface):
         return os.path.splitext(os.path.basename(path_name))[0]
 
     @classmethod
-    def _unsafe_char_protect(cls, input_str, strict=True):
+    def _unsafe_char_protect(cls, input_str, strict=True, bash=[]):
         '''Removes unsafe characters from a string
 
         Checks for unicode control characters and unsafe BASH chars and
@@ -820,6 +929,11 @@ class BaseCmd(CmdInterface):
         '''
 
         try:
+            # protect BASH variable declarations
+            if cls.attr.allow_bash_var:
+                input_str = cls.rx_bash_var.sub(
+                    r'BASHOPEN\g<var>BASHCLOSE', input_str)
+
             # remove unicode control characters
             input_str = cls.rx_illegal_char.sub('', input_str)
 
@@ -828,13 +942,26 @@ class BaseCmd(CmdInterface):
             input_str = cls.rx_unsafe_char.sub(replacement, input_str)
             if replacement:
                 input_str = input_str.replace(replacement[:7], '\\')
+
+            # reinstate bash variable declarations
+            if cls.attr.allow_bash_var:
+                input_str = input_str.replace('BASHOPEN', '${')
+                input_str = input_str.replace('BASHCLOSE', '}')
             return input_str.rstrip()
 
         except AttributeError:
             # compiile and create these regex only once
+            cls.__init_bash_var_regex()
             cls.__init_unsafe_regex()
             cls.__init_illegal_char_regex()
             return cls._unsafe_char_protect(input_str, strict=strict)
+
+    @classmethod
+    def __init_bash_var_regex(cls):
+        '''Compile the regex for bash variable interpolation
+        NOTE: The braces are intentionally required.
+        '''
+        cls.rx_bash_var = re.compile('\$\{(?P<var>\w+)\}')
 
     @classmethod
     def __init_unsafe_regex(cls):

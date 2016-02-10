@@ -7,7 +7,7 @@ sys.path.append("../remsci/")
 import remsci.scripted.base as base
 from remsci.lib.utility import path
 from libpipe.pipes.align import NestedRnaSeqPipe
-from libpipe.parsers.fastq import FastqScripted
+from libpipe.parsers.fastq import RnaseqPipeScripted, WgsPipeParser
 # from libpipe.cmds import (
 #     SkewerCmd, HisatCmd, Bowtie2Cmd, FastqcCmd,
 #     SamtoolsSortCmd, SamtoolsIndexCmd, BedtoolsMulticovCmd,
@@ -21,8 +21,11 @@ PIPE_PBS_TEMPLATE = ''
 def add_subparsers():
     '''Use this function to add subparsers from modules'''
     subparser = base.get_subparser()
-    fastq_parser = FastqScripted(subparser)
+    fastq_parser = RnaseqPipeScripted(subparser)
     fastq_parser.setup()
+
+    wgs_parser = WgsPipeParser(subparser)
+    wgs_parser.setup()
 
 
 def setup_logger():
@@ -42,6 +45,7 @@ def parse_args():
     subpars.required = True
 
     args = parser.parse_args()
+    return args
 
     # parse directory file list
     # (requires input_directory_parser to be included)
@@ -51,7 +55,7 @@ def parse_args():
         pass
 
     # protect file names
-    protect = ['summary', 'root_dir', 'data_dir']
+    protect = ['summary_file', 'root_dir', 'data_dir']
     for p in protect:
         try:
             setattr(args, p, path.protect(getattr(args, p)))
@@ -115,14 +119,54 @@ def run_pipe(summary, genome, project_dir, force=False):
         pipe.run()
 
 
+def run_pipe2(args):
+
+    # confusing paradoxical crap
+    # -- call the bound function, but pass in the object, which will be
+    #    updated and returned.
+    args = args.func(args)
+
+    # initialize all pipes
+    pipes = []
+    for row in args.summary:
+
+        job_name = row[0]
+        files = row[1:]
+        log.info('Processing "{}"'.format(job_name))
+
+        sample_dir = os.path.join(args.project_dir, job_name)
+        path.makedirs(sample_dir)
+
+        pipe = args.pipe(
+            job_name=job_name,
+            odir=sample_dir,
+            input_list=files,
+            force=args.force,
+            filter=args.filter_genomes,
+            reference=args.reference_genome,
+        )
+        pipe.write_script(directory=sample_dir)
+        pipes.append(pipe)
+
+    # execute each pipe in turn
+    for pipe in pipes:
+        relpath = os.path.relpath(pipe.pbs_file, args.root_dir)
+        log.info('Running pbs script: "{}"'.format(relpath))
+        # pipe.run()
+
+
 def main():
     global ROOT_DIR
     args = parse_args()
-    summary = read_summary(args)
+    # summary = read_summary(args)
     force = args.force
 
-    if args.root_dir:
-        ROOT_DIR = path.protect(args.root_dir)
+    if not args.root_dir:
+        setattr(args, 'root_dir', ROOT_DIR)
+        # ROOT_DIR = path.protect(args.root_dir)
+
+    run_pipe2(args)
+    return
 
     genome = args.genome
     project_name = args.project if args.project else 'new_project'

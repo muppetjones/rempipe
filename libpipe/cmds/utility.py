@@ -279,7 +279,8 @@ class AbacasCmd(BaseCmd):
 
         req_kwargs=['-r', '-q', ],
         req_type=[
-            [('-r', '-q'), ('.fa', '.fasta', '.fna'), ],
+            [('-q', ), ('.fa', '.fasta', '.fna'), ],
+            [('-r', ), ('.fa', '.fasta', '.fna'), ],
         ],
     )
 
@@ -306,6 +307,8 @@ class AbacasCmd(BaseCmd):
         except self.FileTypeError:
             # No extn given OR unable to find a file with an expected extn
             raise
+
+        log.debug(self.kwargs)
 
     def _prepcmd(self):
 
