@@ -152,7 +152,7 @@ def run_pipe2(args):
     for pipe in pipes:
         relpath = os.path.relpath(pipe.pbs_file, args.root_dir)
         log.info('Running pbs script: "{}"'.format(relpath))
-        pipe.run()
+        # pipe.run()
 
 
 def main():
