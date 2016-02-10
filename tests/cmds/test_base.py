@@ -750,7 +750,6 @@ class TestBaseCmd_cmd(TestBase):
         cmd = self.CMD(*args, **kwargs)
 
         cmd_str = cmd.cmd(verbose=False)
-        log.debug(cmd_str)
         self.assertIn("${k}", cmd_str)
 
     def test_unexpected_bash_variables_stripped_in_cmd(self):
@@ -768,7 +767,6 @@ class TestBaseCmd_cmd(TestBase):
         cmd = self.CMD(*args, **kwargs)
 
         cmd_str = cmd.cmd(verbose=False)
-        log.debug(cmd_str)
         self.assertNotIn("${k}", cmd_str)
 
     def test_only_alphanum_bash_var_allowed(self):
@@ -786,5 +784,4 @@ class TestBaseCmd_cmd(TestBase):
         cmd = self.CMD(*args, **kwargs)
 
         cmd_str = cmd.cmd(verbose=False)
-        log.debug(cmd_str)
         self.assertNotIn("${rm -rf ./*}", cmd_str)

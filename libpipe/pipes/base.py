@@ -255,7 +255,7 @@ class BasePipe(CmdInterface):
                 cmd_str = cmd.cmd(verbose=verbose)  # must call directly!!
             except:
                 raise
-            if self._do_run(cmd):
+            if self._do_run(cmd) or cmd.wrap:
                 prefix = comment_str.format(cmd.name)
             else:
                 prefix = omit_msg

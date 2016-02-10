@@ -152,14 +152,14 @@ def run_pipe2(args):
     for pipe in pipes:
         relpath = os.path.relpath(pipe.pbs_file, args.root_dir)
         log.info('Running pbs script: "{}"'.format(relpath))
-        # pipe.run()
+        pipe.run()
 
 
 def main():
     global ROOT_DIR
     args = parse_args()
     # summary = read_summary(args)
-    force = args.force
+    # force = args.force
 
     if not args.root_dir:
         setattr(args, 'root_dir', ROOT_DIR)
@@ -168,11 +168,11 @@ def main():
     run_pipe2(args)
     return
 
-    genome = args.genome
-    project_name = args.project if args.project else 'new_project'
-    project_dir = os.path.join(ROOT_DIR, project_name, 'samples')
-
-    run_pipe(summary, genome, project_dir, force=force)
+    # genome = args.genome
+    # project_name = args.project if args.project else 'new_project'
+    # project_dir = os.path.join(ROOT_DIR, project_name, 'samples')
+    #
+    # run_pipe(summary, genome, project_dir, force=force)
 
 
 if __name__ == '__main__':

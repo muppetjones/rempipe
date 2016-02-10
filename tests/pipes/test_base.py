@@ -10,7 +10,6 @@ from unittest.mock import patch, Mock, MagicMock, mock_open, call
 
 from remsci.lib.utility import path
 
-from libpipe.cmds.base import BaseCmd
 from libpipe.pipes.base import BasePipe
 
 import logging
@@ -26,7 +25,11 @@ class TestBasePipe_setup(unittest.TestCase):
         # avoid testing command objects
         patcher = patch(
             'libpipe.cmds.base.BaseCmd',
-            new=MagicMock(link=Mock(), cmd=Mock(return_value='cmd --foo')),
+            new=MagicMock(
+                link=Mock(),
+                cmd=Mock(return_value='cmd --foo'),
+                wrap=None,
+            ),
         )
         self.mock_cmd = patcher.start()
         self.addCleanup(patcher.stop)
@@ -450,6 +453,18 @@ class TestBasePipe_Write(TestBasePipe_setup):
         cmd = args[0]
         self.assertEqual(
             cmd.count('# cmd'), 1, 'Command not commented as expected')
+
+    def test_command_not_commented_if_wrapped(self):
+        self.mock_cmd._has_output = Mock(side_effect=[True, False, False])
+        bp = self.setup_pipe()
+
+        bp.cmds[0].wrap = 'k'
+        bp.write_script('pbs_file')
+
+        args, kwargs = self.mock_write().write.call_args
+        cmd_str = args[0]
+        self.assertNotIn(
+            '# cmd', cmd_str, 'Command should not be commented!')
 
 
 class TestBasePipe_Run(TestBasePipe_setup):
