@@ -913,7 +913,7 @@ class BaseCmd(CmdInterface):
         return os.path.splitext(os.path.basename(path_name))[0]
 
     @classmethod
-    def _unsafe_char_protect(cls, input_str, strict=True, bash=[]):
+    def _unsafe_char_protect(cls, input_str, strict=True):
         '''Removes unsafe characters from a string
 
         Checks for unicode control characters and unsafe BASH chars and
