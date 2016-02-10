@@ -34,7 +34,8 @@ class VelvetkCmd(BaseCmd):
         synopsis='Script to calculate optimal k-mer value for velvet assembly',
         invoke_str=os.path.join(
             os.path.dirname(libpipe.scripts.__file__),
-            'velvetk.pl'),
+            'velvetk.pl',
+        ),
 
         arguments=[
             (None, 'FILE', 'The input fast[aq] file.'),

@@ -252,12 +252,10 @@ class InsertSizesCmd(BaseCmd):
 
     attr = CmdAttributes(
         name='calc_insert_sizes',
-        invoke_str='perl {}'.format(
-            os.path.join(
-                os.path.dirname(libpipe.scripts.__file__),
-                'get_insert_sizes_from_sam.pl'
-            ),
-        ),
+        invoke_str='perl {}'.format(os.path.join(
+            os.path.dirname(libpipe.scripts.__file__),
+            'get_insert_sizes_from_sam.pl'
+        )),
 
         arguments=[
             (None, 'FILE', 'SAM|BAM|CRAM input file'),
