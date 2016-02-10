@@ -4,8 +4,8 @@ import re
 
 from remsci.lib.decorators import file_or_handle
 
-import libpipe
-from libpipe.cmds.base import BaseCmd, CmdAttributes
+import libpipe.scripts
+from libpipe.cmds.base import BaseCmd, BashCmd, CmdAttributes
 
 
 import logging
@@ -33,8 +33,7 @@ class VelvetkCmd(BaseCmd):
         name='velvetk',
         synopsis='Script to calculate optimal k-mer value for velvet assembly',
         invoke_str=os.path.join(
-            os.path.dirname(os.path.dirname(libpipe.__file__)),
-            'scripts',
+            os.path.dirname(libpipe.scripts.__file__),
             'velvetk.pl'),
 
         arguments=[
@@ -310,20 +309,106 @@ class VelvetgCmd(BaseCmd):
         return [self.args[0]] + output_files
 
 
-class ContigSummaryCmd(BaseCmd):
+class AbacasCmd(BaseCmd):
+
+    '''Reorder contigs to match reference genome
+
+    Usage:
+        abacas.pl -r <reference file: single fasta> \
+            -q <query sequence file: fasta> \
+            -p <nucmer/promer>  [OPTIONS]
+
+    Arguments:
+        -r	reference sequence in a single fasta file
+        -q	contigs in multi-fasta format
+        -p	MUMmer program to use: 'nucmer' or 'promer'
+
+    NOTE: If '-p' is not given, we will attempt to determine
+        nucleotide or protein.
+
+    NOTE: If a genome prefix is given, will attempt to identify correct
+        sequence file.
+    '''
+
+    attr = CmdAttributes(
+        name='abacas',
+        synopsis='',
+        invoke_str='',
+
+        arguments=[
+            ('-r', 'FILE', 'reference sequence (single file).'),
+            ('-q', 'FILE', 'contigs (multi-fasta format).'),
+            ('-p', 'nucmer|promer', 'MUMmer program to use.'),
+            ('-o', 'CHAR', 'prefix for output files.'),
+            ('-c', None, 'Reference sequence is circular. Default: True'),
+            ('-m', None, 'Print ordered contigs to fasta file'),
+            ('-b', None, 'Print contigs in bin to file'),
+        ],
+
+        req_kwargs=['-r', '-q', ],
+        req_type=[
+            [('-q', ), ('.fa', '.fasta', '.fna'), ],
+            [('-r', ), ('.fa', '.fasta', '.fna'), ],
+        ],
+        allow_bash_var=True,
+    )
+
+    def __init__(
+            self, *args,
+            circular=True, multifasta=True, binfile=True, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        if circular and '-c' not in self.flags:
+            self.flags.append('-c')
+
+        if multifasta and '-m' not in self.flags:
+            self.flags.append('-m')
+
+        if binfile and '-b' not in self.flags:
+            self.flags.append('-b')
+
+    def _prepreq(self):
+        # ensure genome extension
+        try:
+            self.kwargs['-r'] = self._ensure_file_and_extension(
+                self.kwargs['-r'], self.attr.get_types('-r'))
+        except self.FileTypeError:
+            # No extn given OR unable to find a file with an expected extn
+            raise
+
+        log.debug(self.kwargs)
+
+    def _prepcmd(self):
+
+        if '-o' not in self.kwargs:
+            # assume the contigs are in <sample>/kXX/contigs.fa
+            filepath = os.path.dirname(self.kwargs['-q'])
+            filename = os.path.basename(os.path.dirname(filepath))
+            genome = os.path.splitext(os.path.basename(self.kwargs['-r']))[0]
+
+            self.kwargs['-o'] = os.path.join(
+                filepath, '{}_{}'.format(filename, genome))
+
+    def output(self):
+        extns = ['.fasta', '.bin', '.tab']
+        return [self.kwargs['-o'] + extn for extn in extns]
+
+
+class ContigSummaryCmd(BashCmd):
 
     '''Write contig size summary
 
     Command:
         grep ">" "$f" |awk -F '_' '{print $4}' |sort -rn > "${contigsize}"
 
-    NOTE: BASH one-liner.
+    NOTE: BASH one-liner. Must not do a full cleaning on the command, lest
+        we mangle it beyond recognition.
 
     Arguments:
         filename: Contig file from velvet
         outfile: The file to write to. Default: <dirname>/contig_sizes.txt
             (on init only)
-
     Output:
         1) A file with all contig names and sizes (contig_sizes.txt)
         2) [fall_through] The input fasta file.
@@ -373,10 +458,10 @@ class ContigSummaryCmd(BaseCmd):
         #     self.args[0] = '"{}"'.format(self.args[0])
 
         if not self.redirect:
-            outfile = os.path.join(
-                os.path.dirname(self.args[0]),
+            outfile = '_'.join([
+                os.path.splitext(self.args[0])[0],
                 'contig_sizes.txt',
-            )
+            ])
             self.redirect = ('>', outfile)
 
     def output(self):

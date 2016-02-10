@@ -106,6 +106,9 @@ class CmdAttributes(object):
                     stripped: ${var_name} => var_name. Default: False.
                     It is not recommended to allow BASH-style variables
                     unless it is known that they will be used.
+        strict      A boolean denoting whether to allow custom attributes.
+                    If true, a command will be able to set and use
+                    non-standard attributes.
 
     Example:
         hisat_attr = CmdAttributes(
@@ -125,6 +128,8 @@ class CmdAttributes(object):
         req_type=[],
         n_priority_args=0,
         allow_bash_var=False,
+        strict=True,
+        **kwargs
     ):
         if not invoke_str:
             invoke_str = name
@@ -147,6 +152,11 @@ class CmdAttributes(object):
         self.req_type = req_type[:]
         self.n_priority_args = n_priority_args
         self.allow_bash_var = allow_bash_var
+
+        # allow custom attributes
+        if not strict:
+            for kwarg, value in kwargs.items():
+                setattr(self, kwarg, value)
 
         if not arguments:
             raise ValueError('No arguments given')
@@ -318,6 +328,7 @@ class BaseCmd(CmdInterface):
     class ConfigError(RempipeError, ValueError):
         ERRMSG = {
             'illegal': 'Illegal characters in config file: {}',
+            'auth': 'Unauthorized or unexpected method call',
         }
 
     #
@@ -931,15 +942,15 @@ class BaseCmd(CmdInterface):
         try:
             # protect BASH variable declarations
             if cls.attr.allow_bash_var:
-                input_str = cls.rx_bash_var.sub(
+                input_str = cls.rx['bash_var'].sub(
                     r'BASHOPEN\g<var>BASHCLOSE', input_str)
 
             # remove unicode control characters
-            input_str = cls.rx_illegal_char.sub('', input_str)
+            input_str = cls.rx['illegal_char'].sub('', input_str)
 
             # remove BASH unsafe characters
             replacement = 'ESCCHAR\g<unsafe>' if not strict else ''
-            input_str = cls.rx_unsafe_char.sub(replacement, input_str)
+            input_str = cls.rx['unsafe_char'].sub(replacement, input_str)
             if replacement:
                 input_str = input_str.replace(replacement[:7], '\\')
 
@@ -951,24 +962,36 @@ class BaseCmd(CmdInterface):
 
         except AttributeError:
             # compiile and create these regex only once
-            cls.__init_bash_var_regex()
-            cls.__init_unsafe_regex()
-            cls.__init_illegal_char_regex()
+            cls.__init_cls_regex()
             return cls._unsafe_char_protect(input_str, strict=strict)
+
+    @classmethod
+    def __init_cls_regex(cls):
+        '''Compile all class-related regexes'''
+        cls.rx = {}
+        cls.__init_bash_var_regex()
+        cls.__init_unsafe_regex()
+        cls.__init_illegal_char_regex()
 
     @classmethod
     def __init_bash_var_regex(cls):
         '''Compile the regex for bash variable interpolation
         NOTE: The braces are intentionally required.
         '''
-        cls.rx_bash_var = re.compile('\$\{(?P<var>\w+)\}')
+        try:
+            cls.rx['bash_var'] = re.compile('\$\{(?P<var>\w+)\}')
+        except AttributeError:
+            raise cls.ConfigError('auth')
 
     @classmethod
     def __init_unsafe_regex(cls):
         '''Compile the unicode control char regex'''
-        unsafe = re.escape(';&|><*?`$(){}[]!#')
-        unsafe = r'(?P<unsafe>[{}]\s?)\s*'.format(unsafe)
-        cls.rx_unsafe_char = re.compile(unsafe)
+        try:
+            unsafe = re.escape(';&|><*?`$(){}[]!#')
+            unsafe = r'(?P<unsafe>[{}]\s?)\s*'.format(unsafe)
+            cls.rx['unsafe_char'] = re.compile(unsafe)
+        except AttributeError:
+            raise cls.ConfigError('auth')
 
     @classmethod
     def __init_illegal_char_regex(cls):
@@ -983,7 +1006,10 @@ class BaseCmd(CmdInterface):
              chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
              chr(0xd800), chr(0xdbff), chr(0xdc00), chr(0xdfff),
              ))
-        cls.rx_illegal_char = re.compile(RE_XML_ILLEGAL)
+        try:
+            cls.rx['illegal_char'] = re.compile(RE_XML_ILLEGAL)
+        except AttributeError:
+            raise cls.ConfigError('auth')
 
     @classmethod
     def _check_for_unknown_flags(cls, flags):
@@ -1060,3 +1086,26 @@ class BaseCmd(CmdInterface):
         # otherwise, return the new filename
         else:
             return file_name
+
+
+class BashCmd(BaseCmd):
+
+    '''Abstract class for creating BASH-style scripting commands.
+
+    Abstract command object with methods specific to scripting calls,
+    such as grep.
+
+    NOTE: This class is MUCH less secure than BaseCmd.
+    NOTE: Consider refactoring to make char protection specific to
+        the input data. Requires several smaller steps, but...This
+        method is a good start, though.
+
+    Overridden methods:
+        _unsafe_char_protect: Prevent stripping of required command line
+    '''
+
+    @classmethod
+    def _unsafe_char_protect(cls, input_str, strict=True):
+        '''Overwrite to prevent mangling of piped shell commands'''
+
+        return input_str

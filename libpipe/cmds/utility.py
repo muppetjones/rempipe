@@ -1,6 +1,9 @@
 
 import os.path
+
+import libpipe.scripts
 from libpipe.cmds.base import BaseCmd, CmdAttributes
+
 
 import logging
 log = logging.getLogger(__name__)
@@ -241,87 +244,37 @@ class SamtoolsViewCmd(BaseCmd):
         return [self.kwargs['-o'], ]  # return the given bam file
 
 
-class AbacasCmd(BaseCmd):
+class InsertSizesCmd(BaseCmd):
 
-    '''Reorder contigs to match reference genome
+    '''Script to calculate insert sizes from a SAM file
 
-    Usage:
-        abacas.pl -r <reference file: single fasta> \
-            -q <query sequence file: fasta> \
-            -p <nucmer/promer>  [OPTIONS]
-
-    Arguments:
-        -r	reference sequence in a single fasta file
-        -q	contigs in multi-fasta format
-        -p	MUMmer program to use: 'nucmer' or 'promer'
-
-    NOTE: If '-p' is not given, we will attempt to determine
-        nucleotide or protein.
-
-    NOTE: If a genome prefix is given, will attempt to identify correct
-        sequence file.
     '''
 
     attr = CmdAttributes(
-        name='abacas',
-        synopsis='',
-        invoke_str='',
+        name='calc_insert_sizes',
+        invoke_str='perl {}'.format(
+            os.path.join(
+                os.path.dirname(libpipe.scripts.__file__),
+                'get_insert_sizes_from_sam.pl'
+            ),
+        ),
 
         arguments=[
-            ('-r', 'FILE', 'reference sequence (single file).'),
-            ('-q', 'FILE', 'contigs (multi-fasta format).'),
-            ('-p', 'nucmer|promer', 'MUMmer program to use.'),
-            ('-o', 'CHAR', 'prefix for output files.'),
-            ('-c', None, 'Reference sequence is circular. Default: True'),
-            ('-m', None, 'Print ordered contigs to fasta file'),
-            ('-b', None, 'Print contigs in bin to file'),
+            (None, 'FILE', 'SAM|BAM|CRAM input file'),
+            (None, 'REGION', 'Region(s) as 1-based RNAME[:STARTPOS[-ENDPOS]]'),
+            ('-o', 'FILE', 'File to write final output to'),
+            ('-f', 'INT',
+             'Output alignments with INT bits set in the FLAG field'),
+            ('-F', 'INT',
+             'Output alignments with INT bits NOT set in the FLAG field'),
+            ('-b', None, 'Output to BAM format'),
+            ('-h', None, 'Include headers in output'),
         ],
+        defaults={},
 
-        req_kwargs=['-r', '-q', ],
+        req_kwargs=[],
+        req_args=1,
         req_type=[
-            [('-q', ), ('.fa', '.fasta', '.fna'), ],
-            [('-r', ), ('.fa', '.fasta', '.fna'), ],
+            [(0, ), ('.bam', '.sam')]
         ],
-        allow_bash_var=True,
     )
-
-    def __init__(
-            self, *args,
-            circular=True, multifasta=True, binfile=True, **kwargs):
-
-        super().__init__(*args, **kwargs)
-
-        if circular and '-c' not in self.flags:
-            self.flags.append('-c')
-
-        if multifasta and '-m' not in self.flags:
-            self.flags.append('-m')
-
-        if binfile and '-b' not in self.flags:
-            self.flags.append('-b')
-
-    def _prepreq(self):
-        # ensure genome extension
-        try:
-            self.kwargs['-r'] = self._ensure_file_and_extension(
-                self.kwargs['-r'], self.attr.get_types('-r'))
-        except self.FileTypeError:
-            # No extn given OR unable to find a file with an expected extn
-            raise
-
-        log.debug(self.kwargs)
-
-    def _prepcmd(self):
-
-        if '-o' not in self.kwargs:
-            # assume the contigs are in <sample>/kXX/contigs.fa
-            filepath = os.path.dirname(self.kwargs['-q'])
-            filename = os.path.basename(os.path.dirname(filepath))
-            genome = os.path.splitext(os.path.basename(self.kwargs['-r']))[0]
-
-            self.kwargs['-o'] = os.path.join(
-                filepath, '{}_{}'.format(filename, genome))
-
-    def output(self):
-        extns = ['.fasta', '.bin', '.tab']
-        return [self.kwargs['-o'] + extn for extn in extns]

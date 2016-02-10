@@ -3,7 +3,7 @@ import libpipe
 from unittest.mock import patch, Mock
 
 
-from libpipe.cmds.base import BaseCmd, CmdAttributes
+from libpipe.cmds.base import BaseCmd, BashCmd, CmdAttributes
 
 
 import logging
@@ -95,6 +95,21 @@ class TestCmdAttributes(unittest.TestCase):
                 self.assertEqual(getattr(ca, k), getattr(dup, k))
                 setattr(ca, k, 'not equal')
                 self.assertNotEqual(getattr(ca, k), getattr(dup, k))
+
+    def test_allows_custom_attr_if_not_strict(self):
+        self.kwargs['strict'] = False
+        self.kwargs['custom_attr'] = 5
+        ca = CmdAttributes(**self.kwargs)
+
+        self.assertEqual(ca.custom_attr, 5)
+
+    def test_disallows_custom_attr_if_strict(self):
+        self.kwargs['strict'] = True
+        self.kwargs['custom_attr'] = 5
+        ca = CmdAttributes(**self.kwargs)
+
+        with self.assertRaises(AttributeError):
+            ca.custom_attr
 
 
 class TestBase(unittest.TestCase):
@@ -785,3 +800,29 @@ class TestBaseCmd_cmd(TestBase):
 
         cmd_str = cmd.cmd(verbose=False)
         self.assertNotIn("${rm -rf ./*}", cmd_str)
+
+
+class TestBashCmd(TestBase):
+
+    def setUp(self):
+        super().setUp()
+
+        class BashSample(BashCmd):
+            attr = self.ATTR
+
+            def output(self):
+                return ['file.txt']
+        self.CMD = BashSample
+
+    def test_rx_init_not_called_during_cmd_cleaning(self):
+
+        args = list('abc')
+        kwargs = {'-x': '1', }
+        cmd = self.CMD(*args, **kwargs)
+
+        with patch.object(BaseCmd, '_BaseCmd__init_cls_regex') as m:
+            cmd.cmd(verbose=False)
+
+        self.assertFalse(m.called)  # should not call the rx init method
+        with self.assertRaises(AttributeError):
+            cmd.rx  # should not have compiled regex

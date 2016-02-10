@@ -9,11 +9,7 @@ from libpipe.cmds import (
 )
 
 from libpipe.cmds.assemble import (
-    VelvetkCmd, VelvethCmd, VelvetgCmd, ContigSummaryCmd
-)
-
-from libpipe.cmds.utility import (
-    AbacasCmd,
+    VelvetkCmd, VelvethCmd, VelvetgCmd, AbacasCmd, ContigSummaryCmd
 )
 
 
@@ -34,6 +30,7 @@ class AssemblePipe(PresetPipe):
     Post processing
         4. Summarize contig sizes (BASH one-liner)
         5. abacas (order contigs according to reference genome)
+        6. Summarize contig sizes (BASH one-liner)
 
     NOTE: We could move the post processing into another pipe, but
         both of these commands are fairly crucial to each assembly.
@@ -67,6 +64,11 @@ class AssemblePipe(PresetPipe):
         args = []
         kwargs = {'-r': reference}
         abacas = AbacasCmd(*args, **kwargs)
+
+        # 6. contig size summary
+        args = []
+        kwargs = {}
+        contig_sizes = ContigSummaryCmd(*args, **kwargs)
 
         # add 'em to the pipe
         self.add(velvetk, velveth, velvetg, contig_sizes, abacas, )
