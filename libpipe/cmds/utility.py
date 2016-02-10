@@ -282,6 +282,7 @@ class AbacasCmd(BaseCmd):
             [('-q', ), ('.fa', '.fasta', '.fna'), ],
             [('-r', ), ('.fa', '.fasta', '.fna'), ],
         ],
+        allow_bash_var=True,
     )
 
     def __init__(

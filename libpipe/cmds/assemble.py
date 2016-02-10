@@ -163,6 +163,8 @@ class VelvethCmd(BaseCmd):
             [(2, 3), ('.fa', '.fna', '.fasta', '.fq', '.fastq')],
         ],
         n_priority_args=2,  # output directory and k hash length FIRST!
+        allow_bash_var=True,
+
     )
 
     def __init__(self, *args, output=None, k=None, **kwargs):
@@ -285,6 +287,7 @@ class VelvetgCmd(BaseCmd):
         req_type=[
             [(0, ), ('', )],  # HACK!
         ],
+        allow_bash_var=True,
     )
 
     def output(self):
@@ -329,6 +332,7 @@ class ContigSummaryCmd(BaseCmd):
         req_type=[
             [(0, ), ('.fa', '.fasta', )],
         ],
+        allow_bash_var=True,
     )
 
     def __init__(self, *args, outfile=None, **kwargs):
