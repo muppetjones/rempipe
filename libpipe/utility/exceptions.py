@@ -15,7 +15,7 @@ class RempipeError(Exception):
     '''
     ERRMSG = {}
 
-    def __init__(self, code, *args, details=[], ** kwargs):
+    def __init__(self, code, *args, details=[], obj=None, ** kwargs):
         try:
             msg = self.ERRMSG[code].format(*details)
         except IndexError:
@@ -23,4 +23,6 @@ class RempipeError(Exception):
         except KeyError:
             msg = code  # unknown error code
         finally:
+            if obj:
+                msg = '[{}] {}'.format(obj.__class__.__name__, msg)
             super().__init__(msg, *args, **kwargs)

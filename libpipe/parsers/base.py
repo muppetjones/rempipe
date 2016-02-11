@@ -22,6 +22,7 @@ class BasePipeParser(SubparserBase, metaclass=abc.ABCMeta):
         --data PATH     Specify location of summary file and data.
                         May omit if summary is an absolute path.
         --force         Force all commands to re-run (overwrite existing data).
+        --debug         Write files, but do not run.
 
     Child must define:
         pipe attribute: The pipe class to use.
@@ -94,6 +95,13 @@ class BasePipeParser(SubparserBase, metaclass=abc.ABCMeta):
             default=False,
             help=('Force pipe to rerun steps. ' +
                   'Default: Skip step if output found.'),
+        )
+
+        self.subparser.add_argument(
+            '--debug', dest='debug',
+            action='store_true',
+            default=False,
+            help=('Do not run pipe if set'),
         )
 
         # only fastq files by default

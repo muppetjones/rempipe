@@ -149,10 +149,11 @@ def run_pipe2(args):
         pipes.append(pipe)
 
     # execute each pipe in turn
-    for pipe in pipes:
-        relpath = os.path.relpath(pipe.pbs_file, args.root_dir)
-        log.info('Running pbs script: "{}"'.format(relpath))
-        pipe.run()
+    if not args.debug:
+        for pipe in pipes:
+            relpath = os.path.relpath(pipe.pbs_file, args.root_dir)
+            log.info('Running pbs script: "{}"'.format(relpath))
+            pipe.run()
 
 
 def main():

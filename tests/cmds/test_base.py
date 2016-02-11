@@ -410,6 +410,17 @@ class TestBaseCmd_requirements(TestBase):
                 with self.assertRaises(ValueError):
                     a.cmd()  # should not raise
 
+    def test_cmd_tries_reversing_args_on_req_file_fail_IFF_len_eq_2(self):
+        self.CMD.attr.req_type = [
+            [('0', ), ('.txt', )],
+        ]
+        args = ['not_file', 'file.txt']
+        a = self.sample()
+        a.args = args[:]
+        a.cmd()  # should not raise
+
+        self.assertEqual(a.args, args)
+
 
 class TestBaseCmd_misc(TestBase):
 
@@ -746,6 +757,16 @@ class TestBaseCmd_cmd(TestBase):
 
         cmd_str = cmd.cmd(verbose=False)
         expected_str = '{} a b c -x 1'.format(cmd.invoke_str)
+        self.assertEqual(cmd_str, expected_str)
+
+    def test_cmd_uses_flag_sep_variable(self):
+
+        self.CMD.attr.flag_sep = 'FOO'
+        kwargs = {'-x': 'bar', }
+        cmd = self.CMD(**kwargs)
+
+        cmd_str = cmd.cmd(verbose=False)
+        expected_str = '{} -xFOObar'.format(cmd.invoke_str)
         self.assertEqual(cmd_str, expected_str)
 
     def test_expected_bash_variables_not_stripped_in_cmd(self):

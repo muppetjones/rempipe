@@ -100,6 +100,8 @@ class CmdAttributes(object):
         n_priority_args
                     The number of arguments to put before keyword arguments
                     and flags. Set to -1 to put ALL args first. Default: 0.
+        flag_sep    The character(s) used to separate flags. Default: ' '.
+                    For example, '-f file.txt' or '-f=file.txt'.
         allow_bash_var
                     A bool indicating whether the command should allow
                     BASH-stype variables. If False, any variables will be
@@ -127,6 +129,7 @@ class CmdAttributes(object):
         req_kwargs=[],
         req_type=[],
         n_priority_args=0,
+        flag_sep=' ',
         allow_bash_var=False,
         strict=True,
         **kwargs
@@ -151,6 +154,7 @@ class CmdAttributes(object):
         self.req_kwargs = req_kwargs[:]
         self.req_type = req_type[:]
         self.n_priority_args = n_priority_args
+        self.flag_sep = flag_sep
         self.allow_bash_var = allow_bash_var
 
         # allow custom attributes
@@ -629,7 +633,7 @@ class BaseCmd(CmdInterface):
         # BUT, only if we're in strict
         elif len(args) == n_args:
             if self.strict:
-                raise self.CmdLinkError('mismatch')
+                raise self.CmdLinkError('mismatch', obj=self)
             else:
                 log.warning(self.CmdLinkError.ERRMSG['mismatch'])
 
@@ -655,7 +659,7 @@ class BaseCmd(CmdInterface):
         # make strings from given parameters
         flags = ' '.join(self.flags)  # flags don't need to be separated
         kwargs = sep.join(
-            "{} {}".format(k, v)
+            "{}{}{}".format(k, self.attr.flag_sep, v)
             for k, v in sorted(self.kwargs.items())
         )
 
@@ -748,21 +752,35 @@ class BaseCmd(CmdInterface):
             if not vals:
                 continue  # no relevant values
 
-            # check for explicit types, e.g., int
+            # check for basic (callable) types, e.g., int
             try:
                 self.__check_basic_type(vals, types)
             except self.ArgError:
                 raise  # invalid type!
-
-            # Expected error: 'str' object not callable
-            # check vals for file type
             except TypeError:
-                try:
-                    self.__check_file_type(vals, types)
-                except AttributeError:
-                    # the given object is probably not a string
-                    # -- mising 'rfind'
-                    raise
+                pass  # not a callable type--do file type checking
+            else:
+                continue  # finished without a problem
+
+            # check vals for file type
+            try:
+                self.__check_file_type(vals, types)
+            except AttributeError:
+                # the given object is probably not a string
+                # -- mising 'rfind'
+                raise
+            except self.FileTypeError as e:
+                # small chance, but if there are only two args
+                # try reversing them before we fail out
+                if len(self.args) == 2:
+                    self.args.reverse()
+                    vals = self.__get_values_from_flags(flags)
+                    try:
+                        self.__check_file_type(vals, types)
+                    except self.FileTypeError:
+                        raise e  # raise original error
+                else:
+                    raise e
 
         return True
 

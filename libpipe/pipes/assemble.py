@@ -9,7 +9,10 @@ from libpipe.cmds import (
 )
 
 from libpipe.cmds.assemble import (
-    VelvetkCmd, VelvethCmd, VelvetgCmd, AbacasCmd, ContigSummaryCmd
+    VelvetkCmd, VelvethCmd, VelvetgCmd, AbacasCmd, ContigSummaryCmd,
+)
+from libpipe.cmds.utility import (
+    InsertSizesCmd, ParseInsertSizesCmd,
 )
 
 
@@ -40,6 +43,8 @@ class AssemblePipe(PresetPipe):
 
     def _setup(self, *pipe_args, input_list=[], reference='', **pipe_kwargs):
 
+        # check for ins_len and ins_len_sd
+
         # 1. velvetk
         args = input_list[:]
         kwargs = {'--genome': reference}
@@ -53,6 +58,10 @@ class AssemblePipe(PresetPipe):
         # 3. velvetg
         args = []
         kwargs = {}
+        kwargs.update({
+            k: v for k, v in pipe_kwargs.items()
+            if k in ['-ins_length', '-ins_length_sd']
+        })
         velvetg = VelvetgCmd(*args, **kwargs)
 
         # 4. contig size summary
@@ -127,17 +136,75 @@ class WgsPipe(PresetPipe):
         except KeyError:
             pass  # no filter genomes -- no problem!
 
+        # 2a -- sort sam file
+        # > input: link from previous (sam)
+        # > output: bam files to given directory
+        args = []
+        kwargs = {}
+        st_sort = SamtoolsSortCmd(*args, **kwargs)
+
+        # 2b -- index bam file
+        # > input: link from previous (bam)
+        # > output: bam index files to given directory
+        args = []
+        kwargs = {}
+        st_index = SamtoolsIndexCmd(*args, **kwargs)
+
         # 3. Determine Insertion length
-        # ** SKIP **
+
+        # 3a. Calculate the insert length
+        # > input: sam|bam file
+        # > output: metrics file + prevous
+        args = []
+        kwargs = {
+            # 'fall_through': True,
+        }
+        picard_ins_len = InsertSizesCmd(*args, **kwargs)
+
+        # 3b. Parse the mean insert length
+        # > input: metrics file
+        # > output: previous
+        args = ['mean_ins']
+        kwargs = {
+            'fall_through': True,
+            'wrap': 'ins_len_mean'
+        }
+        mean_ins_len = ParseInsertSizesCmd(*args, **kwargs)
+
+        # 3c. parse the insert length standard deviation
+        # > input: metrics file
+        # > output: previous
+        args = ['stdev']
+        kwargs = {
+            'fall_through': True,
+            'wrap': 'ins_len_stdev'
+        }
+        stdev_ins_len = ParseInsertSizesCmd(*args, **kwargs)
 
         # 4. Assemble
         # > input: link from previous (unaligned fastq)
         # > output: static files in child directory (contigs.fa)
         # -- remove input_list: don't accidently pass on untrimmed reads!
         del pipe_kwargs['input_list']
-        assemble = AssemblePipe(*pipe_args, **pipe_kwargs)
+        pipe_kwargs.update({
+            '-ins_length': '${ins_len_mean}',
+            '-ins_length_sd': '${ins_len_stdev}',
+        })
+        assemble = AssemblePipe(
+            *pipe_args,
+            **pipe_kwargs
+        )
 
         # add all valid commands
+        sam_stuff = [st_sort, st_index]
+        ins_len = [picard_ins_len, mean_ins_len, stdev_ins_len]
         cmd_list = filter(
-            None, [trim] + hisat_list + [assemble])
+            None, [trim] + hisat_list + sam_stuff + ins_len + [assemble])
+
+        # add and link all commands
         self.add(*cmd_list)
+
+        # circumvent the extra stuff
+        # -- either the trimmed or filtered reads
+        start_index = 0 + len(hisat_list)
+        self.cmds[start_index].link(self.cmds[-1])

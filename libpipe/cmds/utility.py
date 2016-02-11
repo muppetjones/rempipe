@@ -246,33 +246,89 @@ class SamtoolsViewCmd(BaseCmd):
 
 class InsertSizesCmd(BaseCmd):
 
-    '''Script to calculate insert sizes from a SAM file
+    '''Calculate insert sizes from a given SAM or BAM file.
 
+    NOTE: You need to setup an alias to call picard.jar, e.g.,
+        alias picard="java -jar ~/picard/dist/picard.jar"
+            -OR-
+        echo 'alias picard="java -jar ~/picard/dist/picard.jar"' >> ~/.bashrc
+
+    NOTE: Another (perhaps better) option is the following script:
+            #!/bin/bash
+            java -jar /path/to/picard/dist/picard.jar $*
+        Save this in your picard folder (or wherever) as 'picard' and make
+        it available to your PATH variable (possibly by linking it):
+            ln -s /path/to/script/picard /usr/local/bin/
     '''
 
     attr = CmdAttributes(
-        name='calc_insert_sizes',
-        invoke_str='perl {}'.format(os.path.join(
+        name='Picard_CollectInsertSizeMetrics',
+        invoke_str='picard CollectInsertSizeMetrics',
+
+        arguments=[
+            ('I', 'FILE', 'SAM|BAM input file'),
+            ('O', 'FILE', 'Output file'),
+            ('M', 'FLOAT', 'Min percentage of all reads per data catagory. '
+                + 'Used for histogram generation only.'),
+            ('H', 'FILE', 'File to write histogram chart to'),
+        ],
+        defaults={
+            'M': 0.5,
+        },
+
+        req_kwargs=['I', 'O', 'H'],
+        req_args=0,
+        req_type=[
+            [('I', ), ('.bam', '.sam')],
+            [('H', ), ('.png', '.pdf', '.jpg')],
+        ],
+
+        flag_sep='=',
+    )
+
+    def output(self):
+        return [self.kwargs['O'], ]
+
+    def _prepreq(self):
+
+        prefix = os.path.splitext(self.kwargs['I'])[0]
+        if 'O' not in self.kwargs:
+            self.kwargs['O'] = '_'.join([prefix, 'ins_sizes.txt'])
+        if 'H' not in self.kwargs:
+            self.kwargs['H'] = '_'.join([prefix, 'ins_sizes.pdf'])
+
+        return
+
+
+class ParseInsertSizesCmd(BaseCmd):
+
+    '''Parse the insert_size_metrics file from Picard_CollectInsertSizeMetrics
+
+    Parse a single metric from the insert_size_metrics output file from
+    the Picard tools CollectInsertSizeMetrics and print it to stdout.
+
+    NOTE: Must be wrapped or redirected to use properly.
+    NOTE: Should use fall_through=True
+    '''
+
+    attr = CmdAttributes(
+        name='Parse_Picard_CollectInsertSizeMetrics',
+        invoke_str='python {}'.format(os.path.join(
             os.path.dirname(libpipe.scripts.__file__),
-            'get_insert_sizes_from_sam.pl'
+            'parse_picard_inslen.py'
         )),
 
         arguments=[
-            (None, 'FILE', 'SAM|BAM|CRAM input file'),
-            (None, 'REGION', 'Region(s) as 1-based RNAME[:STARTPOS[-ENDPOS]]'),
-            ('-o', 'FILE', 'File to write final output to'),
-            ('-f', 'INT',
-             'Output alignments with INT bits set in the FLAG field'),
-            ('-F', 'INT',
-             'Output alignments with INT bits NOT set in the FLAG field'),
-            ('-b', None, 'Output to BAM format'),
-            ('-h', None, 'Include headers in output'),
+            (None, 'FILE', 'The metrics file from CollectInsertSizeMetrics'),
+            (None, 'CHAR', 'The desired metric name'),
+            ('-h', None, 'Print usage'),
         ],
-        defaults={},
 
-        req_kwargs=[],
         req_args=1,
         req_type=[
-            [(0, ), ('.bam', '.sam')]
+            [(0, ), ('.txt', str)],
         ],
     )
+
+    def output(self):
+        return []

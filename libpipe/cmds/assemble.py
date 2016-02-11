@@ -189,7 +189,11 @@ class VelvethCmd(BaseCmd):
         if not self.args[0]:
             self.args[0] = os.path.join(
                 os.path.dirname(self.args[2]),
-                'k' + str(self.args[1].replace(',', '_')),
+                'assembly',
+
+                # NOTE: using k<var> makes it VERY difficult to test for
+                #       existing files. Assembly should be fine.
+                # 'k' + str(self.args[1].replace(',', '_')),
             )
 
     def _additional_requirements(self):
@@ -295,7 +299,7 @@ class VelvetgCmd(BaseCmd):
         req_args=1,
         req_kwargs=[],
         req_type=[
-            [(0, ), ('', )],  # HACK!
+            [(0, ), ('', )],  # HACK! Matches directory.
         ],
         allow_bash_var=True,
     )
