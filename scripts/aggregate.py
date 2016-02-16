@@ -117,16 +117,23 @@ class Aggregator(metaclass=abc.ABCMeta):
             ])
         return stats_rows
 
-    def write_html(self):
+    def write_html(self, omit=[]):
 
         html_dir, html_name, html_path = self._parse_html_name()
 
         # sets self.col_sep and self.template
         base_html = self._parse_template(html_name)
 
+        # update header_len
+        no_omit = [elem for elem in self.summary[1][0] if elem not in omit]
+        self.header_len = len(no_omit)
+
+        for row in self.summary:
+            row[0] = [x for x in row[0] if x not in omit]
+
         # write order should be set in aggregate
         try:
-            rows = [self._create_row(None, self.write_order), ]
+            rows = [self._create_row(None, self.write_order, omit=omit), ]
         except AttributeError:
             raise NotImplementedError('Aggregator MUST set WRITE_ORDER')
 
@@ -138,7 +145,7 @@ class Aggregator(metaclass=abc.ABCMeta):
                 color = next(color_cycle)
                 previous = sample_group
             row = self._create_row(
-                row[0], row[1], class_name=color
+                row[0], row[1], class_name=color, omit=omit
             )
             rows.append(row)
 
@@ -151,7 +158,7 @@ class Aggregator(metaclass=abc.ABCMeta):
                 color = next(color_cycle)
                 previous = sample_group
             row = self._create_row(
-                row[0], row[1], class_name=color
+                row[0], row[1], class_name=color, omit=omit,
             )
             rows.append(row)
         # log.debug('\n'.join(rows))
@@ -242,7 +249,7 @@ class Aggregator(metaclass=abc.ABCMeta):
         for row in self.summary:
             row[1] = [row[1][o] for o in self.write_order]
 
-    def _create_row(self, header, row, class_name=''):
+    def _create_row(self, header, row, class_name='', omit=[]):
 
         # HACK
         header_list = [''] * self.header_len
@@ -455,27 +462,27 @@ if __name__ == '__main__':
     # count_files = path.walk_file(read_dir, pattern=r'\.count[^\.]')
     # align_files = path.walk_file(read_dir, pattern=r'hisat2?\.log')
     #
+    agg_list = []
+
+    omit = ['trimmed', 'pair']
+
+    def aggregate_with(file_list, agg_cls):
+        agg = agg_cls(file_list)
+        agg.aggregate()
+        agg.write_html(omit=omit)
+        return agg
 
     if args.alignment_summary:
-        aggA = AlignmentAggregator(file_list)
-        aggA.aggregate()
-        aggA.write_html()
+        agg_list.append(aggregate_with(file_list, AlignmentAggregator))
 
     if args.count_summary:
-        aggC = CountAggregator(file_list)
-        aggC.aggregate()
-        aggC.write_html()
+        agg_list.append(aggregate_with(file_list, CountAggregator))
 
     common_dir = os.path.dirname(os.path.commonprefix(file_list))
     cov_file = os.path.join(common_dir, 'coverage.txt')
     if os.path.isfile(cov_file):
-        aggCov = CoverageAggregator([cov_file])
-        aggCov.aggregate()
-        aggCov.write_html()
+        agg_list.append(aggregate_with([cov_file], CoverageAggregator))
 
-    try:
-        aggA.combine(aggC)
-        aggA.combine(aggCov)
-        ofile = aggA.write_html()
-    except UnboundLocalError as e:
-        raise
+    for agg in agg_list[1:]:
+        agg_list[0].combine(agg)
+    ofile = agg_list[0].write_html(omit=omit)

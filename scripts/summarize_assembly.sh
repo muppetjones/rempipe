@@ -47,8 +47,8 @@ absin="$(cd "$indir"; pwd)"
 # genome list
 genomelist="${absin}/genome_list.txt"
 rm -f "$genomelist"
-for f in "${absin}"/*/contigs.fa; do
-    genomedir="$(dirname "$f")"
+for f in "${absin}"/*/assembly/contigs.fa; do
+    genomedir="$(dirname "$(dirname "$f")")"
     genomename="$(basename "${genomedir}")"
     echo -e "${f}\t${genomename}" >> "${genomelist}"
 done
@@ -57,7 +57,7 @@ done
 ### -- this will be a list of the genome names, sorted by the longest contigs
 
 # create file of contig sizes for each genome
-for f in "${absin}"/*/contigs.fa; do
+for f in "${absin}"/*/assembly/contigs.fa; do
     contigsize="$(dirname "$f")/contig_sizes.txt"
     grep ">" "$f" |awk -F '_' '{print $4}' |sort -rn > "${contigsize}"
 done
@@ -65,7 +65,7 @@ done
 # create a summary file of all assemblies
 summary="${absin}/assembly_summary.txt"
 rm -f "$summary"
-for f in "${absin}"/*/contig_sizes.txt; do
+for f in "${absin}"/*/assembly/contig_sizes.txt; do
     genomename="$(basename "$(dirname "$(dirname "$f")")")"
     echo -e "${genomename}\t$(wc -l < "$f")\t$(head -n1 "$f")" >> "$summary"
 done

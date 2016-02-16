@@ -57,7 +57,7 @@ class FastQCAggregator(object):
         return '\n'.join(row_list)
 
     def aggregate(self):
-
+        log.debug('aggregate')
         categories = self._read_categories(self.zipped[0])
         results = [
             self._read_summary(zip_file)
@@ -80,6 +80,7 @@ class FastQCAggregator(object):
 
     def write_html(self):
 
+        log.debug('write')
         with open(self.TEMPLATE, 'r') as fh:
             template = fh.read()
 
@@ -121,6 +122,7 @@ class FastQCAggregator(object):
             '{{ n_results }}',
             str(len(self.categories) + 1)
         )]
+        log.debug(sample_html)
         for sample, results, zipped in zip(self.samples, self.results, self.zipped):
             sample_html.append(subtemp.replace(
                 '{{ test }}',
@@ -139,10 +141,14 @@ class FastQCAggregator(object):
                 str(len(self.categories) + 1)
             ))
 
+        log.debug('Writing to {}'.format(html_path))
         with open(html_path, 'w') as fh:
             fh.write('\n'.join(prefix_html))
             fh.write('\n'.join(sample_html))
-            fh.write('\n'.join(postfix_html))
+            fh.write('\n'.join(postfix_html).replace(  # add command to suffix
+                '{{ command }}',
+                ' '.join(sys.argv),
+            ))
 
         return
 
@@ -214,10 +220,12 @@ if __name__ == '__main__':
 
     log = setup_logger()
 
-    read_dir = '/Users/biiremployee/work/projects/lzd_babies_wgs/samples'
+    read_dir = '/Users/biiremployee/work/projects/laura_wgs/samples'
     zipped_files = path.walk_file(read_dir, pattern=r'trimmed.*\.zip')
 
+    log.debug('foo')
     fastqc_agg = FastQCAggregator(zipped_files)
+    log.debug('bar')
     fastqc_agg.aggregate()
 
     fastqc_agg.write_html()
