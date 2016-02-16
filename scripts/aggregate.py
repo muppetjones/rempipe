@@ -231,6 +231,7 @@ class Aggregator(metaclass=abc.ABCMeta):
             [self._filter_header(k), v]
             for k, v in sorted(self.summary.items())
         ]
+
         hmax = [len(row[0]) for row in new_summary]
         self.summary = new_summary
         self.header_len = max(hmax)

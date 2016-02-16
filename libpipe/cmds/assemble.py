@@ -174,8 +174,9 @@ class VelvethCmd(BaseCmd):
 
     def output(self):
         # velveth and velvetg use a common directory with static file names
-        # return the output directory only
-        return [self.args[0], ]
+        # return the output directory and the 'Sequences' file
+        # -- the latter for skipping command if unnecessary
+        return [self.args[0], os.path.join(self.args[0], 'Sequences')]
 
     def _prepreq(self):
         '''Prepare cmd for requirements check
@@ -207,8 +208,11 @@ class VelvethCmd(BaseCmd):
         # assume single-end if only one file
         # assume paired-end if two files
         input_seq = self.args[2:]
-        read_len = self._estimate_read_len(input_seq[0])
-        flag = '-long' if read_len > 200 else '-short'
+        try:
+            read_len = self._estimate_read_len(input_seq[0])
+            flag = '-long' if read_len > 200 else '-short'
+        except FileNotFoundError:
+            flag = '-short'  # assume short if we can't open the file
         if len(input_seq) > 1:
             flag = flag + 'Paired -separate'
         flag = flag.split()
@@ -311,7 +315,8 @@ class VelvetgCmd(BaseCmd):
             os.path.join(self.args[0], f)
             for f in ('contigs.fa', 'stats.txt')
         ]
-        return [self.args[0]] + output_files
+        log.debug(output_files)
+        return [self.args[0], ] + output_files
 
 
 class AbacasCmd(BaseCmd):
@@ -382,8 +387,6 @@ class AbacasCmd(BaseCmd):
             # No extn given OR unable to find a file with an expected extn
             raise
 
-        log.debug(self.kwargs)
-
     def _prepcmd(self):
 
         if '-o' not in self.kwargs:
@@ -394,6 +397,32 @@ class AbacasCmd(BaseCmd):
 
             self.kwargs['-o'] = os.path.join(
                 filepath, '{}_{}'.format(filename, genome))
+
+        # determine nucmer or promer (nucleotide or protein)
+        try:
+            with open(self.kwargs['-q'], 'r') as fh:
+                n_head = 0
+                seq = ''
+                for line in fh:
+                    if line.startswith('>'):
+                        n_head = n_head + 1
+                    if n_head > 1:
+                        break
+                    seq = seq + line.rstrip()
+        except FileNotFoundError:
+            # could be missing b/c not created yet
+            # -- assume nucleotide
+            self.kwargs['-p'] = 'nucmer'
+        else:
+            unique_elements = list(set(list(seq)))
+            nucelotides = list('AGCTUN')
+            non_nucl = [n for n in unique_elements if n not in nucelotides]
+            if non_nucl:
+                self.kwargs['-p'] = 'promer'
+                if len(non_nucl) < 10:
+                    log.warning('Possible unknown seq: {}'.format(non_nucl))
+            else:
+                self.kwargs['-p'] = 'nucmer'
 
     def output(self):
         extns = ['.fasta', '.bin', '.tab']
@@ -453,7 +482,6 @@ class ContigSummaryCmd(BashCmd):
         # ensure file is first, rest of cmd is second
         if self.args[0].startswith('|awk'):
             self.args.reverse()
-            log.debug(self.args)
 
     def _prepcmd(self):
 

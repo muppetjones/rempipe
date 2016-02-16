@@ -2,10 +2,14 @@
 import abc
 import argparse
 import os.path
+import re
 
 import remsci.scripted.base as base
 import remsci.lib.utility.path as path
 from remsci.scripted.interface import SubparserBase
+
+import logging
+log = logging.getLogger(__name__)
 
 
 class BasePipeParser(SubparserBase, metaclass=abc.ABCMeta):
@@ -139,21 +143,34 @@ class BasePipeParser(SubparserBase, metaclass=abc.ABCMeta):
         '''Reads a summary file and returns a list of names and files
 
         Expected format:
-                <name>  <file>  [<file> ...]
-            The first two columns should be the name of the sample
-            and the file. Paired-end should be listed on the same line.
+                <name>  <file>  [<file> ...]    [<data> ...]
+                <name>  <file>[;<file>]         [<data> ...]
+
+        The first column should be the name of the file. The files,
+        should be FASTA or FASTQ format and listed in the following
+        columns (or, preferably, semi-colon separated in a single
+        column). The columns should be space, tab, or comma separated.
+        Semi-colons should only be used within a single column.
+
+        Multiple, consecutive delimiters will be treated as one delimiter.
+        Only files to be included should be listed; multiple files should
+        denote paired-end or mate-pair reads.
         '''
 
         with open(args.summary_file, 'r') as fh:
-            rows = [line.rstrip().split() for line in fh]
+            rows = [re.split(r'[;,\s]+', line.rstrip()) for line in fh]
             data_dir = (args.data_dir
                         if args.data_dir else os.path.dirname(fh.name))
+
+        # compile regex
+        rx_seq = re.compile(r'\.f(?:ast)?[aq]$')
 
         # add and protect path to second (and third) columns in rows
         for row in rows:
             row[1:] = [
                 path.protect(os.path.join(data_dir, col))
                 for col in row[1:]
+                if rx_seq.search(col.lower())
             ]
 
         return rows
