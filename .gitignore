@@ -7,3 +7,5 @@ __pycache
 # static cache
 **/static/CACHE/
 **/migrations/*
+**/config/*.config
+
