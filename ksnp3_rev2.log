@@ -1,0 +1,22 @@
+Location of kSNP scripts: 
+/Users/biiremployee/dev/kSNP3.01_Source
+The home directory is /Users/biiremployee/dev/pipe
+dir /Users/biiremployee/dev/pipe/analyses/ksnp/
+fasta_list /Users/biiremployee/dev/pipe/samples/genome_list.txt
+annotate_list /Users/biiremployee/dev/pipe/samples/genome_names_sorted.txt
+genbankFile /Users/biiremployee/dev/pipe/nonexistent_file
+Starting kSNP
+Thu Feb 25 15:46:23 CST 2016
+input fasta_list: /Users/biiremployee/dev/pipe/samples/genome_list.txt
+output directory: /Users/biiremployee/dev/pipe/analyses/ksnp/
+k=19
+annotate_list file: /Users/biiremployee/dev/pipe/samples/genome_names_sorted.txt
+Report minimal annotations.
+Number CPUs: 2
+cp: /Users/biiremployee/dev/pipe/samples/genome_list.txt: No such file or directory
+Exit 1
+Can't open fasta_list for reading. No such file or directory at /Users/biiremployee/dev/kSNP3.01_Source/LE2Unix line 25.
+Exit 2
+mkdir: /Users/biiremployee/dev/pipe/analyses: No such file or directory
+Exit 1
+/Users/biiremployee/dev/pipe/analyses/ksnp/: No such file or directory.

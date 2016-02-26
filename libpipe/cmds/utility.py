@@ -92,6 +92,7 @@ class SamtoolsSortCmd(BaseCmd):
         invoke_str='samtools sort',
 
         arguments=[
+            (None, 'FILE', 'Input SAM or BAM file'),
             ('-o', 'FILE', 'File to write final output to'),
             ('-O', 'FORMAT', 'Write output as FORMAT (sam/bam/cram)'),
             ('-T', 'PREFIX', 'Write temporary files to PREFIX.nnn.bam'),
