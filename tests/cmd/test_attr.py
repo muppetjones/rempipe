@@ -87,36 +87,3 @@ class TestCmdAttributes(unittest.TestCase):
         del self.kwargs['name']
         ca = CmdAttributes(**self.kwargs)
         self.assertEqual(ca.invoke, ca.name)
-
-    @unittest.skip('nyi')
-    def test_duplicate_creates_new_object(self):
-        ca = CmdAttributes(**self.kwargs)
-        self.assertNotEqual(ca, ca.duplicate())
-
-    @unittest.skip('nyi')
-    def test_duplicate_deep_copies_object(self):
-        ca = CmdAttributes(**self.kwargs)
-        dup = ca.duplicate()
-
-        for k, v in ca.__dict__.items():
-            with self.subTest(attr=k):
-                self.assertEqual(getattr(ca, k), getattr(dup, k))
-                setattr(ca, k, 'not equal')
-                self.assertNotEqual(getattr(ca, k), getattr(dup, k))
-
-    @unittest.skip('nyi')
-    def test_allows_custom_attr_if_not_strict(self):
-        self.kwargs['strict'] = False
-        self.kwargs['custom_attr'] = 5
-        ca = CmdAttributes(**self.kwargs)
-
-        self.assertEqual(ca.custom_attr, 5)
-
-    @unittest.skip('nyi')
-    def test_disallows_custom_attr_if_strict(self):
-        self.kwargs['strict'] = True
-        self.kwargs['custom_attr'] = 5
-        ca = CmdAttributes(**self.kwargs)
-
-        with self.assertRaises(AttributeError):
-            ca.custom_attr
