@@ -86,4 +86,11 @@ class TestCmdBase(unittest.TestCase):
 
 
 class TestCmdBase_init(BaseTestCase):
-    pass
+
+    '''All tests related to command initialization'''
+
+    def test_init_sets_defaults(self):
+        self.CMD.attr.defaults = {'-n': 4800, }
+        cmd = self.CMD()
+
+        self.assertEqual(cmd.kwargs['-n'], self.CMD.attr.defaults['-n'])
