@@ -65,6 +65,8 @@ class CmdAttributes(object):
             and indicates whether the each of the given flags must meet
             the requirements.
 
+            NOTE: File extensions should include the period.
+
             For example, requirements defined as follows:
                 [('-1', '-2', '-U'), ('.fq', '.fastq'), ]
             will require that any of the following have a FASTQ extension.
