@@ -1,8 +1,10 @@
 '''Test the PipeBase class'''
 
+import io
 import random
-import unittest
 from unittest import mock
+
+from tests.base import LibpipeTestCase  # includes read and write mock
 
 from libpipe.cmd.interface import CmdInterface
 from libpipe.pipe.base import PipeBase
@@ -11,7 +13,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class PipeBaseTestCase(unittest.TestCase):
+class PipeBaseTestCase(LibpipeTestCase):
 
     def setUp(self):
 
@@ -241,3 +243,35 @@ class TestPipeBase_CmdInterface(PipeBaseTestCase):
         pipe = PipeBase(input=_input, fall_through=True)
         pipe.add(*self.get_n_cmds(2))
         self.assertEqual(pipe.output(), _input)
+
+
+class TestPipeBase_write(PipeBaseTestCase):
+
+    '''Test ability to write a script'''
+
+    def setUp(self):
+        super().setUp()
+        self.mock_write = self.setup_mock_write()
+
+    def test_write_opens_given_file(self):
+        cmds = self.get_n_cmds(3)
+        pipe = PipeBase(cmds)
+        ofile = 'fake_file.txt'
+
+        pipe.write(ofile)
+        self.mock_write.assert_called_once_with(ofile, 'w')
+
+    def test_write_accepts_file_handle(self):
+        cmds = self.get_n_cmds(3)
+        pipe = PipeBase(cmds)
+        pipe.add(cmds)
+
+        with io.StringIO() as sh:
+            pipe.write(sh)  # should not raise!
+            sh.seek(0)
+            result = sh.read()
+
+        self.assertEqual(result, pipe.cmd())
+
+
+# ENDFILE

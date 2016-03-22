@@ -4,7 +4,7 @@ import unittest
 from unittest import mock
 
 
-class PipeBaseTest(unittest.TestCase):
+class LibpipeTestCase(unittest.TestCase):
 
     def setup_mock_write(self):
         patcher = mock.patch.object(

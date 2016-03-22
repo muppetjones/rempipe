@@ -19,6 +19,9 @@ class PipeBase(CmdInterface):
         * Directly through python subprocesses
         * Through a resource manager system, such as Torque
 
+    PipeBase also impements a full command-line interface:
+        * cmd, link, output
+
     TODO(sjbush): Add Torque and GridEngine handling (both individually
         and through a pbs script).
     TODO(sjbush): Add direct execution via subprocesses (via cmd.run)
@@ -34,6 +37,11 @@ class PipeBase(CmdInterface):
 
     Attributes:
         cmds: A list of commands in the pipeline
+
+    Notable Methods:
+        add: Accepts command objects, links and synchronizes them, and
+            appends them to the list. Accepts any number of commands or
+            commands given in a list. Chainable.
 
     '''
 
@@ -119,6 +127,11 @@ class PipeBase(CmdInterface):
         self.cmds[-1].timestamp = self.timestamp
 
         return self
+
+    def write(self, _file):
+
+        with open(_file, 'w') as fh:
+            fh.write(self.cmd())
 
     #
     #   Protected methods
