@@ -144,7 +144,7 @@ class CmdBase(CmdInterface):
         Build the command string using the given arguments/inputs.
         Performs a number of processing steps before actually creating the
         command string:
-            1. Match up the given input with arguments (uses attr.req_type).
+            1. Match up the given input with arguments (uses attr.req_types).
             2. Process arguments as needed BEFORE checking requirements.
                 > via '_pre_req', defined per child class.
                 > e.g., ensure correct argument order.
@@ -179,8 +179,17 @@ class CmdBase(CmdInterface):
         '''Return usage text'''
         raise NotImplementedError()
 
-    def link(self):
-        pass
+    def link(self, next_cmd):
+        '''Set next_cmd input to self output
+
+        Arguments:
+            next_cmd: Another command object.
+        Return:
+            The given command object
+        '''
+
+        next_cmd.input = self.output
+        return next_cmd
 
     #
     #   To override
@@ -225,6 +234,101 @@ class CmdBase(CmdInterface):
         except ValueError as e:
             log.error(str(e))
             raise
+
+    @classmethod
+    def _filter_by_type(self, vals, types):
+        '''Filter a list of strings based on a list of extension strings
+
+        Arguments:
+            vals: A list of file path strings
+            types: A list of file extension strings
+        Return:
+            A list of file path strings that match the given extensions.
+        Example:
+            self._filter_by_type(['a.txt', 'b.fq'], ['.fq'])
+        '''
+
+        file_type = [_type for _type in types if isinstance(_type, str)]
+        basic_type = [_type for _type in types if _type not in file_type]
+
+        filtered = [
+            val for val in vals
+            if type(val) in basic_type
+            or (isinstance(val, str) and os.path.splitext(val)[1] in file_type)
+        ]
+        return filtered
+
+    def _match_input_with_args(self):
+        '''Match linked inputs to args based on type requirement
+
+        NOTE: If NOT strict AND the required number of positional args has
+            not been met, linked input will be assigned to args. Any
+            positional arguments set in attr.req_types will be set
+            regardless of attr.req_args if the expected type is found.
+
+        Uses attr.req_types to match linked input to a keyword or
+        positional argument, e.g.,
+            input: ['a.txt', 'a.fq', 'b.fq']
+            attr.req_args = 1
+            attr.req_types = [[('-b', '-a'), ('.fq',)]]  <-- notice the order!
+        will result in the following argument conditions:
+            kwargs: {'-b': 'a.fq', '-a': 'b.fq'}
+            args: ['a.txt']
+
+        Return:
+            None
+        Raises:
+            ValueError if no link or input is found.
+            TypeError if linked input is not callable.
+        '''
+        try:
+            linked_input = self.input()
+            n_input = len(linked_input)
+        except AttributeError as e:
+            if self.complain:
+                log.error(str(e))
+            raise  # not linked
+        except TypeError as e:
+            if self.complain:
+                log.error(str(e))
+            raise AttributeError('Bad link')  # not callable
+        except Exception as e:
+            log.debug(str(e))
+            raise
+
+        # match with required type
+        for req_type in self.attr.req_types:
+            try:
+                flag_list, type_list, exact_match = req_type
+            except ValueError:
+                flag_list, type_list = req_type
+                exact_match = False
+
+            # find args with matching file type and update kwargs
+            # -- but only update iff:
+            #    a) we're not looking for an exact match, OR
+            #    b) we do want an exact match, AND we got it!
+            # -- also remove input already matched
+            filtered = self._filter_by_type(linked_input, type_list)
+            if not exact_match or len(filtered) == len(flag_list):
+                self.kwargs.update(dict(zip(flag_list, filtered)))
+                linked_input = [a for a in linked_input if a not in filtered]
+
+        # if a positional argument was defined in attr.req_types,
+        # it is now stored in kwargs -- move it to args and clean kwargs
+        pos_kw = [k for k in self.kwargs.keys() if isinstance(k, int)]
+        self.args.extend([self.kwargs[pos] for pos in sorted(pos_kw)])
+        for pos in pos_kw:
+            del self.kwargs[pos]  # delete instead of dict comp
+
+        # check that some of the input was used
+        # -- but we only really care if we're strict or complaining
+        if len(linked_input) == n_input:
+            msg = 'Unused linked input: {}'.format(', '.join(linked_input))
+            if self.strict:
+                log.warning(msg)
+            if self.complain:
+                raise ValueError(msg)
 
     #
     #   Private methods
@@ -286,7 +390,7 @@ class CmdBase(CmdInterface):
     def __check_types(self):
         '''Check specified kwargs and args to ensure given expected data type.
 
-        NOTE: All extensions in attr.req_type should have leading periods.
+        NOTE: All extensions in attr.req_types should have leading periods.
 
         Check arguments for types as defined in CmdAttributes:
             (arg_id, ...), (<type>, ...), [match exact]
@@ -300,11 +404,11 @@ class CmdBase(CmdInterface):
             ValueError if not expected data type
         '''
 
-        for req in self.attr.req_type:
+        for req in self.attr.req_types:
             try:
-                # match_any used for matching only, not checking
                 arg_ids, types, match_any = req
             except ValueError:
+                # match_any used for matching only, not checking...ignore it
                 arg_ids, types = req
 
             # get argument values (pos or kw)
@@ -383,15 +487,13 @@ class CmdBase(CmdInterface):
         Two checks:
             1. value can be coerced into expected type.
             2. coercion does not result in data loss.
-        For example, a requirement of (int, 0.5) would pass (1), but not (2).
+        For example, the pair (0.5, int) would pass (1), but not (2).
 
-        NOTE: Profile efficiency of this function.
+        TODO: Run profiling.
 
         Arguments:
             val: The value to check
             types: A list of type callables, eg., int
-        Return:
-            None
         Raises:
             ValueError if the value is not of the expected type.
             TypeError if the type is not callable.
@@ -400,8 +502,8 @@ class CmdBase(CmdInterface):
         valid = False
         for _type in types:
             try:
-                if str(_type(val)) != str(val):  # failed first check
-                    raise ValueError('second check')  # failed second check
+                if str(_type(val)) != str(val):
+                    raise ValueError('second check')
             except ValueError as e:
                 err = e
             except TypeError as e:
@@ -420,13 +522,9 @@ class CmdBase(CmdInterface):
     def __check_file_type(cls, val, types):
         '''Check given value to ensure given expected file type.
 
-        NOTE: All extensions in attr.req_type should have leading periods.
-
         Arguments:
             val: The value to check
             types: A list of file extensions
-        Returns:
-            None
         Raises:
             ValueError on failure
         '''

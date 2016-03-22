@@ -51,7 +51,7 @@ class BaseTestCase(unittest.TestCase):
         ca = CmdAttributes(**sample_attributes)
         ca.req_args = 0
         ca.req_kwargs = []
-        ca.req_type = []
+        ca.req_types = []
         ca.defaults = {}
 
         class IndirectBase(CmdBase):
@@ -279,7 +279,7 @@ class TestCmdBase_cmd(BaseTestCase):
     #
 
     def test_cmd_type_checks_pos_and_kw_arguments(self):
-        self.CMD.attr.req_type = [
+        self.CMD.attr.req_types = [
             [(0, 1, '-f'), ('.txt', )],
         ]
         args = ['a_text_file.txt', ]
@@ -291,7 +291,7 @@ class TestCmdBase_cmd(BaseTestCase):
     def test_cmd_raises_ValueError_if_wrong_pos_filetype_given(self):
         '''Test for file type checking (implicitly check non-basic type)'''
 
-        self.CMD.attr.req_type = [
+        self.CMD.attr.req_types = [
             [(1, ), ('.42', )],
         ]
 
@@ -304,7 +304,7 @@ class TestCmdBase_cmd(BaseTestCase):
     def test_cmd_raises_ValueError_if_wrong_kw_filetype_given(self):
         '''Test for file type checking (implicitly check non-basic type)'''
 
-        self.CMD.attr.req_type = [
+        self.CMD.attr.req_types = [
             [('-f', ), ('.42', )],
         ]
 
@@ -316,7 +316,7 @@ class TestCmdBase_cmd(BaseTestCase):
     def test_cmd_raises_ValueError_if_arg_has_wrong_type(self):
         for t, v in [(int, 0.5), (float, 'bar')]:
             with self.subTest(type=t):
-                self.CMD.attr.req_type = [
+                self.CMD.attr.req_types = [
                     [('-f', ), (t, )],
                 ]
 
@@ -327,7 +327,7 @@ class TestCmdBase_cmd(BaseTestCase):
                     cmd.cmd()
 
     def test_cmd_checks_multiple_basic_types(self):
-        self.CMD.attr.req_type = [
+        self.CMD.attr.req_types = [
             [('-f', ), (int, float)],
         ]
 
@@ -338,7 +338,7 @@ class TestCmdBase_cmd(BaseTestCase):
 
     def test_cmd_checks_mixed_types(self):
         '''[YAGNI?] Test that args can have basic and file type req'''
-        self.CMD.attr.req_type = [
+        self.CMD.attr.req_types = [
             [('-f', '-x', ), (int, '.txt')],
         ]
 
@@ -349,10 +349,122 @@ class TestCmdBase_cmd(BaseTestCase):
 
     def test_cmd_tries_reversing_args_on_req_file_fail_IFF_len_eq_2(self):
         '''Test that a simple swap (2 args only) won't break things'''
-        self.CMD.attr.req_type = [
+        self.CMD.attr.req_types = [
             [(0, ), ('.txt', )],
         ]
         args = ['not_file', 'file.txt']
         cmd = self.CMD(*args)
         cmd.cmd()  # should not raise
         self.assertNotEqual(cmd.args, args)  # reversed!
+
+
+class TestBaseCmd_link(BaseTestCase):
+
+    '''Test linking commands together
+
+    NOTE: This group tests '_match_input_with_args', too.
+    '''
+
+    def test_link_sets_dest_input_to_src_output(self):
+        a = self.CMD()
+        b = self.CMD()
+        a.link(b)
+
+        self.assertEqual(a.output, b.input)
+
+    def test_link_chaining(self):
+        a = self.CMD()
+        b = self.CMD()
+        c = a.link(b)
+
+        self.assertNotEqual(a, b)
+        self.assertNotEqual(a, c)
+        self.assertEqual(b, c)
+
+    def test_match_sets_args_with_basic_types(self):
+        self.CMD.attr.req_types = [
+            [(0, ), (int, )],
+        ]
+
+        cmd = self.CMD()
+        cmd.input = lambda: ['hello', 'world', 42, 0.1]
+
+        cmd._match_input_with_args()
+        self.assertEqual(cmd.args[0], 42)
+
+    def test_match_sets_args_with_file_types(self):
+        self.CMD.attr.req_types = [
+            [('-f', ), ('.foo', )],
+        ]
+
+        cmd = self.CMD()
+        cmd.input = lambda: ['hello', 'world.foo', 42, 0.1]
+
+        cmd._match_input_with_args()
+        self.assertEqual(cmd.kwargs['-f'], 'world.foo')
+
+    def test_linked_input_is_matched_by_order_given_in_req_types(self):
+        self.CMD.attr.req_kwargs = ['-f']
+        self.CMD.attr.req_types = [
+            [(0, '-f', ), ('.txt', )],
+        ]
+
+        cmd = self.CMD()
+        cmd.input = lambda: ['fake', 'file-f.txt', 'file0.txt']
+
+        cmd._match_input_with_args()  # should not raise
+        self.assertEqual(cmd.kwargs['-f'], cmd.input()[2])
+        self.assertEqual(cmd.args[0], cmd.input()[1])
+
+    def test_match_raises_AttributeError_if_not_linked(self):
+        cmd = self.CMD()
+        with self.assertRaises(AttributeError):
+            cmd._match_input_with_args()
+
+    def test_match_raises_AttributeError_if_input_not_callable(self):
+        cmd = self.CMD()
+        cmd.input = list('abc')
+        with self.assertRaises(AttributeError):
+            cmd._match_input_with_args()
+
+    def test_match_warns_if_input_not_used_and_strict(self):
+        logger = logging.getLogger('libpipe.cmd.base')
+        with mock.patch.object(logger, 'warning') as mock_warn:
+            cmd = self.CMD()
+            cmd.input = lambda: ['file.txt']
+            cmd._match_input_with_args()
+        self.assertTrue(mock_warn.called)
+
+    def test_match_raises_ValueError_if_input_not_used_and_complaining(self):
+        cmd = self.CMD(complain=True)
+        cmd.input = lambda: ['file.txt']
+        with self.assertRaises(ValueError):
+            cmd._match_input_with_args()
+
+    def test_match_exact_sets_args_with_perfect_match_1(self):
+        '''Test for exact match single file to '-U' arg'''
+        self.CMD.attr.req_types = [
+            [('-U', ), ('.txt', ), True],
+            [('-1', '-2'), ('.txt', ), True],
+        ]
+
+        cmd = self.CMD(complain=True)
+        cmd.input = lambda: ['fileU.txt', ]
+        cmd._match_input_with_args()
+        self.assertEqual(cmd.kwargs['-U'], 'fileU.txt')
+        self.assertNotIn('-1', cmd.kwargs)
+        self.assertNotIn('-2', cmd.kwargs)
+
+    def test_match_exact_sets_args_with_perfect_match_2(self):
+        '''Test for exact match two files to '-1' and '-2' args'''
+        self.CMD.attr.req_types = [
+            [('-U', ), ('.txt', ), True],
+            [('-1', '-2'), ('.txt', ), True],
+        ]
+
+        cmd = self.CMD(complain=True)
+        cmd.input = lambda: ['file1.txt', 'file2.txt']
+        cmd._match_input_with_args()
+        self.assertEqual(cmd.kwargs['-1'], 'file1.txt')
+        self.assertEqual(cmd.kwargs['-2'], 'file2.txt')
+        self.assertNotIn('-U', cmd.kwargs)
