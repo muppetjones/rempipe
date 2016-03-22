@@ -3,7 +3,7 @@
 import unittest
 from unittest import mock
 
-from libpipe.cmd.base import CmdBase
+from libpipe.cmd.interface import CmdInterface
 from libpipe.pipe.base import PipeBase
 
 import logging
@@ -27,11 +27,14 @@ class PipeBaseTestCase(unittest.TestCase):
         return mock.MagicMock(
             link=mock.Mock(),
             cmd=mock.Mock(return_value='cmd --foo'),
-            wrap=None,
+            output=lambda: [],
         )
 
     def get_n_cmds(self, n):
         return [self.create_mock_cmd() for i in range(n)]
+
+
+class TestPipeBase(PipeBaseTestCase):
 
     def test_CmdBase_is_mocked(self):
         pass
@@ -49,6 +52,12 @@ class PipeBaseTestCase(unittest.TestCase):
 
         pipe = PipeBase(input=list('abc'))
         self.assertEqual(pipe.dummy.output(), list('abc'))
+
+    def test_input_returns_list_from_dummy_cmd(self):
+        pipe = PipeBase(input=list('abc'))
+        _input = pipe.input()
+        self.assertEqual(_input, list('abc'))
+        self.assertEqual(pipe.dummy.input(), _input)
 
     def test_add_stores_cmds_in_list_in_order_added(self):
         '''Test basic add cmd (implicit test for multiple adding methods)'''
@@ -89,9 +98,73 @@ class PipeBaseTestCase(unittest.TestCase):
         self.assertEqual(pipe.dummy.output(), cmd.input())
 
 
-class TestPipeBase_CmdInterface(unittest.TestCase):
+class TestPipeBase_CmdInterface(PipeBaseTestCase):
 
     '''Test that PipeBase implements the CmdInterface
 
     NOTE: Perhaps move to implementation tests?
     '''
+
+    def test_inherits_from_cmd_interface(self):
+        pipe = PipeBase()
+        self.assertIsInstance(pipe, CmdInterface)
+
+    #
+    #   Link
+    #
+
+    def test_link_raises_ValueError_if_pipe_is_empty(self):
+        cmd = self.mock_cmd()
+        pipe = PipeBase()
+        with self.assertRaises(ValueError):
+            pipe.link(cmd)
+
+    def test_link_returns_given_obj(self):
+        '''Test link enables chaining by returning linked object'''
+        cmd_add, cmd_link = self.get_n_cmds(2)
+        pipe = PipeBase()
+        pipe.add(cmd_add)
+        link_out = pipe.link(cmd_link)
+        self.assertEqual(link_out, cmd_link)
+
+    def test_link_sets_linked_obj_input_to_last_cmd_output(self):
+        cmd_add, cmd_link = self.get_n_cmds(2)
+        cmd_add.output = lambda: list('abc')
+        pipe = PipeBase()
+        pipe.add(cmd_add)
+        pipe.link(cmd_link)
+        self.assertEqual(cmd_link.input(), cmd_add.output())
+
+    def test_pipe_can_be_linked(self):
+        pipe1 = PipeBase(input=list('xyz'), fall_through=True)
+        pipe2 = PipeBase()
+        pipe1.add(*self.get_n_cmds(2))
+        pipe2.add(*self.get_n_cmds(2))
+        link_ret = pipe1.link(pipe2)
+
+        self.assertEqual(link_ret, pipe2)
+        self.assertEqual(pipe2.input(), list('xyz'))
+
+    #
+    #   Output
+    #
+
+    def test_output_raises_ValueError_if_pipe_is_empty(self):
+        pipe = PipeBase()
+        with self.assertRaises(ValueError):
+            pipe.output()
+
+    def test_output_returns_output_from_last_command(self):
+        cmd = self.mock_cmd()
+        cmd.output = lambda: list('abc')
+
+        pipe = PipeBase()
+        pipe.add(cmd)
+
+        self.assertEqual(pipe.output(), cmd.output())
+
+    def test_fall_through_passes_all_input_to_output(self):
+        _input = list('abc')
+        pipe = PipeBase(input=_input, fall_through=True)
+        pipe.add(*self.get_n_cmds(2))
+        self.assertEqual(pipe.output(), _input)

@@ -38,5 +38,9 @@ def fall_through(func):
         self.output = fall_through(self.output)
     '''
     def _fall_through():
-        return func.__self__.input() + func()
+        try:
+            return func.__self__.input() + func()
+        except AttributeError as e:
+            msg = 'Fall through decorator: Try linking the object'
+            raise AttributeError(msg) from e
     return _fall_through
