@@ -81,6 +81,14 @@ class BaseTestCase(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def mock_log_warning(self):
+        # prevent error logs from occuring during testing
+        # -- any log.error calls **should** be expected!
+        patcher = mock.patch.object(libpipe.cmd.base.log, 'warning')
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return
+
 
 #-----------------------------------------------------------------------------
 #   Direct Tests
@@ -391,6 +399,7 @@ class TestBaseCmd_link(BaseTestCase):
         self.assertTrue(mock_warn.called)
 
     def test_match_raises_ValueError_if_input_not_used_and_complaining(self):
+        self.mock_log_warning()  # already tested for warning
         cmd = self.CMD(complain=True)
         cmd.input = lambda: ['file.txt']
         with self.assertRaises(ValueError):
