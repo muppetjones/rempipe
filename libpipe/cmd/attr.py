@@ -95,11 +95,19 @@ class CmdAttributes(object):
             'defaults', 'flag_sep',
         ]
 
-        # Ensure at least the basic information was given
+        # Ensure at least the required information was given
         missing = [arg for arg in required if arg not in kwargs]
         if missing:
             msg = 'Missing required args: {}'.format(', '.join(missing))
             raise ValueError(msg)
+
+        # Even though some values may not be required,
+        # we may still need them to exist in some form
+        default_attrs = {
+            'name': kwargs['invoke'],
+            'flag_sep': ' ',
+            'defaults': {},
+        }
 
         # Ensure the defaults only provide values for known arguments
         # -- More of a ID10T/typo check.
@@ -130,8 +138,7 @@ class CmdAttributes(object):
         # set as attributes
         self.__dict__.update(allowed_attr)
 
-        if 'name' not in kwargs:
-            self.name = kwargs['invoke']
-
-        if 'flag_sep' not in kwargs:
-            self.flag_sep = ' '
+        # set default attributes where missing
+        for attr, default in default_attrs.items():
+            if attr not in self.__dict__:
+                self.__dict__[attr] = default

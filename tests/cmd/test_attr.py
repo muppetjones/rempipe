@@ -87,3 +87,9 @@ class TestCmdAttributes(unittest.TestCase):
         del self.kwargs['name']
         ca = CmdAttributes(**self.kwargs)
         self.assertEqual(ca.invoke, ca.name)
+
+    def test_init_sets_defaults_to_empty_dict_if_not_given(self):
+        del self.kwargs['defaults']
+        ca = CmdAttributes(**self.kwargs)
+        self.assertIsNotNone(ca.defaults)
+        self.assertIsInstance(ca.defaults, dict)
