@@ -1,34 +1,13 @@
+'''Define the base class for command-line objects'''
 
-import abc
 import os.path
 import time
 
 
+from libpipe.cmd import CmdInterface
+
 import logging
 log = logging.getLogger(__name__)
-
-
-class CmdInterface(metaclass=abc.ABCMeta):
-    '''Define an interface for command-like objects
-
-    Abstract methods:
-        cmd: Return the bash-executable string of the command.
-        link: Pair current 'output' with given command's 'input'.
-            Should return the given command to allow chaining.
-        output: Return a list of command output. Should be string paths
-            in *most* cases.
-    '''
-    @abc.abstractmethod
-    def cmd(self):
-        pass
-
-    @abc.abstractmethod
-    def output(self):
-        pass
-
-    @abc.abstractmethod
-    def link(self):
-        pass
 
 
 class CmdBase(CmdInterface):
@@ -40,10 +19,10 @@ class CmdBase(CmdInterface):
     requirements. Certain methods may be overridden to allow specific
     handling and preparation of given arguments.
 
-    TODO(sjbush): Define file classes (via Django) to handle file type requirements.
+    TODO(sjbush): Define file classes (via Django) to handle file type reqs.
     TODO(sjbush): Consolidate and standardize Exceptions and their messages.
-    TODO(sjbush): Define 'run' method to execute cmds directly (versus relying on
-        a pipe to write to a script).
+    TODO(sjbush): Define 'run' method to execute cmds directly (versus
+        relying on a pipe to write to a script).
 
     Attributes:
         args: A list of positional arguments.
@@ -178,8 +157,8 @@ class CmdBase(CmdInterface):
             6. Generate the command string.
             7. Wrap the command string (if given).
 
-        TODO(sjbush): Implement 'wrap' argument to encase the command as a BASH-style
-            variable, e.g., wrap='k' would yield 'k=$(<cmd>)'
+        TODO(sjbush): Implement 'wrap' argument to encase the command as
+            a BASH-style variable, e.g., wrap='k' would yield 'k=$(<cmd>)'
 
         Return:
             A BASH executable string.

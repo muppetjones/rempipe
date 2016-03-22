@@ -81,7 +81,7 @@ class TestCmdAttributes(unittest.TestCase):
         '''
         self.kwargs['defaults'] = {'--unknown': 'bad_arg'}
         with self.assertRaises(ValueError):
-            _ = CmdAttributes(**self.kwargs)
+            CmdAttributes(**self.kwargs)
 
     def test_init_sets_name_from_invoke_if_not_given(self):
         del self.kwargs['name']

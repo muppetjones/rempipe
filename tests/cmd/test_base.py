@@ -1,16 +1,29 @@
+'''Test the CmdBase class
+
+Test CmdBase directly (no instantiation) and indirectly (fake child).
+Due to the size of the class, tests are split across several test cases.
+Indirect tests are in alphabetical order, with the exception of init tests.
+
+    * init
+    * classmethods
+    * cmd
+    * link
+    * requirements
+'''
 
 import unittest
 from unittest import mock
 
 import libpipe
-from libpipe.cmd.attr import CmdAttributes
-from libpipe.cmd.base import CmdInterface, CmdBase
+from libpipe.cmd import CmdAttributes
+from libpipe.cmd import CmdBase
 
 import logging
 log = logging.getLogger(__name__)
 
 # NOTE: flake8 complains about use of '_' for unused variables
 #       e.g., _ = Obj()
+#       So...just remove.
 
 
 sample_attributes = {
@@ -71,14 +84,6 @@ class BaseTestCase(unittest.TestCase):
 
 #-----------------------------------------------------------------------------
 #   Direct Tests
-
-
-class TestCmdInterface(unittest.TestCase):
-
-    def test_cannot_be_instatiated_directly(self):
-        with self.assertRaises(TypeError):
-            CmdInterface()
-
 
 class TestCmdBase(unittest.TestCase):
 
@@ -201,6 +206,223 @@ class TestCmdBase_init(BaseTestCase):
         kwargs = {'--unknown': 'bad_kwarg'}
         with self.assertRaises(ValueError):
             self.CMD(complain=True, **kwargs)
+
+
+class TestCmdBase_classmethods(BaseTestCase):
+
+    def test_filter_type_returns_files_with_expected_type(self):
+        args = ['seq.1.fq', 'seq.2.fq', 'seq.txt']
+        extn = ['.fq']
+
+        self.assertEqual(self.CMD._filter_by_type(args, extn), args[:-1])
+
+    def test_filter_type_returns_empty_if_not_found(self):
+        args = ['seq.1.fq', 'seq.2.fq', 'seq.txt']
+        extn = ['.csv']
+
+        self.assertFalse(
+            self.CMD._filter_by_type(args, extn),
+            'Filter returned non-empty list'
+        )
+
+
+class TestCmdBase_cmd(BaseTestCase):
+
+    '''Test cmd() output
+
+    TODO: Protect against unsafe characters.
+    TODO: Allow BASH variables in cmd string (removed if protected).
+    TODO: Define 'priority_args' to allow some args to come before kwargs.
+
+    NOTE: The above are required for some programs, e.g., velvet.
+        These features are already implemented in rempipe, but are not
+        included here.
+    '''
+
+    def test_magic_method_str_calls_non_verbose_cmd(self):
+        cmd = self.CMD()
+
+        with mock.patch.object(
+                cmd, 'cmd', return_value="I've lost the bleeps") as mock_cmd:
+            str(cmd)
+
+        mock_cmd.assert_called_once_with(verbose=False)
+
+    def test_cmd_calls_each_user_defined_customization(self):
+        '''Test cmd calls each available user defined methods for cmd prep'''
+
+        avail_user_custom = ['_pre_req', '_post_req', '_pre_cmd']
+
+        cmd = self.CMD()
+        mocked = {}
+        for cust in avail_user_custom:
+            mocked[cust] = mock.Mock()
+            setattr(cmd, cust, mocked[cust])
+
+        cmd.cmd()
+        for cust in avail_user_custom:
+            with self.subTest(custom_method=cust):
+                mocked[cust].assert_called_once_with()
+
+    def test_cmd_verbose_adds_bash_safe_line_breaks(self):
+        '''Test that verbose adds '\\n between each arg'''
+
+        kwargs = {'-f': 'req_kwarg', '-n': 'a'}
+        cmd = self.CMD(**kwargs)
+        cmd_str = cmd.cmd()
+
+        line_break = '\\\n'
+        n_breaks = cmd_str.count(line_break)
+
+        # +1 line break for break btwn invoke and first arg
+        self.assertEqual(n_breaks, len(cmd.kwargs))
+
+    def test_cmd_returns_expected_cmd_string(self):
+        '''Test that 'cmd' pieces together given args in an expected manner
+
+        The command should be "[invoke] [kwargs] [args] > [redirect]".
+        '''
+
+        kwargs = {'-f': 'req_kwarg', '-n': 'a'}
+        cmd = self.CMD(**kwargs)
+
+        expected_kwargs = ' '.join([
+            '{} {}'.format(k, v)
+            for k, v in sorted(kwargs.items())
+        ])
+        expected_args = None
+        expected_flags = None
+        expected_cmd = ' '.join(filter(None, [
+            self.CMD.attr.invoke,
+            expected_flags,
+            expected_kwargs,
+            expected_args,
+        ]))
+
+        self.assertEqual(
+            cmd.cmd(verbose=False).rstrip(), expected_cmd.rstrip())
+
+    def test_cmd_uses_flag_sep_variable(self):
+
+        self.CMD.attr.flag_sep = '='
+        kwargs = {'-x': 'bar', }
+        cmd = self.CMD(**kwargs)
+
+        cmd_str = cmd.cmd(verbose=False)
+        expected_str = '{} -x=bar'.format(cmd.attr.invoke)
+        self.assertEqual(cmd_str, expected_str)
+
+
+class TestBaseCmd_link(BaseTestCase):
+
+    '''Test linking commands together
+
+    NOTE: This group tests '_match_input_with_args', too.
+    '''
+
+    def test_link_sets_dest_input_to_src_output(self):
+        a = self.CMD()
+        b = self.CMD()
+        a.link(b)
+
+        self.assertEqual(a.output, b.input)
+
+    def test_link_chaining(self):
+        a = self.CMD()
+        b = self.CMD()
+        c = a.link(b)
+
+        self.assertNotEqual(a, b)
+        self.assertNotEqual(a, c)
+        self.assertEqual(b, c)
+
+    def test_match_sets_args_with_basic_types(self):
+        self.CMD.attr.req_types = [
+            [(0, ), (int, )],
+        ]
+
+        cmd = self.CMD()
+        cmd.input = lambda: ['hello', 'world', 42, 0.1]
+
+        cmd._match_input_with_args()
+        self.assertEqual(cmd.args[0], 42)
+
+    def test_match_sets_args_with_file_types(self):
+        self.CMD.attr.req_types = [
+            [('-f', ), ('.foo', )],
+        ]
+
+        cmd = self.CMD()
+        cmd.input = lambda: ['hello', 'world.foo', 42, 0.1]
+
+        cmd._match_input_with_args()
+        self.assertEqual(cmd.kwargs['-f'], 'world.foo')
+
+    def test_linked_input_is_matched_by_order_given_in_req_types(self):
+        self.CMD.attr.req_kwargs = ['-f']
+        self.CMD.attr.req_types = [
+            [(0, '-f', ), ('.txt', )],
+        ]
+
+        cmd = self.CMD()
+        cmd.input = lambda: ['fake', 'file-f.txt', 'file0.txt']
+
+        cmd._match_input_with_args()  # should not raise
+        self.assertEqual(cmd.kwargs['-f'], cmd.input()[2])
+        self.assertEqual(cmd.args[0], cmd.input()[1])
+
+    def test_match_raises_AttributeError_if_not_linked(self):
+        cmd = self.CMD()
+        with self.assertRaises(AttributeError):
+            cmd._match_input_with_args()
+
+    def test_match_raises_AttributeError_if_input_not_callable(self):
+        cmd = self.CMD()
+        cmd.input = list('abc')
+        with self.assertRaises(AttributeError):
+            cmd._match_input_with_args()
+
+    def test_match_warns_if_input_not_used_and_strict(self):
+        logger = logging.getLogger('libpipe.cmd.base')
+        with mock.patch.object(logger, 'warning') as mock_warn:
+            cmd = self.CMD()
+            cmd.input = lambda: ['file.txt']
+            cmd._match_input_with_args()
+        self.assertTrue(mock_warn.called)
+
+    def test_match_raises_ValueError_if_input_not_used_and_complaining(self):
+        cmd = self.CMD(complain=True)
+        cmd.input = lambda: ['file.txt']
+        with self.assertRaises(ValueError):
+            cmd._match_input_with_args()
+
+    def test_match_exact_sets_args_with_perfect_match_1(self):
+        '''Test for exact match single file to '-U' arg'''
+        self.CMD.attr.req_types = [
+            [('-U', ), ('.txt', ), True],
+            [('-1', '-2'), ('.txt', ), True],
+        ]
+
+        cmd = self.CMD(complain=True)
+        cmd.input = lambda: ['fileU.txt', ]
+        cmd._match_input_with_args()
+        self.assertEqual(cmd.kwargs['-U'], 'fileU.txt')
+        self.assertNotIn('-1', cmd.kwargs)
+        self.assertNotIn('-2', cmd.kwargs)
+
+    def test_match_exact_sets_args_with_perfect_match_2(self):
+        '''Test for exact match two files to '-1' and '-2' args'''
+        self.CMD.attr.req_types = [
+            [('-U', ), ('.txt', ), True],
+            [('-1', '-2'), ('.txt', ), True],
+        ]
+
+        cmd = self.CMD(complain=True)
+        cmd.input = lambda: ['file1.txt', 'file2.txt']
+        cmd._match_input_with_args()
+        self.assertEqual(cmd.kwargs['-1'], 'file1.txt')
+        self.assertEqual(cmd.kwargs['-2'], 'file2.txt')
+        self.assertNotIn('-U', cmd.kwargs)
 
 
 class TestCmdBase_requirements(BaseTestCase):
@@ -344,220 +566,3 @@ class TestCmdBase_requirements(BaseTestCase):
         cmd = self.CMD(*args)
         cmd.cmd()  # should not raise
         self.assertNotEqual(cmd.args, args)  # reversed!
-
-
-class TestBaseCmd_link(BaseTestCase):
-
-    '''Test linking commands together
-
-    NOTE: This group tests '_match_input_with_args', too.
-    '''
-
-    def test_link_sets_dest_input_to_src_output(self):
-        a = self.CMD()
-        b = self.CMD()
-        a.link(b)
-
-        self.assertEqual(a.output, b.input)
-
-    def test_link_chaining(self):
-        a = self.CMD()
-        b = self.CMD()
-        c = a.link(b)
-
-        self.assertNotEqual(a, b)
-        self.assertNotEqual(a, c)
-        self.assertEqual(b, c)
-
-    def test_match_sets_args_with_basic_types(self):
-        self.CMD.attr.req_types = [
-            [(0, ), (int, )],
-        ]
-
-        cmd = self.CMD()
-        cmd.input = lambda: ['hello', 'world', 42, 0.1]
-
-        cmd._match_input_with_args()
-        self.assertEqual(cmd.args[0], 42)
-
-    def test_match_sets_args_with_file_types(self):
-        self.CMD.attr.req_types = [
-            [('-f', ), ('.foo', )],
-        ]
-
-        cmd = self.CMD()
-        cmd.input = lambda: ['hello', 'world.foo', 42, 0.1]
-
-        cmd._match_input_with_args()
-        self.assertEqual(cmd.kwargs['-f'], 'world.foo')
-
-    def test_linked_input_is_matched_by_order_given_in_req_types(self):
-        self.CMD.attr.req_kwargs = ['-f']
-        self.CMD.attr.req_types = [
-            [(0, '-f', ), ('.txt', )],
-        ]
-
-        cmd = self.CMD()
-        cmd.input = lambda: ['fake', 'file-f.txt', 'file0.txt']
-
-        cmd._match_input_with_args()  # should not raise
-        self.assertEqual(cmd.kwargs['-f'], cmd.input()[2])
-        self.assertEqual(cmd.args[0], cmd.input()[1])
-
-    def test_match_raises_AttributeError_if_not_linked(self):
-        cmd = self.CMD()
-        with self.assertRaises(AttributeError):
-            cmd._match_input_with_args()
-
-    def test_match_raises_AttributeError_if_input_not_callable(self):
-        cmd = self.CMD()
-        cmd.input = list('abc')
-        with self.assertRaises(AttributeError):
-            cmd._match_input_with_args()
-
-    def test_match_warns_if_input_not_used_and_strict(self):
-        logger = logging.getLogger('libpipe.cmd.base')
-        with mock.patch.object(logger, 'warning') as mock_warn:
-            cmd = self.CMD()
-            cmd.input = lambda: ['file.txt']
-            cmd._match_input_with_args()
-        self.assertTrue(mock_warn.called)
-
-    def test_match_raises_ValueError_if_input_not_used_and_complaining(self):
-        cmd = self.CMD(complain=True)
-        cmd.input = lambda: ['file.txt']
-        with self.assertRaises(ValueError):
-            cmd._match_input_with_args()
-
-    def test_match_exact_sets_args_with_perfect_match_1(self):
-        '''Test for exact match single file to '-U' arg'''
-        self.CMD.attr.req_types = [
-            [('-U', ), ('.txt', ), True],
-            [('-1', '-2'), ('.txt', ), True],
-        ]
-
-        cmd = self.CMD(complain=True)
-        cmd.input = lambda: ['fileU.txt', ]
-        cmd._match_input_with_args()
-        self.assertEqual(cmd.kwargs['-U'], 'fileU.txt')
-        self.assertNotIn('-1', cmd.kwargs)
-        self.assertNotIn('-2', cmd.kwargs)
-
-    def test_match_exact_sets_args_with_perfect_match_2(self):
-        '''Test for exact match two files to '-1' and '-2' args'''
-        self.CMD.attr.req_types = [
-            [('-U', ), ('.txt', ), True],
-            [('-1', '-2'), ('.txt', ), True],
-        ]
-
-        cmd = self.CMD(complain=True)
-        cmd.input = lambda: ['file1.txt', 'file2.txt']
-        cmd._match_input_with_args()
-        self.assertEqual(cmd.kwargs['-1'], 'file1.txt')
-        self.assertEqual(cmd.kwargs['-2'], 'file2.txt')
-        self.assertNotIn('-U', cmd.kwargs)
-
-
-class TestCmdBase_cmd(BaseTestCase):
-
-    '''Test cmd() output
-
-    TODO: Protect against unsafe characters.
-    TODO: Allow BASH variables in cmd string (removed if protected).
-    TODO: Define 'priority_args' to allow some args to come before kwargs.
-
-    NOTE: The above are required for some programs, e.g., velvet.
-        These features are already implemented in rempipe, but are not
-        included here.
-    '''
-
-    def test_magic_method_str_calls_non_verbose_cmd(self):
-        cmd = self.CMD()
-
-        with mock.patch.object(
-                cmd, 'cmd', return_value="I've lost the bleeps") as mock_cmd:
-            str(cmd)
-
-        mock_cmd.assert_called_once_with(verbose=False)
-
-    def test_cmd_calls_each_user_defined_customization(self):
-        '''Test cmd calls each available user defined methods for cmd prep'''
-
-        avail_user_custom = ['_pre_req', '_post_req', '_pre_cmd']
-
-        cmd = self.CMD()
-        mocked = {}
-        for cust in avail_user_custom:
-            mocked[cust] = mock.Mock()
-            setattr(cmd, cust, mocked[cust])
-
-        cmd.cmd()
-        for cust in avail_user_custom:
-            with self.subTest(custom_method=cust):
-                mocked[cust].assert_called_once_with()
-
-    def test_cmd_verbose_adds_bash_safe_line_breaks(self):
-        '''Test that verbose adds '\\n between each arg'''
-
-        kwargs = {'-f': 'req_kwarg', '-n': 'a'}
-        cmd = self.CMD(**kwargs)
-        cmd_str = cmd.cmd()
-
-        line_break = '\\\n'
-        n_breaks = cmd_str.count(line_break)
-
-        # +1 line break for break btwn invoke and first arg
-        self.assertEqual(n_breaks, len(cmd.kwargs))
-
-    def test_cmd_returns_expected_cmd_string(self):
-        '''Test that 'cmd' pieces together given args in an expected manner
-
-        The command should be "[invoke] [kwargs] [args] > [redirect]".
-        '''
-
-        kwargs = {'-f': 'req_kwarg', '-n': 'a'}
-        cmd = self.CMD(**kwargs)
-
-        expected_kwargs = ' '.join([
-            '{} {}'.format(k, v)
-            for k, v in sorted(kwargs.items())
-        ])
-        expected_args = None
-        expected_flags = None
-        expected_cmd = ' '.join(filter(None, [
-            self.CMD.attr.invoke,
-            expected_flags,
-            expected_kwargs,
-            expected_args,
-        ]))
-
-        self.assertEqual(
-            cmd.cmd(verbose=False).rstrip(), expected_cmd.rstrip())
-
-    def test_cmd_uses_flag_sep_variable(self):
-
-        self.CMD.attr.flag_sep = '='
-        kwargs = {'-x': 'bar', }
-        cmd = self.CMD(**kwargs)
-
-        cmd_str = cmd.cmd(verbose=False)
-        expected_str = '{} -x=bar'.format(cmd.attr.invoke)
-        self.assertEqual(cmd_str, expected_str)
-
-
-class TestCmdBase_classmethods(BaseTestCase):
-
-    def test_filter_type_returns_files_with_expected_type(self):
-        args = ['seq.1.fq', 'seq.2.fq', 'seq.txt']
-        extn = ['.fq']
-
-        self.assertEqual(self.CMD._filter_by_type(args, extn), args[:-1])
-
-    def test_filter_type_returns_empty_if_not_found(self):
-        args = ['seq.1.fq', 'seq.2.fq', 'seq.txt']
-        extn = ['.csv']
-
-        self.assertFalse(
-            self.CMD._filter_by_type(args, extn),
-            'Filter returned non-empty list'
-        )
