@@ -65,6 +65,8 @@ class CmdAttributes(object):
             and indicates whether the each of the given flags must meet
             the requirements.
 
+            NOTE: File extensions should include the period.
+
             For example, requirements defined as follows:
                 [('-1', '-2', '-U'), ('.fq', '.fastq'), ]
             will require that any of the following have a FASTQ extension.
@@ -90,7 +92,7 @@ class CmdAttributes(object):
         expected = [
             'name', 'synopsis', 'description',  # help related
             'req_args', 'req_kwargs', 'req_types',  # argument checking
-            'defaults',
+            'defaults', 'flag_sep',
         ]
 
         # Ensure at least the basic information was given
@@ -130,3 +132,6 @@ class CmdAttributes(object):
 
         if 'name' not in kwargs:
             self.name = kwargs['invoke']
+
+        if 'flag_sep' not in kwargs:
+            self.flag_sep = ' '
