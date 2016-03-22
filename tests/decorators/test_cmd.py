@@ -21,7 +21,7 @@ class TestUniversalFallThroughDecorator(unittest.TestCase):
 
     def setUp(self):
         patcher = mock.patch(
-            'libpipe.cmd.CmdAttributes',
+            'libpipe.cmd.attr.CmdAttributes',
         )
         self.mock_attr = patcher.start()
         self.mock_attr().defaults = {}
@@ -53,7 +53,7 @@ class TestBasicFallThroughDecorator(unittest.TestCase):
 
     def setUp(self):
         patcher = mock.patch(
-            'libpipe.cmd.CmdAttributes',
+            'libpipe.cmd.attr.CmdAttributes',
         )
         self.mock_attr = patcher.start()
         self.mock_attr().defaults = {}

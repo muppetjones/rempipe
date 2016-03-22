@@ -1,7 +1,7 @@
 
 
-from libpipe.cmd import CmdAttributes
-from libpipe.cmd import CmdBase
+from libpipe.cmd.attr import CmdAttributes
+from libpipe.cmd.base import CmdBase
 from libpipe.decorators.cmd import universal_fall_through
 
 

@@ -15,8 +15,8 @@ import unittest
 from unittest import mock
 
 import libpipe
-from libpipe.cmd import CmdAttributes
-from libpipe.cmd import CmdBase
+from libpipe.cmd.attr import CmdAttributes
+from libpipe.cmd.base import CmdBase
 
 import logging
 log = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ import os.path
 import time
 
 
-from libpipe.cmd import CmdInterface
+from libpipe.cmd.interface import CmdInterface
 
 import logging
 log = logging.getLogger(__name__)

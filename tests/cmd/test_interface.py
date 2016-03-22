@@ -2,7 +2,7 @@
 import unittest
 
 
-from libpipe.cmd import CmdInterface
+from libpipe.cmd.interface import CmdInterface
 
 
 class TestCmdInterface(unittest.TestCase):
