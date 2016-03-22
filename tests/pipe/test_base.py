@@ -1,5 +1,6 @@
 '''Test the PipeBase class'''
 
+import random
 import unittest
 from unittest import mock
 
@@ -22,16 +23,16 @@ class PipeBaseTestCase(unittest.TestCase):
         self.mock_cmd = patcher.start()
         self.addCleanup(patcher.stop)
 
-    def create_mock_cmd(self):
+    def create_mock_cmd(self, i=0):
         '''Use to create individual mock instances (vs. self.mock_cmd)'''
         return mock.MagicMock(
             link=mock.Mock(),
-            cmd=mock.Mock(return_value='cmd --foo'),
-            output=lambda: [],
+            cmd=mock.Mock(return_value='cmd --foo={}'.format(i)),
+            output=mock.Mock(return_value=[])
         )
 
     def get_n_cmds(self, n):
-        return [self.create_mock_cmd() for i in range(n)]
+        return [self.create_mock_cmd(i) for i in range(n)]
 
 
 class TestPipeBase(PipeBaseTestCase):
@@ -39,6 +40,15 @@ class TestPipeBase(PipeBaseTestCase):
     def test_CmdBase_is_mocked(self):
         pass
         # pipe.CmdBase()  # should not raise
+
+    def test_init_saves_timestamp_if_given(self):
+        kwargs = {'timestamp': '151012-162900'}
+        pipe = PipeBase(**kwargs)
+        self.assertEqual(pipe.timestamp, kwargs['timestamp'])
+
+    def test_init_saves_a_timestamp_if_not_given(self):
+        pipe = PipeBase()
+        self.assertRegex(pipe.timestamp, '\d{6}-\d{6}')
 
     def test_init_creates_a_dummy_cmd_for_linking(self):
         '''Test that init creates a cmd obj to use for linking'''
@@ -62,12 +72,22 @@ class TestPipeBase(PipeBaseTestCase):
     def test_add_stores_cmds_in_list_in_order_added(self):
         '''Test basic add cmd (implicit test for multiple adding methods)'''
 
-        cmds = self.get_n_cmds(3)
-
+        cmds = self.get_n_cmds(5)
         pipe = PipeBase()
-        pipe.add(cmds[0], cmds[1]).add(cmds[-1])
+
+        # tests chaining
+        # tests adding commands individually, as *args, and as a list
+        pipe.add(cmds[0]).add(cmds[1], cmds[2]).add(cmds[3:])
 
         self.assertEqual(pipe.cmds, cmds)
+
+    def test_add_sets_timestamp_on_each_cmd(self):
+        cmds = self.get_n_cmds(3)
+        pipe = PipeBase()
+        pipe.add(cmds)
+
+        for cmd in pipe.cmds:
+            self.assertEqual(pipe.timestamp, cmd.timestamp)
 
     def test_add_links_all_cmds_when_called(self):
         '''Test that commands are re-linked on successive calls'''
@@ -108,6 +128,59 @@ class TestPipeBase_CmdInterface(PipeBaseTestCase):
     def test_inherits_from_cmd_interface(self):
         pipe = PipeBase()
         self.assertIsInstance(pipe, CmdInterface)
+
+    #
+    #   Cmd
+    #
+
+    def test_cmd_raises_ValueError_if_pipe_is_empty(self):
+        pipe = PipeBase()
+        with self.assertRaises(ValueError):
+            pipe.cmd()
+
+    def test_cmd_returns_a_string(self):
+        pipe = PipeBase()
+        pipe.add(self.get_n_cmds(3))
+        cmd_str = pipe.cmd()
+        self.assertIsInstance(cmd_str, str)
+
+    def test_cmd_returns_string_with_one_cmd_per_line(self):
+        pipe = PipeBase()
+        cmds = self.get_n_cmds(3)
+        pipe.add(cmds)
+
+        expected = '\n'.join(cmd.cmd() for cmd in cmds)
+        cmd_str = pipe.cmd()
+        self.assertEqual(cmd_str, expected)
+
+    def test_cmd_uses_cmd_sep_parameter_to_join_cmds(self):
+        pipe = PipeBase()
+        cmds = self.get_n_cmds(3)
+        pipe.add(cmds)
+
+        cmd_str = pipe.cmd(cmd_sep='@')
+        self.assertEqual(cmd_str.count('@'), len(cmds) - 1)
+
+    def test_cmd_does_not_block_exceptions_from_cmd(self):
+
+        # this list is not complete, but includes the standard we would
+        # expect plus a couple we wouldn't
+        exception_list = [
+            AttributeError, ValueError, KeyError, OSError, TabError,
+        ]
+
+        n = 3
+        for err in exception_list:
+            which_cmd = random.randrange(0, n)
+            pipe = PipeBase()
+            cmds = self.get_n_cmds(n)
+            pipe.add(cmds)
+
+            cmds[which_cmd].cmd.side_effect = err
+
+            with self.subTest(err=err):
+                with self.assertRaises(err):
+                    pipe.cmd()
 
     #
     #   Link

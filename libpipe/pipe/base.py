@@ -1,8 +1,9 @@
 
+import time
 
 from libpipe.cmd.dummy import CmdDummy
 from libpipe.cmd.interface import CmdInterface
-from libpipe.decorators.cmd import fall_through
+from libpipe.decorators.cmd import fall_through as fall_through_wrapper
 
 import logging
 log = logging.getLogger(__name__)
@@ -22,13 +23,25 @@ class PipeBase(CmdInterface):
         and through a pbs script).
     TODO(sjbush): Add direct execution via subprocesses (via cmd.run)
     TODO(sjbush): Allow commands to be skipped if their output is detected.
+    TODO(sjbush): Implement pass_through (soft_output on rempipe) to
+        collect unique output from all cmds. (as decorator)
+    TODO(sjbush): Maintain a symbolic link to current (i.e., self) script
+        and log files (named with timestamp).
+
+    Arguments:
+        fall_through: A boolean indicating whether input should be
+            included in the output.
 
     Attributes:
-
+        cmds: A list of commands in the pipeline
 
     '''
 
-    def __init__(self, **kwargs):
+    def __init__(self, timestamp=None, fall_through=False, **kwargs):
+
+        # save a timestamp, given or generated
+        self.timestamp = (timestamp if timestamp
+                          else time.strftime("%y%m%d-%H%M%S"))
 
         # check if 'input' was given
         # -- use kwargs b/c input is a builtin function
@@ -40,18 +53,18 @@ class PipeBase(CmdInterface):
         self.dummy = CmdDummy(*_input)
         self.cmds = []
 
-        try:
-            if kwargs['fall_through']:
-                self.output = fall_through(self.output)
-        except KeyError:
-            pass  # do nothing--output is fine as is
+        if fall_through:
+            self.output = fall_through_wrapper(self.output)
 
     #
     #   Cmd Interface
     #
 
-    def cmd(self):
-        pass
+    def cmd(self, cmd_sep='\n'):
+        if not self.cmds:
+            msg = 'Error: pipe is empty'
+            raise ValueError(msg)
+        return cmd_sep.join(self._get_cmd_strs())
 
     def link(self, cmd):
         if not self.cmds:
@@ -102,5 +115,14 @@ class PipeBase(CmdInterface):
         self.dummy.link(self.cmds[0])
         for cmd, next_cmd in zip(self.cmds[:-1], self.cmds[1:]):
             cmd.link(next_cmd)
+            cmd.timestamp = self.timestamp
+        self.cmds[-1].timestamp = self.timestamp
 
         return self
+
+    #
+    #   Protected methods
+    #
+
+    def _get_cmd_strs(self):
+        return [cmd.cmd() for cmd in self.cmds]
