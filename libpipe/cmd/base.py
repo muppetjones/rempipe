@@ -40,8 +40,10 @@ class CmdBase(CmdInterface):
     requirements. Certain methods may be overridden to allow specific
     handling and preparation of given arguments.
 
-    TODO: Define file classes (via Django) to handle file type requirements.
-    TODO: Consolidate and standardize Exceptions and their messages.
+    TODO(sjbush): Define file classes (via Django) to handle file type requirements.
+    TODO(sjbush): Consolidate and standardize Exceptions and their messages.
+    TODO(sjbush): Define 'run' method to execute cmds directly (versus relying on
+        a pipe to write to a script).
 
     Attributes:
         args: A list of positional arguments.
@@ -126,6 +128,7 @@ class CmdBase(CmdInterface):
             _flags = [v for v in _flags if v in expected_flags]
             _kwargs = {k: v for k, v in kwargs.items() if k in expected_flags}
 
+        self.redirect = None
         self.args = _args  # deep copy list--but not elements
         self.flags = _flags
         self.kwargs = dict.copy(self.attr.defaults)
@@ -135,10 +138,27 @@ class CmdBase(CmdInterface):
         self.complain = complain
 
     #
+    #   Property & magic methods
+    #
+
+    def __str__(self):
+        return self.cmd(verbose=False)
+
+    @property
+    def name(self):
+        '''Name property. Do NOT override'''
+        return self.attr.name
+
+    @property
+    def invoke(self):
+        '''Invocation string property. Do NOT override (unless necessary)'''
+        return self.attr.invoke
+
+    #
     #   Public access
     #
 
-    def cmd(self):
+    def cmd(self, **kwargs):
         '''Generate the command string
 
         Build the command string using the given arguments/inputs.
@@ -158,10 +178,9 @@ class CmdBase(CmdInterface):
             6. Generate the command string.
             7. Wrap the command string (if given).
 
-        Arguments:
-            *args, **kwargs: Catch (and ignore) anything passed in.
-            wrap: See main docstring. Will wrap command in a BASH-style
-                assignment to a variable with the given name.
+        TODO(sjbush): Implement 'wrap' argument to encase the command as a BASH-style
+            variable, e.g., wrap='k' would yield 'k=$(<cmd>)'
+
         Return:
             A BASH executable string.
         Raises:
@@ -174,6 +193,9 @@ class CmdBase(CmdInterface):
         self._post_req()
         self._check_requirements()
         self._pre_cmd()
+        cmd_str = self._cmd(**kwargs)
+
+        return cmd_str
 
     def help(self):
         '''Return usage text'''
@@ -235,28 +257,47 @@ class CmdBase(CmdInterface):
             log.error(str(e))
             raise
 
-    @classmethod
-    def _filter_by_type(self, vals, types):
-        '''Filter a list of strings based on a list of extension strings
+    def _cmd(self, *args, verbose=True, **kwargs):
+        '''Create BASH executable string.
 
         Arguments:
-            vals: A list of file path strings
-            types: A list of file extension strings
-        Return:
-            A list of file path strings that match the given extensions.
-        Example:
-            self._filter_by_type(['a.txt', 'b.fq'], ['.fq'])
+            verbose: A bool indicating whether the command should be easier
+                to read. Currently, that means splitting the command with
+                new lines.
+        Returns:
+            A BASH executable string.
         '''
 
-        file_type = [_type for _type in types if isinstance(_type, str)]
-        basic_type = [_type for _type in types if _type not in file_type]
+        arg_sep = ' \\\n  ' if verbose else ' '
 
-        filtered = [
-            val for val in vals
-            if type(val) in basic_type
-            or (isinstance(val, str) and os.path.splitext(val)[1] in file_type)
-        ]
-        return filtered
+        # make strings from given parameters
+        flags = ' '.join(self.flags)  # flags don't need to be separated
+        kwargs = arg_sep.join(
+            "{}{}{}".format(k, self.attr.flag_sep, v)
+            for k, v in sorted(self.kwargs.items())
+        )
+
+        # handle priority args, e.g., velvet
+        # -- NOT implemented
+        priority_args = None
+
+        # Filter main command elements
+        # NOTE: Redirect is a special case--add later
+        cmd_parts = filter(  # remove missing elements
+            None, [self.invoke, priority_args, flags, kwargs, args])
+
+        cmd_str = arg_sep.join(cmd_parts)
+
+        # redirect may be a tuple ('>', 'logfile.log') or string
+        # TODO(sjbush): rework 'redirect'
+        if not isinstance(self.redirect, str) and self.redirect is not None:
+            redirect = ' '.join(self.redirect)
+        else:
+            redirect = self.redirect
+        if redirect:
+            cmd_str = '{}{}{}'.format(cmd_str, arg_sep, redirect)
+
+        return cmd_str
 
     def _match_input_with_args(self):
         '''Match linked inputs to args based on type requirement
@@ -329,6 +370,7 @@ class CmdBase(CmdInterface):
                 log.warning(msg)
             if self.complain:
                 raise ValueError(msg)
+        return
 
     #
     #   Private methods
@@ -352,6 +394,7 @@ class CmdBase(CmdInterface):
             msg = 'Missing positional arguments: {} of {}'.format(
                 n_missing, self.attr.req_args)
             raise IndexError(msg)
+        return
 
     def __check_kwargs(self):
         '''Ensure non-type, keyword arg  requirements are met.
@@ -397,7 +440,7 @@ class CmdBase(CmdInterface):
         Where 'arg_id' is a kw flag or position index, and type is a
         string file extension or a callable type, e.g., int.
 
-        TODO: Enable better parg matching BEFORE checking. The current
+        TODO(sjbush): Enable better parg matching BEFORE checking. The current
             two arg swap is inefficient; plus, would add robustness.
 
         Raises:
@@ -458,6 +501,11 @@ class CmdBase(CmdInterface):
 
         return vals
 
+    #
+    #   Class methods
+    #   NOTE: Some of these are unavailable to children
+    #
+
     @classmethod
     def __check_type(cls, val, types):
         '''Check that the given value matches the type requirement
@@ -489,7 +537,7 @@ class CmdBase(CmdInterface):
             2. coercion does not result in data loss.
         For example, the pair (0.5, int) would pass (1), but not (2).
 
-        TODO: Run profiling.
+        TODO(sjbush): Run profiling.
 
         Arguments:
             val: The value to check
@@ -532,3 +580,26 @@ class CmdBase(CmdInterface):
         if extn not in types:
             raise ValueError()
         return
+
+    @classmethod
+    def _filter_by_type(self, vals, types):
+        '''Filter a list of strings based on a list of extension strings
+
+        Arguments:
+            vals: A list of file path strings
+            types: A list of file extension strings
+        Return:
+            A list of file path strings that match the given extensions.
+        Example:
+            self._filter_by_type(['a.txt', 'b.fq'], ['.fq'])
+        '''
+
+        file_type = [_type for _type in types if isinstance(_type, str)]
+        basic_type = [_type for _type in types if _type not in file_type]
+
+        filtered = [
+            val for val in vals
+            if type(val) in basic_type
+            or (isinstance(val, str) and os.path.splitext(val)[1] in file_type)
+        ]
+        return filtered

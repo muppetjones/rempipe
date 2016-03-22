@@ -92,7 +92,7 @@ class CmdAttributes(object):
         expected = [
             'name', 'synopsis', 'description',  # help related
             'req_args', 'req_kwargs', 'req_types',  # argument checking
-            'defaults',
+            'defaults', 'flag_sep',
         ]
 
         # Ensure at least the basic information was given
@@ -132,3 +132,6 @@ class CmdAttributes(object):
 
         if 'name' not in kwargs:
             self.name = kwargs['invoke']
+
+        if 'flag_sep' not in kwargs:
+            self.flag_sep = ' '

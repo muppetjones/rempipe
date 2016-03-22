@@ -139,6 +139,10 @@ class TestCmdBase_init(BaseTestCase):
         cmd = self.CMD()
         self.assertRegex(cmd.timestamp, '\d{6}-\d{6}')
 
+    def test_init_sets_redirect_to_None(self):
+        cmd = self.CMD()
+        self.assertIsNone(cmd.redirect)
+
     def test_init_sets_given_args_as_positional_args(self):
         args = list('abc')
         cmd = self.CMD(*args)
@@ -199,23 +203,7 @@ class TestCmdBase_init(BaseTestCase):
             self.CMD(complain=True, **kwargs)
 
 
-class TestCmdBase_cmd(BaseTestCase):
-
-    def test_cmd_calls_each_user_defined_customization(self):
-        '''Test cmd calls each available user defined methods for cmd prep'''
-
-        avail_user_custom = ['_pre_req', '_post_req', '_pre_cmd']
-
-        cmd = self.CMD()
-        mocked = {}
-        for cust in avail_user_custom:
-            mocked[cust] = mock.Mock()
-            setattr(cmd, cust, mocked[cust])
-
-        cmd.cmd()
-        for cust in avail_user_custom:
-            with self.subTest(custom_method=cust):
-                mocked[cust].assert_called_once_with()
+class TestCmdBase_requirements(BaseTestCase):
 
     #
     #   Positional requirements
@@ -468,3 +456,108 @@ class TestBaseCmd_link(BaseTestCase):
         self.assertEqual(cmd.kwargs['-1'], 'file1.txt')
         self.assertEqual(cmd.kwargs['-2'], 'file2.txt')
         self.assertNotIn('-U', cmd.kwargs)
+
+
+class TestCmdBase_cmd(BaseTestCase):
+
+    '''Test cmd() output
+
+    TODO: Protect against unsafe characters.
+    TODO: Allow BASH variables in cmd string (removed if protected).
+    TODO: Define 'priority_args' to allow some args to come before kwargs.
+
+    NOTE: The above are required for some programs, e.g., velvet.
+        These features are already implemented in rempipe, but are not
+        included here.
+    '''
+
+    def test_magic_method_str_calls_non_verbose_cmd(self):
+        cmd = self.CMD()
+
+        with mock.patch.object(
+                cmd, 'cmd', return_value="I've lost the bleeps") as mock_cmd:
+            str(cmd)
+
+        mock_cmd.assert_called_once_with(verbose=False)
+
+    def test_cmd_calls_each_user_defined_customization(self):
+        '''Test cmd calls each available user defined methods for cmd prep'''
+
+        avail_user_custom = ['_pre_req', '_post_req', '_pre_cmd']
+
+        cmd = self.CMD()
+        mocked = {}
+        for cust in avail_user_custom:
+            mocked[cust] = mock.Mock()
+            setattr(cmd, cust, mocked[cust])
+
+        cmd.cmd()
+        for cust in avail_user_custom:
+            with self.subTest(custom_method=cust):
+                mocked[cust].assert_called_once_with()
+
+    def test_cmd_verbose_adds_bash_safe_line_breaks(self):
+        '''Test that verbose adds '\\n between each arg'''
+
+        kwargs = {'-f': 'req_kwarg', '-n': 'a'}
+        cmd = self.CMD(**kwargs)
+        cmd_str = cmd.cmd()
+
+        line_break = '\\\n'
+        n_breaks = cmd_str.count(line_break)
+
+        # +1 line break for break btwn invoke and first arg
+        self.assertEqual(n_breaks, len(cmd.kwargs))
+
+    def test_cmd_returns_expected_cmd_string(self):
+        '''Test that 'cmd' pieces together given args in an expected manner
+
+        The command should be "[invoke] [kwargs] [args] > [redirect]".
+        '''
+
+        kwargs = {'-f': 'req_kwarg', '-n': 'a'}
+        cmd = self.CMD(**kwargs)
+
+        expected_kwargs = ' '.join([
+            '{} {}'.format(k, v)
+            for k, v in sorted(kwargs.items())
+        ])
+        expected_args = None
+        expected_flags = None
+        expected_cmd = ' '.join(filter(None, [
+            self.CMD.attr.invoke,
+            expected_flags,
+            expected_kwargs,
+            expected_args,
+        ]))
+
+        self.assertEqual(
+            cmd.cmd(verbose=False).rstrip(), expected_cmd.rstrip())
+
+    def test_cmd_uses_flag_sep_variable(self):
+
+        self.CMD.attr.flag_sep = '='
+        kwargs = {'-x': 'bar', }
+        cmd = self.CMD(**kwargs)
+
+        cmd_str = cmd.cmd(verbose=False)
+        expected_str = '{} -x=bar'.format(cmd.attr.invoke)
+        self.assertEqual(cmd_str, expected_str)
+
+
+class TestCmdBase_classmethods(BaseTestCase):
+
+    def test_filter_type_returns_files_with_expected_type(self):
+        args = ['seq.1.fq', 'seq.2.fq', 'seq.txt']
+        extn = ['.fq']
+
+        self.assertEqual(self.CMD._filter_by_type(args, extn), args[:-1])
+
+    def test_filter_type_returns_empty_if_not_found(self):
+        args = ['seq.1.fq', 'seq.2.fq', 'seq.txt']
+        extn = ['.csv']
+
+        self.assertFalse(
+            self.CMD._filter_by_type(args, extn),
+            'Filter returned non-empty list'
+        )
