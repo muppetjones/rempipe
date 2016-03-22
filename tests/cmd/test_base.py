@@ -6,6 +6,9 @@ import libpipe
 from libpipe.cmd.attr import CmdAttributes
 from libpipe.cmd.base import CmdInterface, CmdBase
 
+import logging
+log = logging.getLogger(__name__)
+
 # NOTE: flake8 complains about use of '_' for unused variables
 #       e.g., _ = Obj()
 
@@ -285,7 +288,22 @@ class TestCmdBase_cmd(BaseTestCase):
 
         cmd.cmd()  # should not raise; implicit check against missing [1]
 
+    def test_cmd_raises_ValueError_if_wrong_pos_filetype_given(self):
+        '''Test for file type checking (implicitly check non-basic type)'''
+
+        self.CMD.attr.req_type = [
+            [(1, ), ('.42', )],
+        ]
+
+        args = ['not_correct_arg.42', 'unexpected.txt', 'no_swap']
+        cmd = self.CMD(*args)
+
+        with self.assertRaises(ValueError):
+            cmd.cmd()
+
     def test_cmd_raises_ValueError_if_wrong_kw_filetype_given(self):
+        '''Test for file type checking (implicitly check non-basic type)'''
+
         self.CMD.attr.req_type = [
             [('-f', ), ('.42', )],
         ]
@@ -294,3 +312,47 @@ class TestCmdBase_cmd(BaseTestCase):
         cmd = self.CMD(**kwargs)
         with self.assertRaises(ValueError):
             cmd.cmd()
+
+    def test_cmd_raises_ValueError_if_arg_has_wrong_type(self):
+        for t, v in [(int, 0.5), (float, 'bar')]:
+            with self.subTest(type=t):
+                self.CMD.attr.req_type = [
+                    [('-f', ), (t, )],
+                ]
+
+                kwargs = {'-f': v}
+                cmd = self.CMD(**kwargs)
+
+                with self.assertRaises(ValueError):
+                    cmd.cmd()
+
+    def test_cmd_checks_multiple_basic_types(self):
+        self.CMD.attr.req_type = [
+            [('-f', ), (int, float)],
+        ]
+
+        kwargs = {'-f': 0.01}
+        cmd = self.CMD(**kwargs)
+
+        cmd.cmd()  # should NOT raise--int will fail, but float should not
+
+    def test_cmd_checks_mixed_types(self):
+        '''[YAGNI?] Test that args can have basic and file type req'''
+        self.CMD.attr.req_type = [
+            [('-f', '-x', ), (int, '.txt')],
+        ]
+
+        kwargs = {'-f': 3, '-x': 'hi.txt'}
+        cmd = self.CMD(**kwargs)
+
+        cmd.cmd()  # should NOT raise
+
+    def test_cmd_tries_reversing_args_on_req_file_fail_IFF_len_eq_2(self):
+        '''Test that a simple swap (2 args only) won't break things'''
+        self.CMD.attr.req_type = [
+            [(0, ), ('.txt', )],
+        ]
+        args = ['not_file', 'file.txt']
+        cmd = self.CMD(*args)
+        cmd.cmd()  # should not raise
+        self.assertNotEqual(cmd.args, args)  # reversed!

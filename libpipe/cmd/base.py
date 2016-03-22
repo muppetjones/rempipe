@@ -1,5 +1,6 @@
 
 import abc
+import os.path
 import time
 
 
@@ -39,6 +40,9 @@ class CmdBase(CmdInterface):
     requirements. Certain methods may be overridden to allow specific
     handling and preparation of given arguments.
 
+    TODO: Define file classes (via Django) to handle file type requirements.
+    TODO: Consolidate and standardize Exceptions and their messages.
+
     Attributes:
         args: A list of positional arguments.
         flags: A list of flag-only arguments.
@@ -63,8 +67,6 @@ class CmdBase(CmdInterface):
             an exception if conditions are not met. Use sparingly.
         _pre_cmd(): Final modification before creating the executable string,
             e.g., such as setting up redirect.
-
-
 
     Example:
         # Flags may be given as positional arguments
@@ -219,7 +221,7 @@ class CmdBase(CmdInterface):
             raise
 
         try:
-            self.__check_type()
+            self.__check_types()
         except ValueError as e:
             log.error(str(e))
             raise
@@ -262,7 +264,6 @@ class CmdBase(CmdInterface):
 
         # compound requirement -- require all or none of args in the tuple
         compound = [kw for kw in self.attr.req_kwargs if kw not in simple]
-        log.debug(compound)
         for cmpd in compound:
 
             # tuple indicates all or nothing
@@ -280,12 +281,156 @@ class CmdBase(CmdInterface):
         if missing:
             msg = 'Missing required keyword arg: {}'.format(', '.join(missing))
             raise KeyError(msg)
+        return
 
-    def __check_type(self):
-        '''Ensure that pos and kw args match the expected type
+    def __check_types(self):
+        '''Check specified kwargs and args to ensure given expected data type.
 
+        NOTE: All extensions in attr.req_type should have leading periods.
+
+        Check arguments for types as defined in CmdAttributes:
+            (arg_id, ...), (<type>, ...), [match exact]
+        Where 'arg_id' is a kw flag or position index, and type is a
+        string file extension or a callable type, e.g., int.
+
+        TODO: Enable better parg matching BEFORE checking. The current
+            two arg swap is inefficient; plus, would add robustness.
+
+        Raises:
+            ValueError if not expected data type
+        '''
+
+        for req in self.attr.req_type:
+            try:
+                # match_any used for matching only, not checking
+                arg_ids, types, match_any = req
+            except ValueError:
+                arg_ids, types = req
+
+            # get argument values (pos or kw)
+            vals = self.__get_arg_values(arg_ids)
+            if not vals:
+                continue  # no relevant values
+
+            # check for argument type requirements
+            bad_vals = [
+                str(val) for val in vals if not self.__check_type(val, types)]
+
+            # basic mercy--try swapping args (if relevant)
+            # -- first check if we need to and we have exactly to args
+            # -- then make sure that at least one of the args is positional
+            # (don't bother swapping back if didn't work!)
+            if bad_vals and len(self.args) == 2:
+                if any(isinstance(x, int) for x in arg_ids):
+                    self.args.reverse()
+                    vals = self.__get_arg_values(arg_ids)
+                    bad_vals = [
+                        str(val) for val in vals
+                        if not self.__check_type(val, types)
+                    ]
+
+            if bad_vals:
+                msg = 'Bad values for [{}]: {}'.format(
+                    ', '.join(str(i) for i in arg_ids),
+                    ', '.join(bad_vals),
+                )
+                raise ValueError(msg)
+
+        return
+
+    def __get_arg_values(self, arg_ids):
+        '''Return a list of values for the given args
+
+        Arguments:
+            arg_ids: A list of kwarg flags or arg positions
+        Return:
+            A list of values for the given flags
+        '''
+
+        indices = [v for v in arg_ids if isinstance(v, int)]
+        flags = [v for v in arg_ids if v not in indices]
+        vals = [self.kwargs[f] for f in flags if f in self.kwargs]
+        vals.extend(self.args[i] for i in indices if i < len(self.args))
+
+        return vals
+
+    @classmethod
+    def __check_type(cls, val, types):
+        '''Check that the given value matches the type requirement
+
+        Checks for basic type first, then a file check.
+
+        Args:
+            val: The value to test
+            types: The types to try
+        Returns:
+            True if type matched; false otherwise.
+        '''
+
+        try:
+            try:
+                cls.__check_basic_type(val, types)
+            except TypeError:
+                cls.__check_file_type(val, types)
+        except ValueError:
+            return False
+        return True
+
+    @classmethod
+    def __check_basic_type(cls, val, types):
+        '''Check given value has expected data type
+
+        Two checks:
+            1. value can be coerced into expected type.
+            2. coercion does not result in data loss.
+        For example, a requirement of (int, 0.5) would pass (1), but not (2).
+
+        NOTE: Profile efficiency of this function.
+
+        Arguments:
+            val: The value to check
+            types: A list of type callables, eg., int
+        Return:
+            None
+        Raises:
+            ValueError if the value is not of the expected type.
+            TypeError if the type is not callable.
+        '''
+        possible_type_error = None
+        valid = False
+        for _type in types:
+            try:
+                if str(_type(val)) != str(val):  # failed first check
+                    raise ValueError('second check')  # failed second check
+            except ValueError as e:
+                err = e
+            except TypeError as e:
+                possible_type_error = e
+            else:
+                valid = True
+                break
+        if not valid:
+            if possible_type_error:
+                raise possible_type_error
+            else:
+                raise err
+        return
+
+    @classmethod
+    def __check_file_type(cls, val, types):
+        '''Check given value to ensure given expected file type.
+
+        NOTE: All extensions in attr.req_type should have leading periods.
+
+        Arguments:
+            val: The value to check
+            types: A list of file extensions
+        Returns:
+            None
         Raises:
             ValueError on failure
         '''
-
-        pass
+        extn = os.path.splitext(val)[1]
+        if extn not in types:
+            raise ValueError()
+        return
