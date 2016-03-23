@@ -2,6 +2,7 @@
 
 import io
 import random
+import unittest
 from unittest import mock
 
 from tests.base import LibpipeTestCase  # includes read and write mock
@@ -253,15 +254,72 @@ class TestPipeBase_write(PipeBaseTestCase):
         super().setUp()
         self.mock_write = self.setup_mock_write()
 
+        # from __update_pbs_permissions
+        patcher = mock.patch('os.chmod')
+        self.mock_oschmod = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        patcher = mock.patch('os.stat')
+        self.mock_osstat = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_write_raises_ValueError_if_pipe_is_empty(self):
+        pipe = PipeBase()
+        with self.assertRaises(ValueError):
+            pipe.write('script.pbs')
+
+    #
+    #   PBS template setup
+    #
+
+    def test_init_sets_default_template_path(self):
+        pipe = PipeBase()
+        self.assertIsNotNone(pipe.pbs_template_path)
+
+    def test_init_sets_given_template_path(self):
+        template_path = '~/template.pbs'
+        pipe = PipeBase(template_path=template_path)
+        self.assertEqual(pipe.pbs_template_path, template_path)
+
+    def test_write_pbs_script_loads_template_on_initial_call(self):
+        self.setup_mock_read('Hello world')
+        pipe = PipeBase()
+
+        with mock.patch.object(pipe, '_write_pbs_script'):
+            pipe.write('script.pbs')
+
+        self.assertIsNotNone(pipe.pbs_template)
+        self.assertEqual(pipe.pbs_template, 'Hello world')
+
+    def test_write_does_not_load_pbs_template_on_subsequent_calls(self):
+        mock_open = self.setup_mock_read('Hello world')
+        pipe = PipeBase()
+
+        with mock.patch.object(pipe, '_write_pbs_script'):
+            pipe.write('script.pbs')
+            pipe.write('script.pbs')
+
+        self.assertEqual(
+            mock_open.call_count, 1,
+            'PBS template not loaded exactly once'
+        )
+
+    #
+    #   write
+    #
+
     def test_write_opens_given_file(self):
         cmds = self.get_n_cmds(3)
-        pipe = PipeBase(cmds)
-        ofile = 'fake_file.txt'
+        pipe = PipeBase()
+        pipe.add(cmds)
+        ofile = 'fake_file.pbs'
+        pipe.pbs_template = 'Hello world'
 
-        pipe.write(ofile)
+        with mock.patch.object(pipe, '_PipeBase__load_pbs_template'):
+            pipe.write(ofile)
         self.mock_write.assert_called_once_with(ofile, 'w')
 
-    def test_write_accepts_file_handle(self):
+    def test_pipe_writes_all_commands_to_handle(self):
         cmds = self.get_n_cmds(3)
         pipe = PipeBase(cmds)
         pipe.add(cmds)
@@ -272,6 +330,34 @@ class TestPipeBase_write(PipeBaseTestCase):
             result = sh.read()
 
         self.assertEqual(result, pipe.cmd())
+
+    def test_write_pbs_includes_the_pbs_template(self):
+        mock_read = self.setup_mock_read('Hello world')
+        cmds = self.get_n_cmds(3)
+        pipe = PipeBase()
+        pipe.add(cmds)
+
+        # the mock_read call overwrites the mock created in setUp
+        pipe.write('script.pbs')
+        mock_read().write.assert_any_call('Hello world\n')
+
+    def test_write_attempts_to_update_permissions_on_pbs_script(self):
+        self.setup_mock_read('Hello world')
+        pipe = PipeBase()
+
+        with mock.patch.object(pipe, '_write_pbs_script'):
+            pipe.write('script.pbs')
+
+        self.mock_oschmod.assert_called_once_with(
+            'script.pbs', self.mock_osstat().st_mode.__or__())
+
+    def test_write_still_writes_commands_if_unknown_script_type(self):
+        cmds = self.get_n_cmds(3)
+        pipe = PipeBase()
+        pipe.add(cmds)
+
+        pipe.write('script.csh')
+        self.mock_write.assert_called_once_with('script.csh', 'w')
 
 
 # ENDFILE

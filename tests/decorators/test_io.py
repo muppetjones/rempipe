@@ -153,11 +153,10 @@ class TestFileOrHandle(TestSetup, CommonTests):
     # Positive Tests
     # -------------------------------------------------------------------------
 
-    @unittest.skip('Patch python first--mock_issue18622_2')
+    @unittest.skip('Patch python first--mock_issue18622_2 (run twice)')
     def test_open_called_with_correct_mode(self):
         for mode in list('wr+'):
-            # self.mopen = self.setup_mock_write()
-            self.mopen.reset_mock()
+            self.mopen.reset_mock()  # reset_mock is the bug!
             with self.subTest(mode=mode):
                 self.validate_open_called_with(mode)
 
@@ -174,7 +173,10 @@ class TestFileOrHandle(TestSetup, CommonTests):
 
 class TestFileOrHandle_METHOD(TestFileOrHandle):
 
-    '''Test 'file_or_handle_write' decorator on class methods'''
+    '''Test 'file_or_handle_write' decorator on class methods
+
+    NOTE: Inherits (& runs) the buggy test: test_open_called_with_correct_mode
+    '''
 
     def get_decorated_function(self, mode):
         class TempClass(object):

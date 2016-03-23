@@ -1,9 +1,15 @@
 
+import os
+import os.path
+import stat
 import time
+
 
 from libpipe.cmd.dummy import CmdDummy
 from libpipe.cmd.interface import CmdInterface
 from libpipe.decorators.cmd import fall_through as fall_through_wrapper
+from libpipe.decorators.io import file_or_handle
+from libpipe import templates
 
 import logging
 log = logging.getLogger(__name__)
@@ -45,7 +51,10 @@ class PipeBase(CmdInterface):
 
     '''
 
-    def __init__(self, timestamp=None, fall_through=False, **kwargs):
+    def __init__(
+            self,
+            timestamp=None, fall_through=False, template_path=None,
+            **kwargs):
 
         # save a timestamp, given or generated
         self.timestamp = (timestamp if timestamp
@@ -63,6 +72,14 @@ class PipeBase(CmdInterface):
 
         if fall_through:
             self.output = fall_through_wrapper(self.output)
+
+        # initialize template information
+        if template_path:
+            self.pbs_template_path = template_path
+        else:
+            self.pbs_template_path = os.path.join(
+                os.path.dirname(templates.__file__), 'template.pbs')
+        self.pbs_template = None
 
     #
     #   Cmd Interface
@@ -128,10 +145,30 @@ class PipeBase(CmdInterface):
 
         return self
 
-    def write(self, _file):
+    def write(self, _file, fmt=None):
+        '''Handle write preparation and go to appropriate 'write' method
 
-        with open(_file, 'w') as fh:
-            fh.write(self.cmd())
+        Attributes:
+            _file: The file to write to
+            fmt: The script format. Must use if passing a handle.
+                Default: 'pbs'.
+        '''
+
+        try:
+            extn = os.path.splitext(_file)[1]
+            if extn in ['.pbs', '.sh']:
+                self.__load_pbs_template()
+                self._write_pbs_script(_file)
+            else:
+                raise AttributeError()  # force default write
+        except AttributeError:
+            # Probably passed a handle
+            self._write(_file)
+            # raise NotImplementedError('Unknown script type: {}'.format(
+            #     os.path.splitext(_file)[1]
+            # ))
+
+        self.__update_file_permissions(_file)
 
     #
     #   Protected methods
@@ -139,3 +176,32 @@ class PipeBase(CmdInterface):
 
     def _get_cmd_strs(self):
         return [cmd.cmd() for cmd in self.cmds]
+
+    @file_or_handle(mode='w')
+    def _write(self, fh):
+        fh.write(self.cmd())
+
+    @file_or_handle(mode='w')
+    def _write_pbs_script(self, fh):
+        fh.write(self.pbs_template + "\n")
+        self._write(fh)
+
+    #
+    #   Private Methods
+    #
+
+    def __load_pbs_template(self):
+        if not self.pbs_template:
+            with open(self.pbs_template_path, 'r') as ih:
+                self.pbs_template = ih.read().rstrip()
+
+    @classmethod
+    def __update_file_permissions(cls, _file):
+        '''Make file executable by all parties
+
+        http://stackoverflow.com/a/12792002/977342
+        '''
+
+        file_stat = os.stat(_file)
+        st_all_exec = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        os.chmod(_file, file_stat.st_mode | st_all_exec)
