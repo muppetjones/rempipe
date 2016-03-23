@@ -192,6 +192,9 @@ class CmdBase(CmdInterface):
         next_cmd.input = self.output
         return next_cmd
 
+    def run(self):
+        raise NotImplementedError('Cmd cannot be run directly (yet)')
+
     #
     #   To override
     #   NOTE: Don't forget about "output"

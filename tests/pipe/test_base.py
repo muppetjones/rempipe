@@ -3,7 +3,7 @@
 import io
 import os.path
 import random
-import unittest
+import subprocess
 from unittest import mock
 
 from tests.base import LibpipeTestCase  # includes read and write mock
@@ -44,6 +44,17 @@ class TestPipeBase(PipeBaseTestCase):
     def test_CmdBase_is_mocked(self):
         pass
         # pipe.CmdBase()  # should not raise
+
+    def test_init_raises_TypeError_if_unexpected_kwarg(self):
+        '''Test we don't get arguments we don't expect
+
+        NOTE: We may want to allow this in later implementations,
+            e.g., to pass arguments through to commands
+        '''
+        u = list('rcdefblame')
+        kwargs = {'shot_through_the_heart': u[1:-5]}
+        with self.assertRaises(TypeError):
+            PipeBase(**kwargs)
 
     def test_init_saves_timestamp_if_given(self):
         kwargs = {'timestamp': '151012-162900'}
@@ -394,6 +405,66 @@ class TestPipeBase_write(PipeBaseTestCase):
         pipe = PipeBase(cmds=self.get_n_cmds(3))
         pipe.write(_file)
         self.assertEqual(pipe.script_file, self.mock_write().name)
+
+
+class TestPipeBase_run(PipeBaseTestCase):
+
+    '''Test ability to run commands
+
+    TODO(sjbush): Run commands separately
+    TODO(sjbush): Submit job if available
+    '''
+
+    def setUp(self):
+        super().setUp()
+
+        # prevent actually calling any commands
+        patcher = mock.patch('subprocess.check_call')
+        self.mock_call = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        # log test name (for debugging)
+        id_split = self.id().split('.')
+        log.debug('-' * 50 + '\n\t' + '.'.join(id_split[-2:]))
+
+    def test_run_calls_each_cmd_run_if_no_script_file(self):
+        '''Test each cmd is run sep. if script_file not set'''
+        cmds = self.get_n_cmds(3)
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.run()
+
+        for cmd in pipe.cmds:
+            cmd.run.assert_called_once_with()
+        self.assertEqual(self.mock_call.call_count, 0)  # cmd is mocked
+
+    def test_run_calls_subprocess_once_if_script_file_set(self):
+        '''Test script_file is executed if set (implicit logfile check)'''
+
+        cmds = self.get_n_cmds(3)
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        pipe.run()
+
+        for cmd in cmds:
+            self.assertEqual(cmd.call_count, 0)
+        self.mock_call.assert_called_once_with(
+            pipe.script_file, stdout=pipe.log_file, stderr=pipe.log_file)
+
+    def test_run_script_raises_CalledProcessError_if_problem(self):
+        self.mock_call.side_effect = subprocess.CalledProcessError(1, 'AH!')
+
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        with self.assertRaises(subprocess.CalledProcessError):
+            pipe.run()
+
+    def test_run_local_called_by_default(self):
+        '''Test that run mode is 'local' by default'''
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        with mock.patch.object(pipe, '_run_local') as mock_run_local:
+            pipe.run()
+        mock_run_local.assert_called_once_with()
 
 
 # ENDFILE

@@ -2,6 +2,7 @@
 import os
 import os.path
 import stat
+import subprocess
 import time
 
 
@@ -64,6 +65,7 @@ class PipeBase(CmdInterface):
         # -- use kwargs b/c input is a builtin function
         try:
             _input = kwargs['input']
+            del kwargs['input']
         except KeyError:
             _input = []
 
@@ -83,6 +85,10 @@ class PipeBase(CmdInterface):
             self.pbs_template_path = os.path.join(
                 os.path.dirname(templates.__file__), 'template.pbs')
         self.pbs_template = None
+
+        if kwargs:
+            raise TypeError('__init__ got unexpected argument(s): {}'.format(
+                list(kwargs.keys())))
 
     #
     #   Cmd Interface
@@ -148,6 +154,27 @@ class PipeBase(CmdInterface):
 
         return self
 
+    def run(self):
+
+        self._run_local()
+
+        # we have a script (via `write`). use it.
+        if self.script_file:
+            log_file = os.path.splitext(self.script_file)[0] + '.log'
+
+            try:
+                subprocess.check_call(
+                    self.script_file, stdout=log_file, stderr=log_file)
+            except subprocess.CalledProcessError:
+                raise
+            finally:
+                self.log_file = log_file
+
+        # no script--call each cmd individually
+        else:
+            for cmd in self.cmds:
+                cmd.run()
+
     @file_or_handle(mode='w')
     def write(self, fh, fmt=None):
         '''Handle write preparation and go to appropriate 'write' method
@@ -189,6 +216,9 @@ class PipeBase(CmdInterface):
             with open(self.pbs_template_path, 'r') as ih:
                 self.pbs_template = ih.read().rstrip()
         return
+
+    def _run_local(self):
+        pass
 
     def _write(self, fh):
         fh.write(self.cmd())
