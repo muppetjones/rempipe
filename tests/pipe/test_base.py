@@ -424,12 +424,11 @@ class TestPipeBase_run(PipeBaseTestCase):
         self.addCleanup(patcher.stop)
 
         # log test name (for debugging)
-        id_split = self.id().split('.')
-        log.debug('-' * 50 + '\n\t' + '.'.join(id_split[-2:]))
+        # id_split = self.id().split('.')
+        # log.debug('-' * 50 + '\n\t' + '.'.join(id_split[-2:]))
 
     def test_run_calls_each_cmd_run_if_no_script_file(self):
         '''Test each cmd is run sep. if script_file not set'''
-        cmds = self.get_n_cmds(3)
         pipe = PipeBase(cmds=self.get_n_cmds(3))
         pipe.run()
 
@@ -458,7 +457,21 @@ class TestPipeBase_run(PipeBaseTestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             pipe.run()
 
-    def test_run_local_called_by_default(self):
+    def test_run_script_does_not_call_subprocess_directly(self):
+        # assumes default mode of local
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        with mock.patch.object(pipe, '_run_local'):
+            pipe.run()
+        self.assertEqual(self.mock_call.call_count, 0)
+
+    def test_run_script_raises_ValueError_for_unknown_mode(self):
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        with self.assertRaises(ValueError):
+            pipe.run(mode='Dorian')
+
+    def test_run_script_local_called_by_default(self):
         '''Test that run mode is 'local' by default'''
         pipe = PipeBase(cmds=self.get_n_cmds(3))
         pipe.script_file = 'script.pbs'
@@ -466,5 +479,15 @@ class TestPipeBase_run(PipeBaseTestCase):
             pipe.run()
         mock_run_local.assert_called_once_with()
 
+    def test_run_script_calls_run_pbs_if_mode_is_pbs(self):
+        '''Test that _run_pbs is used when mode=pbs'''
+
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        with mock.patch.object(pipe, '_run_local') as mock_run_local, \
+                mock.patch.object(pipe, '_run_pbs') as mock_run_pbs:
+            pipe.run(mode='pbs')
+        mock_run_pbs.assert_called_once_with()
+        self.assertEqual(mock_run_local.call_count, 0)
 
 # ENDFILE

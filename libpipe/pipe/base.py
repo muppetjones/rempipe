@@ -154,21 +154,24 @@ class PipeBase(CmdInterface):
 
         return self
 
-    def run(self):
-
-        self._run_local()
+    def run(self, mode='local'):
 
         # we have a script (via `write`). use it.
         if self.script_file:
             log_file = os.path.splitext(self.script_file)[0] + '.log'
+            self.log_file = log_file
 
+            # TODO(sjbush): Make this dynamic using dir
+            run_via = {
+                'local': self._run_local,
+                'pbs': self._run_pbs,
+            }
             try:
-                subprocess.check_call(
-                    self.script_file, stdout=log_file, stderr=log_file)
-            except subprocess.CalledProcessError:
-                raise
-            finally:
-                self.log_file = log_file
+                run_via[mode]()
+            except KeyError:
+                msg = 'Unknown run mode "{}". Try: {}'.format(
+                    mode, list(run_via.keys()))
+                raise ValueError(msg)
 
         # no script--call each cmd individually
         else:
@@ -218,6 +221,13 @@ class PipeBase(CmdInterface):
         return
 
     def _run_local(self):
+        try:
+            subprocess.check_call(
+                self.script_file, stdout=self.log_file, stderr=self.log_file)
+        except subprocess.CalledProcessError:
+            raise
+
+    def _run_pbs(self):
         pass
 
     def _write(self, fh):
