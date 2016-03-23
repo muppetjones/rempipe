@@ -6,11 +6,18 @@ from unittest import mock
 
 class LibpipeTestCase(unittest.TestCase):
 
-    def setup_mock_write(self):
+    def setup_mock_write(self, create=False):
+        if create:
+            m = mock.mock_open()
+        else:
+            try:
+                m = self._mock_open
+            except AttributeError:
+                m = mock.mock_open()
+                self._mock_open = m
+
         patcher = mock.patch.object(
-            builtins, 'open',
-            mock.mock_open(),
-            create=True)
+            builtins, 'open', m, create=True)
         m = patcher.start()
         self.addCleanup(patcher.stop)
         return m

@@ -1,6 +1,7 @@
 '''Test the PipeBase class'''
 
 import io
+import os.path
 import random
 import unittest
 from unittest import mock
@@ -65,6 +66,13 @@ class TestPipeBase(PipeBaseTestCase):
 
         pipe = PipeBase(input=list('abc'))
         self.assertEqual(pipe.dummy.output(), list('abc'))
+
+    def test_init_adds_cmds_from_list(self):
+        '''Test commands added and linked directly through init'''
+        cmds = self.get_n_cmds(3)
+        pipe = PipeBase(input=list('abc'), cmds=cmds)
+        self.assertEqual(pipe.cmds, cmds)
+        self.assertEqual(pipe.cmds[0].input(), list('abc'))
 
     def test_input_returns_list_from_dummy_cmd(self):
         pipe = PipeBase(input=list('abc'))
@@ -263,6 +271,19 @@ class TestPipeBase_write(PipeBaseTestCase):
         self.mock_osstat = patcher.start()
         self.addCleanup(patcher.stop)
 
+        # log test name (for debugging)
+        # id_split = self.id().split('.')
+        # log.debug('-' * 50 + '\n\t' + '.'.join(id_split[-2:]))
+
+    def mock_splitext(self, _file):
+        '''Mock out splitext--cannot easily get filename from mock handle'''
+        split_tuple = os.path.splitext(_file)
+        patcher = mock.patch('os.path.splitext')
+        mock_obj = patcher.start()
+        self.addCleanup(patcher.stop)
+        mock_obj.return_value = list(split_tuple)
+        return mock_obj
+
     def test_write_raises_ValueError_if_pipe_is_empty(self):
         pipe = PipeBase()
         with self.assertRaises(ValueError):
@@ -281,48 +302,48 @@ class TestPipeBase_write(PipeBaseTestCase):
         pipe = PipeBase(template_path=template_path)
         self.assertEqual(pipe.pbs_template_path, template_path)
 
-    def test_write_pbs_script_loads_template_on_initial_call(self):
+    def test_pbs_template_not_set_before_call_to_write(self):
+        pipe = PipeBase()
+        self.assertIsNone(pipe.pbs_template)
+
+    def test_pbs_template_not_loaded_if_non_pbs_extension_found(self):
+        '''Test non-pbs file formats do not load the pbs template'''
+        _file = 'script.csh'
+        self.mock_splitext(_file)
         self.setup_mock_read('Hello world')
+
+        pipe = PipeBase()
+        with mock.patch.object(pipe, '_load_pbs_template') as mock_load, \
+                mock.patch.object(pipe, '_write'):
+            pipe.write(_file)
+        self.assertIsNone(pipe.pbs_template)
+        self.assertEqual(mock_load.call_count, 0)
+
+    def test_pbs_template_loaded_once_on_initial_call(self):
+        mock_read = self.setup_mock_read('Hello world')
         pipe = PipeBase()
 
-        with mock.patch.object(pipe, '_write_pbs_script'):
-            pipe.write('script.pbs')
+        for i in range(5):
+            pipe._load_pbs_template()
 
-        self.assertIsNotNone(pipe.pbs_template)
+        mock_read.assert_called_once_with(pipe.pbs_template_path, 'r')
         self.assertEqual(pipe.pbs_template, 'Hello world')
-
-    def test_write_does_not_load_pbs_template_on_subsequent_calls(self):
-        mock_open = self.setup_mock_read('Hello world')
-        pipe = PipeBase()
-
-        with mock.patch.object(pipe, '_write_pbs_script'):
-            pipe.write('script.pbs')
-            pipe.write('script.pbs')
-
-        self.assertEqual(
-            mock_open.call_count, 1,
-            'PBS template not loaded exactly once'
-        )
 
     #
     #   write
     #
 
     def test_write_opens_given_file(self):
-        cmds = self.get_n_cmds(3)
-        pipe = PipeBase()
-        pipe.add(cmds)
-        ofile = 'fake_file.pbs'
-        pipe.pbs_template = 'Hello world'
+        '''Assert `write` attempts to open the file'''
+        _file = 'script.pbs'
+        self.mock_splitext(_file)
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
 
-        with mock.patch.object(pipe, '_PipeBase__load_pbs_template'):
-            pipe.write(ofile)
-        self.mock_write.assert_called_once_with(ofile, 'w')
+        pipe.write(_file)
+        self.mock_write.assert_any_call(_file, 'w')
 
     def test_pipe_writes_all_commands_to_handle(self):
-        cmds = self.get_n_cmds(3)
-        pipe = PipeBase(cmds)
-        pipe.add(cmds)
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
 
         with io.StringIO() as sh:
             pipe.write(sh)  # should not raise!
@@ -331,33 +352,48 @@ class TestPipeBase_write(PipeBaseTestCase):
 
         self.assertEqual(result, pipe.cmd())
 
-    def test_write_pbs_includes_the_pbs_template(self):
-        mock_read = self.setup_mock_read('Hello world')
-        cmds = self.get_n_cmds(3)
-        pipe = PipeBase()
-        pipe.add(cmds)
+    def test_pbs_template_written_if_pbs_or_shell_file_given(self):
+        '''Tests pbs template loaded when needed'''
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.pbs_template = 'Thou cream faced loon'  # prevent template loading
+        mock_splitext = self.mock_splitext('script.pbs')
 
-        # the mock_read call overwrites the mock created in setUp
-        pipe.write('script.pbs')
-        mock_read().write.assert_any_call('Hello world\n')
+        for extn in ['.pbs', '.sh']:
+            with self.subTest(extn=extn):
+                mock_splitext.return_value[1] = extn
+                _file = 'script' + extn
+                pipe.write(_file)
+                self.mock_write().write.assert_any_call(
+                    pipe.pbs_template + "\n")  # don't forget the new line!
 
-    def test_write_attempts_to_update_permissions_on_pbs_script(self):
-        self.setup_mock_read('Hello world')
-        pipe = PipeBase()
+    def test_write_attempts_to_update_permissions_if_filename_given(self):
+        _file = 'script.pbs'
+        self.mock_splitext(_file)
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.pbs_template = 'You fustilarian!'  # prevent template loading
 
-        with mock.patch.object(pipe, '_write_pbs_script'):
-            pipe.write('script.pbs')
+        with mock.patch.object(pipe, '_write'):  # prevent write
+            pipe.write(_file)
 
         self.mock_oschmod.assert_called_once_with(
-            'script.pbs', self.mock_osstat().st_mode.__or__())
+            self.mock_write().name, self.mock_osstat().st_mode.__or__())
 
-    def test_write_still_writes_commands_if_unknown_script_type(self):
-        cmds = self.get_n_cmds(3)
-        pipe = PipeBase()
-        pipe.add(cmds)
+    def test_write_does_not_attempt_permissions_if_non_file_handle(self):
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.pbs_template = 'You fustilarian!'  # prevent template loading
 
-        pipe.write('script.csh')
-        self.mock_write.assert_called_once_with('script.csh', 'w')
+        with io.StringIO() as sh:
+            pipe.write(sh)
+
+        self.assertEqual(self.mock_oschmod.call_count, 0)
+
+    def test_write_stores_filename_if_file(self):
+        '''Test that the filename written to is stored by pipe'''
+        _file = 'script.pbs'
+        self.mock_splitext(_file)
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.write(_file)
+        self.assertEqual(pipe.script_file, self.mock_write().name)
 
 
 # ENDFILE
