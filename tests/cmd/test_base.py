@@ -467,22 +467,38 @@ class TestCmdBase_requirements(BaseTestCase):
         with self.assertRaises(KeyError):
             cmd.cmd()
 
+    def test_cmd_does_not_raise_if_all_AND_req_members_given(self):
+        self.CMD.attr.req_kwargs = [('-f', '-o', '-n'), ]
+        self.CMD.attr.defaults = {}
+        kwargs = {'-f': 0, '-n': 2, '-o': 42}
+
+        cmd = self.CMD(**kwargs)  # should not raise
+        cmd.cmd()  # should NOT raise!!
+
     def test_cmd_does_not_raise_if_no_AND_req_members_given(self):
         self.CMD.attr.req_kwargs = [('-f', '-o', '-n'), ]
         self.CMD.attr.defaults = {}
-        kw = {'--foo': 'something different', }
+        kwargs = {'--foo': 'something different', }
 
-        cmd = self.CMD(**kw)  # should not raise
+        cmd = self.CMD(**kwargs)  # should not raise
         cmd.cmd()  # should NOT raise!!
 
     def test_cmd_raises_KeyError_if_do_not_have_all_AND_kwargs(self):
         self.CMD.attr.req_kwargs = [('-f', '-o', '-n')]  # req all three
         self.CMD.attr.defaults = {}
-        kw = {'-f': 0, '-n': 2}
+        kwargs = {'-f': 0, '-n': 2}
 
-        cmd = self.CMD(**kw)  # should not raise
+        cmd = self.CMD(**kwargs)  # should not raise
         with self.assertRaises(KeyError):
             cmd.cmd()
+
+    def test_cmd_does_not_raise_if_exactly_one_XOR_arg_given(self):
+        self.CMD.attr.req_kwargs = [['-f', '-o', '-n'], ]
+        self.CMD.attr.defaults = {}
+        kwargs = {'-f': 0, }
+
+        cmd = self.CMD(**kwargs)
+        cmd.cmd()  # should not raise
 
     def test_cmd_raises_KeyError_if_missing_all_XOR_args(self):
         self.CMD.attr.req_kwargs = [['-f', '-o', '-n'], ]
