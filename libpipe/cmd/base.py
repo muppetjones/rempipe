@@ -231,19 +231,22 @@ class CmdBase(CmdInterface):
         try:
             self.__check_args()
         except IndexError as e:
-            log.error(str(e))
+            if self.complain:
+                log.error(str(e))
             raise
 
         try:
             self.__check_kwargs()
         except KeyError as e:
-            log.error(str(e))
+            if self.complain:
+                log.error(str(e))
             raise
 
         try:
             self.__check_types()
         except ValueError as e:
-            log.error(str(e))
+            if self.complain:
+                log.error(str(e))
             raise
 
     def _cmd(self, *args, verbose=True, **kwargs):
