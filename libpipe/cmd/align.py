@@ -11,6 +11,14 @@ log = logging.getLogger(__name__)
 
 class Hisat2Cmd(CmdBase):
 
+    '''Hisat2 Sequence Aligner
+
+    Command to run the hisat2 aligner.
+
+    TODO(sjbush): Add stricter formatting to output (sam, log, etc.) by
+        adding timestamp, job_name, etc.
+    '''
+
     attr = CmdAttributes(
         invoke='hisat2',
         args=[
@@ -88,6 +96,21 @@ class Hisat2Cmd(CmdBase):
                     os.path.splitext(self.kwargs['-U'])[0]
                 )
             self.kwargs['-S'] = sam_file
+
+        # basic log file name
+        log_file = sam_file.replace('.sam', '.log')
+        log_file = os.path.join(
+            os.path.dirname(log_file),
+            'hisat_{}'.format(os.path.basename(log_file))
+        )
+        self.redirect = ('2>&1', '|', 'tee -a', log_file)
+
+        # ensure unaligned reads are written to a file
+        # -- tag with _unal label (but make sure there's only one)
+        unal_key = '--un' if '-U' in self.kwargs else '--un-conc'
+        unal_base = os.path.splitext(self.kwargs['-S'])[0].replace('_unal', '')
+        unal = unal_base + '_unal.fastq'
+        self.kwargs.update({unal_key: unal})
 
     #
     #   Class methods

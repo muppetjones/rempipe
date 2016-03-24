@@ -116,13 +116,66 @@ class TestHistatCmd(unittest.TestCase):
         self.assertIn('-S', cmd.kwargs)
         self.assertEqual(cmd.kwargs['-S'], 'data/sample.2.sam')
 
+    def test_pre_cmd_sets_redirect_to_log_file(self):
+        cmd = self.get_cmd()
+        cmd._match_input_with_args()
+        cmd._pre_cmd()
+
+        self.assertIsNotNone(cmd.redirect)
+        found = cmd.redirect[-1]
+        expected = 'data/hisat_sample.log'
+
+        # NOTE: The log filename is created from the output file, so the
+        #       genome name will only be in the file if the user puts it
+        #       or if the user does not provide an output file.
+        self.assertEqual(
+            found, expected,
+            'Redirect not set to expected log file ({})'.format(cmd.redirect),
+        )
+
+    def test_prepcmd_sets_unal_based_on_given_samfile_name_se(self):
+        cmd = self.get_cmd(_input=DEFAULT_INPUT[1:])
+        cmd._match_input_with_args()
+        cmd._pre_cmd()
+
+        expected_file = os.path.splitext(cmd.kwargs['-S'])[0] + '_unal.fastq'
+
+        self.assertIn('--un', cmd.kwargs)
+        self.assertEqual(cmd.kwargs['--un'], expected_file)
+
+    def test_prepcmd_sets_unal_based_on_given_samfile_name_pe(self):
+        cmd = self.get_cmd()
+        cmd._match_input_with_args()
+        cmd._pre_cmd()
+
+        expected_file = os.path.splitext(cmd.kwargs['-S'])[0] + '_unal.fastq'
+
+        self.assertIn('--un-conc', cmd.kwargs)
+        self.assertEqual(cmd.kwargs['--un-conc'], expected_file)
+
+    def test_pre_cmd_sets_redirect_for_stdout_and_stderr_to_tee(self):
+        cmd = self.get_cmd()
+        cmd._match_input_with_args()
+        cmd._pre_cmd()
+
+        self.assertIsNotNone(cmd.redirect)
+        found = cmd.redirect[:-1]
+        expected = ('2>&1', '|', 'tee -a')
+
+        self.assertEqual(
+            found, expected,
+            'Redirect not set properly: {}'.format(cmd.redirect),
+        )
+
     #
     #   Cmd
     #
 
-    # def test_cmd_raises_TypeError_if_1_and_U_set(self):
-    #     hc = self.sample_cmd()
-    #     hc.kwargs['-1'] = 'seq1.fq'
-    #
-    #     with self.assertRaises(AttributeError):
-    #         hc.cmd()
+    def test_cmd_raises_KeyError_if_1_and_U_set(self):
+        cmd = self.get_cmd()
+        # cmd._match_input_with_args()
+        cmd.kwargs['-U'] = 'data/seqU.fq'
+
+        with mock.patch.object(libpipe.cmd.base.log, 'error'):
+            with self.assertRaises(KeyError):
+                cmd.cmd()
