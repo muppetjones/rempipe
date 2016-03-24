@@ -1,17 +1,18 @@
-import os.path
 import unittest
 from unittest import mock
 
 import libpipe
 from libpipe.cmd.dummy import CmdDummy
-from libpipe.cmd.samtools import SamtoolsSortCmd
 from libpipe.cmd.samtools import SamtoolsIndexCmd
+from libpipe.cmd.samtools import SamtoolsSortCmd
 
 import logging
 log = logging.getLogger(__name__)
 
 
-class UtilityTestCase(unittest.TestCase):
+class SamtoolsTestCase(unittest.TestCase):
+
+    # TODO(sjbush): This is duplicated in several tests--refactor
 
     def get_cmd(self, *args, _input=None, **kwargs):
         '''Initialize the basic command'''
@@ -22,7 +23,7 @@ class UtilityTestCase(unittest.TestCase):
         return self.dummy.link(cmd)
 
 
-class TestSamtoolsIndexCmd(UtilityTestCase):
+class TestSamtoolsIndexCmd(SamtoolsTestCase):
 
     '''Test samtools index
 
@@ -33,8 +34,6 @@ class TestSamtoolsIndexCmd(UtilityTestCase):
     def setUp(self):
         self.default_input = ['data/sample.s.bam', ]
         self.CMD = SamtoolsIndexCmd
-
-        log.debug(self.id())
 
     def test_cmd_raises_IndexError_if_not_given_bam_parg(self):
         cmd = self.get_cmd(_input=['not/a/bam', ])
@@ -67,7 +66,7 @@ class TestSamtoolsIndexCmd(UtilityTestCase):
         self.assertEqual(cmd.output(), cmd.args)
 
 
-class TestSamtoolsSortCmd(UtilityTestCase):
+class TestSamtoolsSortCmd(SamtoolsTestCase):
 
     '''Test samtools sort
 
