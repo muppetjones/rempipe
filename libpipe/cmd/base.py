@@ -168,6 +168,13 @@ class CmdBase(CmdInterface):
             IndexError if bad args.
         '''
 
+        try:
+            self._match_input_with_args()
+        except AttributeError:
+            pass  # not linked...Strange, but ignore
+        except TypeError:
+            raise  # bad link...let someone know
+
         self._pre_req()
         self._post_req()
         self._check_requirements()
@@ -304,6 +311,7 @@ class CmdBase(CmdInterface):
             ValueError if no link or input is found.
             TypeError if linked input is not callable.
         '''
+
         try:
             linked_input = self.input()
             n_input = len(linked_input)
@@ -314,7 +322,7 @@ class CmdBase(CmdInterface):
         except TypeError as e:
             if self.complain:
                 log.error(str(e))
-            raise AttributeError('Bad link')  # not callable
+            raise TypeError('Bad link')  # not callable
         except Exception as e:
             log.debug(str(e))
             raise
@@ -398,7 +406,7 @@ class CmdBase(CmdInterface):
             # tuple indicates all or nothing
             if isinstance(cmpd, tuple):
                 missed = [kw for kw in cmpd if kw not in self.kwargs]
-                if len(missed) != len(cmpd):  # remember, nothing is fine!
+                if missed and len(missed) != len(cmpd):  # all missing is fine!
                     missing.append('AND({})'.format(', '.join(missed)))
 
             # a list indicates exactly one (must have at least one)

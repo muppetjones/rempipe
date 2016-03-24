@@ -38,6 +38,14 @@ class TestCmdAttributes(unittest.TestCase):
     def setUp(self):
         self.kwargs = dict.copy(sample_attributes)
 
+    def test_init_raises_TypeError_if_unknown_args(self):
+        with self.assertRaises(TypeError):
+            CmdAttributes('huh')
+
+    def test_init_accepts_dict_as_single_arg_param(self):
+        ca = CmdAttributes(self.kwargs)  # should not raise
+        self.assertEqual(ca.invoke, self.kwargs['invoke'])
+
     def test_init_raises_ValueError_if_missing_required_args(self):
         '''Ensure we can't create the obj w/o the basics'''
         required = ['invoke', 'args']

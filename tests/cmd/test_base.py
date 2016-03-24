@@ -256,6 +256,14 @@ class TestCmdBase_cmd(BaseTestCase):
 
         mock_cmd.assert_called_once_with(verbose=False)
 
+    def test_cmd_calls_match_method(self):
+        '''Test that input is matched to args from via cmd'''
+
+        cmd = self.CMD()
+        with mock.patch.object(cmd, '_match_input_with_args') as mock_match:
+            cmd.cmd()
+        mock_match.assert_called_once_with()
+
     def test_cmd_calls_each_user_defined_customization(self):
         '''Test cmd calls each available user defined methods for cmd prep'''
 
@@ -384,10 +392,10 @@ class TestBaseCmd_link(BaseTestCase):
         with self.assertRaises(AttributeError):
             cmd._match_input_with_args()
 
-    def test_match_raises_AttributeError_if_input_not_callable(self):
+    def test_match_raises_TypeError_if_input_not_callable(self):
         cmd = self.CMD()
         cmd.input = list('abc')
-        with self.assertRaises(AttributeError):
+        with self.assertRaises(TypeError):
             cmd._match_input_with_args()
 
     def test_match_warns_if_input_not_used_and_strict(self):

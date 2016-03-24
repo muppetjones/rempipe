@@ -95,6 +95,15 @@ class CmdAttributes(object):
             'defaults', 'flag_sep',
         ]
 
+        # ID10T Error -- forgot to use ** when calling
+        # Check for unknown args
+        if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], dict):
+            kwargs = args[0]
+            args = ()
+        elif len(args) > 0:
+            msg = '__init__ got unexpected argument(s): {}'.format(args)
+            raise TypeError(msg)
+
         # Ensure at least the required information was given
         missing = [arg for arg in required if arg not in kwargs]
         if missing:
@@ -107,6 +116,9 @@ class CmdAttributes(object):
             'name': kwargs['invoke'],
             'flag_sep': ' ',
             'defaults': {},
+            'req_args': 0,
+            'req_kwargs': [],
+            'req_types': [],
         }
 
         # Ensure the defaults only provide values for known arguments

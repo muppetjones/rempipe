@@ -29,6 +29,7 @@ class PipeBase(CmdInterface):
     PipeBase also impements a full command-line interface:
         * cmd, link, output
 
+    TODO(sjbush): Add 'job_name' attribute and use (+ timestamp) for files.
     TODO(sjbush): Add Torque and GridEngine handling (both individually
         and through a pbs script).
     TODO(sjbush): Add direct execution via subprocesses (via cmd.run)
