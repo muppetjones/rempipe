@@ -50,3 +50,47 @@ class TestSamtoolsSortCmd(UtilityTestCase):
                 cmd = self.get_cmd(_input=_input)
                 cmd._match_input_with_args()
                 self.assertEqual(cmd.args, _input)
+
+    def test_cmd_uses_given_output(self):
+        '''Test that output file is not overwritten if given'''
+
+        cmd = self.get_cmd()
+
+        expected = 'data/sorted.sam'
+        cmd.kwargs['-o'] = expected
+        cmd.cmd()
+
+        self.assertEqual(cmd.kwargs['-o'], expected)
+
+    def test_pre_cmd_ensures_o_value_has_bam_extension_by_default(self):
+        '''Test that cmd defaults output name to <basename>.s.bam'''
+        cmd = self.get_cmd()
+        cmd._match_input_with_args()
+        cmd._pre_cmd()
+
+        self.assertIn('-o', cmd.kwargs)
+        self.assertTrue(
+            cmd.kwargs['-o'].endswith('.s.bam'),
+            'Output not set with BAM extension',
+        )
+
+    def test_pre_cmd_sets_T_option_if_o_is_set(self):
+        '''Ensure that -T is set with .tmp extn if -o '''
+        cmd = self.get_cmd()
+        cmd._match_input_with_args()
+        cmd._pre_cmd()
+
+        self.assertIn('-o', cmd.kwargs)
+        self.assertIn('-T', cmd.kwargs)
+
+        self.assertTrue(
+            cmd.kwargs['-T'].endswith('.tmp'),
+            'Temporary flag not set with .tmp extension',
+        )
+
+    def test_output_contains_only_o_flag(self):
+        cmd = self.get_cmd()
+        cmd.cmd()
+
+        expected = [self.default_input[0].replace('.sam', '.s.bam')]
+        self.assertEqual(cmd.output(), expected)
