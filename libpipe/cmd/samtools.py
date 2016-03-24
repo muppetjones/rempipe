@@ -4,6 +4,56 @@ import os.path
 from libpipe.cmd.attr import CmdAttributes
 from libpipe.cmd.base import CmdBase
 
+import logging
+log = logging.getLogger(__name__)
+
+
+class SamtoolsIndexCmd(CmdBase):
+
+    '''Samtools Index
+
+    Command Usage:
+        samtools index [-bc] [-m INT] <in.bam>
+
+    TODO(sjbush): Better handling for [(-c, -m), -b]
+    TODO(sjbush): Enable fall through of genome index.
+
+    Attributes:
+        fmt: The string flag used to denote the index format. Default: "-b".
+
+    Known Issues:
+        * If 'None' is used instead of '0' in attr.args, the required type
+            does not match up input to the arg.
+    '''
+
+    attr = CmdAttributes(
+        name='samtools_index',
+        invoke='samtools index',
+
+        args=[
+            (0, 'FILE', 'BAM file to index'),
+            ('-b', None, 'Generate BAI-format index for BAM files [default]'),
+            ('-c', None, 'Generate CAI-format index for BAM files'),
+            ('-m', 'INT', 'Set min interval size for CSI indices to 2^INT'),
+        ],
+        defaults={},
+
+        req_kwargs=[],
+        req_args=1,
+        req_types=[
+            [(0, ), ('.bam', )]
+        ],
+    )
+
+    def __init__(self, *args, fmt=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if not fmt and not self.flags:
+            self.flags.append('-b')
+
+    def output(self):
+        return [self.args[0]]
+
 
 class SamtoolsSortCmd(CmdBase):
 
@@ -13,6 +63,8 @@ class SamtoolsSortCmd(CmdBase):
     By default, the output is sent to a bam file and tagged with '.s' to
     help avoid name collision:
         e.g., data/sample.sam --> data/sample.s.bam
+
+    TODO(sjbush): Enable fall through of genome index.
 
     Command Usage (v1.3+):
         samtools sort [options...] <in>

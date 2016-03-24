@@ -4,7 +4,8 @@ from unittest import mock
 
 import libpipe
 from libpipe.cmd.dummy import CmdDummy
-from libpipe.cmd.utility import SamtoolsSortCmd
+from libpipe.cmd.samtools import SamtoolsSortCmd
+from libpipe.cmd.samtools import SamtoolsIndexCmd
 
 import logging
 log = logging.getLogger(__name__)
@@ -12,13 +13,58 @@ log = logging.getLogger(__name__)
 
 class UtilityTestCase(unittest.TestCase):
 
-    def get_cmd(self, _input=None):
+    def get_cmd(self, *args, _input=None, **kwargs):
         '''Initialize the basic command'''
         if not _input:
             _input = self.default_input
         self.dummy = CmdDummy(*_input)
-        cmd = self.CMD()
+        cmd = self.CMD(*args, **kwargs)
         return self.dummy.link(cmd)
+
+
+class TestSamtoolsIndexCmd(UtilityTestCase):
+
+    '''Test samtools index
+
+    NOTE: The first couple of tests ensure that CmdBase is working as
+        expected.
+    '''
+
+    def setUp(self):
+        self.default_input = ['data/sample.s.bam', ]
+        self.CMD = SamtoolsIndexCmd
+
+        log.debug(self.id())
+
+    def test_cmd_raises_IndexError_if_not_given_bam_parg(self):
+        cmd = self.get_cmd(_input=['not/a/bam', ])
+
+        with mock.patch.object(libpipe.cmd.base.log, 'warning'):
+            with self.assertRaises(IndexError):
+                cmd.cmd()
+
+    def test_match_sets_sam_or_bam_to_first_parg(self):
+        cmd = self.get_cmd()
+        cmd._match_input_with_args()
+        self.assertEqual(cmd.args, self.default_input)
+
+    def test_b_flag_set_by_default(self):
+        '''Test that a BAI-format index is created by default'''
+        cmd = self.get_cmd()
+        self.assertIn('-b', cmd.flags)
+
+    def test_fmt_kwarg_does_not_overwrite_fmt_passed_by_arg(self):
+        cmd = self.get_cmd('-c')
+        self.assertIn('-c', cmd.flags)
+        self.assertNotIn('-b', cmd.flags)
+
+    def test_output_contains_only_given_bam_file(self):
+        '''Test that the output includes the given bam file, but not index'''
+
+        cmd = self.get_cmd()
+        cmd.cmd()
+
+        self.assertEqual(cmd.output(), cmd.args)
 
 
 class TestSamtoolsSortCmd(UtilityTestCase):
@@ -30,6 +76,7 @@ class TestSamtoolsSortCmd(UtilityTestCase):
     '''
 
     def setUp(self):
+        # mimic expected hisat2 output
         self.default_input = [
             'data/sample.sam', 'data/sample_unal.fq', 'genome/hisat_index']
         self.CMD = SamtoolsSortCmd
