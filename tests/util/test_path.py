@@ -4,6 +4,7 @@ Created on Apr 29, 2015
 @author: biiremployee
 '''
 
+import os
 import unittest
 from unittest import mock
 
@@ -14,7 +15,40 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class TestPath(unittest.TestCase):
+class TestProtect(unittest.TestCase):
+
+    def test_expands_user(self):
+        given = '~/foo/bar/'
+        clean = path.protect(given)
+        self.assertNotIn('~', clean)
+
+    def test_removes_trailing_slash(self):
+        given = '~/foo/bar/'
+        clean = path.protect(given)
+        self.assertFalse(clean.endswith('/'), 'Still has trailing slash.')
+
+    def test_raises_AssertionError_for_unsafe_char(self):
+        given = '~/foo/b?ar/'
+        with self.assertRaises(AssertionError):
+            path.protect(given)
+
+    def test_converts_to_absolute_path_if_dir_detected(self):
+        given = 'foo/bar'
+        clean = path.protect(given)
+        self.assertTrue(clean.startswith(os.getcwd()), 'Not absolutized.')
+
+    def test_does_not_convert_to_absolute_path_if_no_dir_detected(self):
+        given = 'foo_bar'
+        clean = path.protect(given)
+        self.assertFalse(clean.startswith(os.getcwd()), 'Is absolutized.')
+
+    def test_does_not_convert_to_absolute_path_if_abspath_is_False(self):
+        given = 'foo/bar'
+        clean = path.protect(given, abspath=False)
+        self.assertFalse(clean.startswith(os.getcwd()), 'Is absolutized.')
+
+
+class TestWalkFile(unittest.TestCase):
 
     def setUp(self):
         # create os.walk return values based on following directory structure
@@ -315,5 +349,5 @@ class TestPath(unittest.TestCase):
         self.assertEqual(suffixes, expected)
 
 if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
+    # import sys;sys.argv = ['', 'Test.testName']
     unittest.main()

@@ -22,7 +22,7 @@ def isValidPath(path_str):
     return True
 
 
-def protect(path_str):
+def protect(path_str, abspath=True):
     '''Protect a given path string
 
     Checks the following for a given path:
@@ -31,6 +31,8 @@ def protect(path_str):
         * Expands any environment variables (and user)
         * Normalizes path components
         * Converts path component to absolute path
+            -- good for ensuring file correctness
+            -- bad for cross-system functionality
 
     Arguments:
         path_str
@@ -55,7 +57,7 @@ def protect(path_str):
     # ensure absolute path
     # -- don't do it if no directory is included
     # otherwise it will add path to curr directory
-    if os.path.dirname(val_path):
+    if abspath and os.path.dirname(val_path):
         val_path = os.path.normpath(val_path)
         val_path = os.path.abspath(val_path)
 
