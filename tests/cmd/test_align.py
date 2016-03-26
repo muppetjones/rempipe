@@ -52,6 +52,26 @@ class TestHistatCmd(unittest.TestCase):
         sam_files = [o for o in cmd.output() if o.lower().endswith('.sam')]
         self.assertEqual(len(sam_files), 1)
 
+    def test_output_includes_two_unal_fq_for_pe_input(self):
+        cmd = self.get_cmd()
+        cmd.cmd()  # must call to process args
+
+        prefix, extn = os.path.splitext(cmd.kwargs['-S'])
+        expected = [
+            '{}_unal.{}{}'.format(prefix, i + 1, '.fastq') for i in range(2)
+        ]
+        unal_files = [o for o in cmd.output() if 'unal' in o]
+        self.assertEqual(unal_files, expected)
+
+    def test_output_includes_one_unal_fq_for_se_input(self):
+        cmd = self.get_cmd(_input=DEFAULT_INPUT[1:])
+        cmd.cmd()  # must call to process args
+
+        prefix, extn = os.path.splitext(cmd.kwargs['-S'])
+        expected = ['{}_unal{}'.format(prefix, '.fastq')]
+        unal_files = [o for o in cmd.output() if 'unal' in o]
+        self.assertEqual(unal_files, expected)
+
     #
     #   Test match
     #
@@ -115,6 +135,15 @@ class TestHistatCmd(unittest.TestCase):
 
         self.assertIn('-S', cmd.kwargs)
         self.assertEqual(cmd.kwargs['-S'], 'data/sample.2.sam')
+
+    def test_pre_cmd_removes_trailing_underscore_from_S_common_prefix(self):
+        _input = ['seq_1.fq', 'seq_2.fq']
+        cmd = self.get_cmd(_input=_input)
+        cmd._match_input_with_args()
+        cmd._pre_cmd()
+
+        self.assertIn('-S', cmd.kwargs)
+        self.assertEqual(cmd.kwargs['-S'], 'seq.sam')
 
     def test_pre_cmd_sets_redirect_to_log_file(self):
         cmd = self.get_cmd()

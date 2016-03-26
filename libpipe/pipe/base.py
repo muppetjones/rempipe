@@ -87,6 +87,16 @@ class PipeBase(CmdInterface):
                 os.path.dirname(templates.__file__), 'template.pbs')
         self.pbs_template = None
 
+        # pass all leftover kwargs to setup
+        # -- rather, all that weren't deleted
+        if not self.cmds:
+            try:
+                self._setup(**kwargs)
+                kwargs = {}  # empty it! The child should handle cleanup.
+            except NotImplementedError:
+                pass  # no preset cmds...no worries
+
+        # otherwise, complain about unexpected kwargs
         if kwargs:
             raise TypeError('__init__ got unexpected argument(s): {}'.format(
                 list(kwargs.keys())))
@@ -127,6 +137,14 @@ class PipeBase(CmdInterface):
         except IndexError:
             msg = 'Error: pipe is empty'
             raise ValueError(msg)
+
+    #
+    #   Overrideable
+    #
+
+    def _setup(self):
+        '''Function used to create preset pipes--Implement in children'''
+        raise NotImplementedError('Implement in children')
 
     #
     #   Public methods

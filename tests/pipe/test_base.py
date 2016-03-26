@@ -45,7 +45,7 @@ class TestPipeBase(PipeBaseTestCase):
         pass
         # pipe.CmdBase()  # should not raise
 
-    def test_init_raises_TypeError_if_unexpected_kwarg(self):
+    def test_init_raises_TypeError_if_unexpected_kwarg_and_no_setup(self):
         '''Test we don't get arguments we don't expect
 
         NOTE: We may want to allow this in later implementations,
@@ -138,6 +138,28 @@ class TestPipeBase(PipeBaseTestCase):
 
         self.assertEqual(cmd.input(), _input)
         self.assertEqual(pipe.dummy.output(), cmd.input())
+
+    def test_setup_raises_NotImplemented_error(self):
+        pipe = PipeBase()
+        with self.assertRaises(NotImplementedError):
+            pipe._setup()
+
+    def test_setup_called_during_init(self):
+        with mock.patch.object(PipeBase, '_setup') as mock_setup:
+            PipeBase()
+        mock_setup.assert_called_once_with()
+
+    def test_setup_not_called_if_cmds_passed_to_init(self):
+        cmds = self.get_n_cmds(3)
+        with mock.patch.object(PipeBase, '_setup') as mock_setup:
+            PipeBase(cmds=cmds)
+        self.assertEqual(mock_setup.call_count, 0, '_setup was called!')
+
+    def test_setup_gets_unused_kwargs(self):
+        kwargs = {'input': ['not_passed'], 'give_to_setup': 'passed'}
+        with mock.patch.object(PipeBase, '_setup') as mock_setup:
+            PipeBase(**kwargs)
+        mock_setup.assert_called_once_with(give_to_setup='passed')
 
 
 class TestPipeBase_CmdInterface(PipeBaseTestCase):
@@ -263,6 +285,90 @@ class TestPipeBase_CmdInterface(PipeBaseTestCase):
         pipe = PipeBase(input=_input, fall_through=True)
         pipe.add(*self.get_n_cmds(2))
         self.assertEqual(pipe.output(), _input)
+
+
+class TestPipeBase_run(PipeBaseTestCase):
+
+    '''Test ability to run commands
+
+    TODO(sjbush): Run commands separately
+    TODO(sjbush): Submit job if available
+    '''
+
+    def setUp(self):
+        super().setUp()
+
+        # prevent actually calling any commands
+        patcher = mock.patch('subprocess.check_call')
+        self.mock_call = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        # log test name (for debugging)
+        # id_split = self.id().split('.')
+        # log.debug('-' * 50 + '\n\t' + '.'.join(id_split[-2:]))
+
+    def test_run_calls_each_cmd_run_if_no_script_file(self):
+        '''Test each cmd is run sep. if script_file not set'''
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.run()
+
+        for cmd in pipe.cmds:
+            cmd.run.assert_called_once_with()
+        self.assertEqual(self.mock_call.call_count, 0)  # cmd is mocked
+
+    def test_run_calls_subprocess_once_if_script_file_set(self):
+        '''Test script_file is executed if set (implicit logfile check)'''
+
+        cmds = self.get_n_cmds(3)
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        pipe.run()
+
+        for cmd in cmds:
+            self.assertEqual(cmd.call_count, 0)
+        self.mock_call.assert_called_once_with(
+            pipe.script_file, stdout=pipe.log_file, stderr=pipe.log_file)
+
+    def test_run_script_raises_CalledProcessError_if_problem(self):
+        self.mock_call.side_effect = subprocess.CalledProcessError(1, 'AH!')
+
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        with self.assertRaises(subprocess.CalledProcessError):
+            pipe.run()
+
+    def test_run_script_does_not_call_subprocess_directly(self):
+        # assumes default mode of local
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        with mock.patch.object(pipe, '_run_local'):
+            pipe.run()
+        self.assertEqual(self.mock_call.call_count, 0)
+
+    def test_run_script_raises_ValueError_for_unknown_mode(self):
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        with self.assertRaises(ValueError):
+            pipe.run(mode='Dorian')
+
+    def test_run_script_local_called_by_default(self):
+        '''Test that run mode is 'local' by default'''
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        with mock.patch.object(pipe, '_run_local') as mock_run_local:
+            pipe.run()
+        mock_run_local.assert_called_once_with()
+
+    def test_run_script_calls_run_pbs_if_mode_is_pbs(self):
+        '''Test that _run_pbs is used when mode=pbs'''
+
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe.script_file = 'script.pbs'
+        with mock.patch.object(pipe, '_run_local') as mock_run_local, \
+                mock.patch.object(pipe, '_run_pbs') as mock_run_pbs:
+            pipe.run(mode='pbs')
+        mock_run_pbs.assert_called_once_with()
+        self.assertEqual(mock_run_local.call_count, 0)
 
 
 class TestPipeBase_write(PipeBaseTestCase):
@@ -406,88 +512,5 @@ class TestPipeBase_write(PipeBaseTestCase):
         pipe.write(_file)
         self.assertEqual(pipe.script_file, self.mock_write().name)
 
-
-class TestPipeBase_run(PipeBaseTestCase):
-
-    '''Test ability to run commands
-
-    TODO(sjbush): Run commands separately
-    TODO(sjbush): Submit job if available
-    '''
-
-    def setUp(self):
-        super().setUp()
-
-        # prevent actually calling any commands
-        patcher = mock.patch('subprocess.check_call')
-        self.mock_call = patcher.start()
-        self.addCleanup(patcher.stop)
-
-        # log test name (for debugging)
-        # id_split = self.id().split('.')
-        # log.debug('-' * 50 + '\n\t' + '.'.join(id_split[-2:]))
-
-    def test_run_calls_each_cmd_run_if_no_script_file(self):
-        '''Test each cmd is run sep. if script_file not set'''
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
-        pipe.run()
-
-        for cmd in pipe.cmds:
-            cmd.run.assert_called_once_with()
-        self.assertEqual(self.mock_call.call_count, 0)  # cmd is mocked
-
-    def test_run_calls_subprocess_once_if_script_file_set(self):
-        '''Test script_file is executed if set (implicit logfile check)'''
-
-        cmds = self.get_n_cmds(3)
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
-        pipe.script_file = 'script.pbs'
-        pipe.run()
-
-        for cmd in cmds:
-            self.assertEqual(cmd.call_count, 0)
-        self.mock_call.assert_called_once_with(
-            pipe.script_file, stdout=pipe.log_file, stderr=pipe.log_file)
-
-    def test_run_script_raises_CalledProcessError_if_problem(self):
-        self.mock_call.side_effect = subprocess.CalledProcessError(1, 'AH!')
-
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
-        pipe.script_file = 'script.pbs'
-        with self.assertRaises(subprocess.CalledProcessError):
-            pipe.run()
-
-    def test_run_script_does_not_call_subprocess_directly(self):
-        # assumes default mode of local
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
-        pipe.script_file = 'script.pbs'
-        with mock.patch.object(pipe, '_run_local'):
-            pipe.run()
-        self.assertEqual(self.mock_call.call_count, 0)
-
-    def test_run_script_raises_ValueError_for_unknown_mode(self):
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
-        pipe.script_file = 'script.pbs'
-        with self.assertRaises(ValueError):
-            pipe.run(mode='Dorian')
-
-    def test_run_script_local_called_by_default(self):
-        '''Test that run mode is 'local' by default'''
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
-        pipe.script_file = 'script.pbs'
-        with mock.patch.object(pipe, '_run_local') as mock_run_local:
-            pipe.run()
-        mock_run_local.assert_called_once_with()
-
-    def test_run_script_calls_run_pbs_if_mode_is_pbs(self):
-        '''Test that _run_pbs is used when mode=pbs'''
-
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
-        pipe.script_file = 'script.pbs'
-        with mock.patch.object(pipe, '_run_local') as mock_run_local, \
-                mock.patch.object(pipe, '_run_pbs') as mock_run_pbs:
-            pipe.run(mode='pbs')
-        mock_run_pbs.assert_called_once_with()
-        self.assertEqual(mock_run_local.call_count, 0)
 
 # ENDFILE
