@@ -20,16 +20,20 @@ class ProtectAbsPathArg(argparse.Action):
 
     '''Protect path strings'''
 
-    # def __call__(self, parser, namespace, values, option_string):
-    #     values = path.protect(values)
-    #     super(ProtectAbsPathList, self).__call__(
-    #         parser, namespace, values, option_string)
-
     def __call__(self, parser, namespace, dir_str, option_string):
         dir_str = path.protect(dir_str)
-        # if getattr(namespace, self.dest, self.default) is not None:
-        #     parser.error(option_string + " appears several times.")
         setattr(namespace, self.dest, dir_str)
+
+
+class ProtectAbsPathList(argparse._AppendAction):
+
+    '''Protect path strings'''
+
+    def __call__(self, parser, namespace, values, option_string):
+        values = path.protect(values)
+        super(ProtectAbsPathList, self).__call__(
+            parser, namespace, values, option_string)
+
 
 #
 #   Define input argparse objects
@@ -75,6 +79,18 @@ def __add_pipe_group(parser):
         '--data', metavar='PATH', dest='data',
         action=ProtectAbsPathArg,
         help='The dir where the data files given in --summary are stored.'
+    )
+
+    grp.add_argument(
+        '--genome', metavar='INDEX', dest='genome',
+        action=ProtectAbsPathArg,
+        help=('The name of the alignment index, including path.'),
+    )
+
+    grp.add_argument(
+        '--filter', metavar='INDEX', dest='filter_list',
+        action=ProtectAbsPathList,
+        help=('Other genome indices to use to filter unwanted reads.'),
     )
 
     grp.add_argument(

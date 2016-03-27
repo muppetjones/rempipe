@@ -22,7 +22,9 @@ class TestArgpPipe(ArgpTestCase):
             'root': '~/foo/bar',
             'summary': 'path/to/summary.txt',
             'data': 'path/to/data',
-            # 'debug': '',
+            'genome': 'genome/index_ref',
+            # 'filter': 'genome/index_filter',
+            # 'debug': '',  # flag only -- test elsewhere
         }
 
     def test_basic_args_with_variables_set(self):
@@ -35,6 +37,7 @@ class TestArgpPipe(ArgpTestCase):
                 self.assertEqual(getattr(args, name), val)
 
     def test_pip_parser_calls_path_protect_abspath_for_each_arg_dir(self):
+        self.default['filter'] = 'genome/index_filter'  # add filter
         dir_args = {
             k: v for k, v in self.default.items()
             if '/' in v
@@ -45,3 +48,9 @@ class TestArgpPipe(ArgpTestCase):
         expected = [
             mock.call(v) for v in dir_args.values()]
         mock_protect.assert_has_calls(expected, any_order=True)
+
+    def test_input_parser_stores_filter_args_in_filter_list(self):
+        args = self.get_args('--filter=gen/idx0 --filter gen/idx1')
+        filters = [os.path.join(os.getcwd(), 'gen/idx{}'.format(i))
+                   for i in range(2)]
+        self.assertEqual(args.filter_list, filters)
