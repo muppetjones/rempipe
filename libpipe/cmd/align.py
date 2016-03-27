@@ -18,6 +18,7 @@ class Hisat2Cmd(CmdBase):
     TODO(sjbush): Add stricter formatting to output (sam, log, etc.) by
         adding timestamp, job_name, etc.
     TODO(sjbush): Enable caching of check index results.
+    TODO(sjbush): Add AlignIndex class and factory.
 
     Command usage:
         hisat2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r>} -S <sam>
