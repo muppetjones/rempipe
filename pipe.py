@@ -8,6 +8,8 @@ Details here.
 from libpipe import argp
 from textwrap import dedent
 
+from libpipe.pipe import align
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -30,10 +32,10 @@ def setup_parser():
     _ = argp.pipe.pipe_parser(parser)
     return _
 
+
 #
 #   Info Functions
 #
-
 
 def summarize_args(args):
 
@@ -61,14 +63,23 @@ def summarize_args(args):
     ''').format(**args_dict)
     return(summary)
 
+
+#
+#
+#
+
+
 #
 #   Main
 #
 
-
 def main(args):
 
     log.info(summarize_args(args))
+
+    #
+
+    pipe = align.AlignPipe()
     pass
 
 
