@@ -66,9 +66,6 @@ class UniqueStore(argparse.Action):
     '''
 
     def __call__(self, parser, namespace, values, option_string):
-        # log.debug(namespace)
-        # log.debug(self.dest)
-        # log.debug(self.default)
         if getattr(namespace, self.dest, self.default) is not None:
             parser.error(option_string + " appears several times.")
         setattr(namespace, self.dest, values)
@@ -78,6 +75,7 @@ class UniqueStore(argparse.Action):
 #   Define input argparse objects
 #
 
+# TODO(sjbush): Make dir feed directly into file_list
 
 def input_parser(parser=None, accept_dirs=True, accept_files=True):
 
@@ -100,6 +98,7 @@ def __add_file_group(parser):
         action=ProtectAbsPathList,
         help='One or more input files.'
     )
+    return
 
 
 def __add_dir_group(parser):
@@ -123,6 +122,7 @@ def __add_dir_group(parser):
     )
 
     grp.set_defaults(find_files=__append_dir_files_to_file_list)
+    return
 
 
 #

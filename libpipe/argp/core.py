@@ -1,7 +1,6 @@
 '''A series of functions for setting up an argparse parser
 
 Functions for setting up and adding to a single parser.
-
 '''
 
 import argparse
