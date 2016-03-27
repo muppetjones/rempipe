@@ -18,6 +18,7 @@ class Hisat2Cmd(CmdBase):
     TODO(sjbush): Add stricter formatting to output (sam, log, etc.) by
         adding timestamp, job_name, etc.
     TODO(sjbush): Enable caching of check index results.
+    TODO(sjbush): Add AlignIndex class and factory.
 
     Command usage:
         hisat2 [options]* -x <bt2-idx> {-1 <m1> -2 <m2> | -U <r>} -S <sam>
@@ -65,7 +66,16 @@ class Hisat2Cmd(CmdBase):
     #
 
     def output(self):
-        return [self.kwargs['-S'], ]
+        _output = [self.kwargs['-S'], ]
+        try:
+            _output.append(self.kwargs['--un'])
+        except KeyError:
+            prefix, extn = os.path.splitext(self.kwargs['--un-conc'])
+            _output.extend([
+                '{}.{}{}'.format(prefix, i + 1, '.fastq')
+                for i in range(2)
+            ])
+        return _output
 
     #
     #   Overrides
@@ -94,7 +104,7 @@ class Hisat2Cmd(CmdBase):
             try:
                 sam_file = '{}.sam'.format(
                     os.path.commonprefix(
-                        [self.kwargs['-1'], self.kwargs['-2']]).rstrip('.')
+                        [self.kwargs['-1'], self.kwargs['-2']]).rstrip('._')
                 )
             except KeyError:
                 sam_file = '{}.sam'.format(
@@ -103,7 +113,7 @@ class Hisat2Cmd(CmdBase):
             self.kwargs['-S'] = sam_file
 
         # basic log file name
-        log_file = sam_file.replace('.sam', '.log')
+        log_file = self.kwargs['-S'].replace('.sam', '.log')
         log_file = os.path.join(
             os.path.dirname(log_file),
             'hisat_{}'.format(os.path.basename(log_file))
