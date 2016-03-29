@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 class ProtectAbsPathArg(argparse.Action):
 
-    '''Protect path strings'''
+    '''Protect path string'''
 
     def __call__(self, parser, namespace, dir_str, option_string):
         dir_str = path.protect(dir_str)
@@ -33,6 +33,18 @@ class ProtectAbsPathList(argparse._AppendAction):
         values = path.protect(values)
         super(ProtectAbsPathList, self).__call__(
             parser, namespace, values, option_string)
+
+
+class ParseSummaryArg(argparse.Action):
+
+    def __call__(self, parser, namespace, summary_file, option_string):
+        summary_file = path.protect(summary_file)
+        summary = {}
+        with open(summary_file, 'r') as fh:
+            rows = [line.lstrip().rstrip().split() for line in fh]
+            summary = {col[0]: col[1].split(';') for col in rows}
+
+        setattr(namespace, self.dest, summary)
 
 
 #
@@ -67,7 +79,7 @@ def __add_pipe_group(parser):
 
     grp.add_argument(
         '--summary', metavar='FILE', dest='summary',
-        action=ProtectAbsPathArg,
+        action=ParseSummaryArg,
         help=' '.join([
             'Path to file with project summary.',
             'Expects first two columns in format:',

@@ -5,6 +5,8 @@ Details here.
 
 # TODO(sjbush): Make subparsers.
 
+import os.path
+
 from libpipe import argp
 from textwrap import dedent
 
@@ -24,13 +26,15 @@ def setup_logger():
     return log
 
 
-def setup_parser():
+def setup_parser(parser=None):
 
-    parser = argp.core.parser()
-    _ = argp.io.input_parser(parser, accept_dirs=True, accept_files=True)
-    _ = argp.io.output_parser(parser, accept_dirs=False)
-    _ = argp.pipe.pipe_parser(parser)
-    return _
+    if parser is None:
+        parser = argp.core.parser()
+    parser = argp.io.input_parser(parser, accept_dirs=True, accept_files=True)
+    parser = argp.io.output_parser(parser, accept_dirs=False)
+    parser = argp.pipe.pipe_parser(parser)
+
+    return parser
 
 
 #
@@ -39,16 +43,31 @@ def setup_parser():
 
 def summarize_args(args):
 
-    value_args = ['project', 'root', 'data', 'genome', 'summary']
+    value_args = ['project', 'root', 'data', 'genome']
     list_args = ['filter_list', 'file_list']
-    args_dict = {k: getattr(args, k) for k in value_args}
-    args_dict.update({
-        k: ('\n{}'.format(' ' * 8).join(getattr(args, k))
-            if getattr(args, k) is not None else None)
-        for k in list_args
-    })
-    log.debug(args_dict)
+    args_dict = {k: None for k in (value_args + list_args)}
+    args_dict.update({k: getattr(args, k) for k in value_args})
+    join_str = '\n' + ' ' * 8
+
+    for arg in list_args:
+        try:
+            arg_str = join_str.join(getattr(args, arg))
+        except TypeError:
+            arg_str = None
+        finally:
+            args_dict[arg] = arg_str
+
+    try:
+        summary_list = join_str.join(
+            '{}: {}'.format(k, v)
+            for k, v in args.summary.items()
+        )
+    except AttributeError:
+        summary_list = None
+    finally:
+        args_dict['summary'] = summary_list
     summary = dedent('''
+        -----------------------------------------------------------------------
         Pipe args:
             Project: {project}
             Root dir: {root}
@@ -60,13 +79,23 @@ def summarize_args(args):
                 {file_list}
             Input (summary):
                 {summary}
+        -----------------------------------------------------------------------
     ''').format(**args_dict)
     return(summary)
 
 
 #
+#   Pipe execution
 #
-#
+
+def run_pipes(file_dict):
+
+    for name, file_list in sorted(file_dict.items()):
+        log.debug(name)
+        log.debug(file_list)
+        _input = file_list
+        pipe = align.AlignPipe(input=file_list)
+        pipe.write('~/dev/tempus/data/test_script.pbs')
 
 
 #
@@ -77,9 +106,18 @@ def main(args):
 
     log.info(summarize_args(args))
 
-    #
+    if args.summary is not None:
+        file_dict = args.summary
+    else:
+        # convert file_list to to dict (akin to args.summary)
+        # NOTE: will NOT handle pe in current form
+        file_dict = {
+            os.path.basename(
+                os.path.splitext(f)[0]
+            ): [f] for f in args.file_list
+        }
+    run_pipes(file_dict)
 
-    pipe = align.AlignPipe()
     pass
 
 

@@ -5,13 +5,15 @@ import unittest
 from unittest import mock
 
 
+from tests import base
+
 # from libpipe.util import path
 
 import logging
 log = logging.getLogger(__name__)
 
 
-class ArgpTestCase(unittest.TestCase):
+class ArgpTestCase(base.LibpipeTestCase):
 
     @classmethod
     def setUpClass(cls):
