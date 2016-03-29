@@ -1,0 +1,2 @@
+tempus_200  TCRBOA7-T-RNA.n200.read1.fastq;TCRBOA7-T-RNA.n200.read2.fastq
+tempus_500  TCRBOA7-T-RNA.n500.read1.fq;TCRBOA7-T-RNA.n500.read2.fq
