@@ -293,21 +293,22 @@ class TestCmdBase_cmd(BaseTestCase):
         # +1 line break for break btwn invoke and first arg
         self.assertEqual(n_breaks, len(cmd.kwargs))
 
-    def test_cmd_returns_expected_cmd_string(self):
-        '''Test that 'cmd' pieces together given args in an expected manner
+    def test_cmd_returns_expected_kwargs_in_cmd_string(self):
+        '''Test that 'cmd' pieces together given kwargs in an expected manner
 
         The command should be "[invoke] [kwargs] [args] > [redirect]".
         '''
 
+        args = ['seq1.fq', 'seq2.fq', '-x']
         kwargs = {'-f': 'req_kwarg', '-n': 'a'}
-        cmd = self.CMD(**kwargs)
+        cmd = self.CMD(*args, **kwargs)
 
         expected_kwargs = ' '.join([
             '{} {}'.format(k, v)
             for k, v in sorted(kwargs.items())
         ])
-        expected_args = None
-        expected_flags = None
+        expected_args = ' '.join(['seq1.fq', 'seq2.fq'])
+        expected_flags = ' '.join(['-x'])
         expected_cmd = ' '.join(filter(None, [
             self.CMD.attr.invoke,
             expected_flags,
@@ -327,6 +328,52 @@ class TestCmdBase_cmd(BaseTestCase):
         cmd_str = cmd.cmd(verbose=False)
         expected_str = '{} -x=bar'.format(cmd.attr.invoke)
         self.assertEqual(cmd_str, expected_str)
+
+    def test_cmd_does_not_duplicate_given_args_after_each_run(self):
+        '''Test that match is not re-adding args'''
+
+        args = ['a_text_file.txt', ]
+        kwargs = {'-f': 'more_text.txt', }
+        cmd = self.CMD(*args, **kwargs)
+
+        for i in range(100):
+            cmd.cmd()
+            self.assertEqual(cmd.args, args)
+            self.assertEqual(cmd.kwargs, cmd.kwargs)
+
+    def test_cmd_does_not_duplicate_input_args_after_each_run(self):
+        '''Test that match is not re-adding args'''
+
+        self.CMD.attr.req_kwargs = ['-f']
+        self.CMD.attr.req_types = [
+            [(0, '-f', ), ('.txt', )],
+        ]
+
+        cmd = self.CMD()
+        cmd.input = lambda: ['fake', 'file0.txt', 'file-f.txt']
+        args = ['file0.txt']
+        kwargs = {'-f': 'file-f.txt'}
+
+        for i in range(100):
+            cmd.cmd()
+            self.assertEqual(cmd.args, args)
+            self.assertEqual(cmd.kwargs, kwargs)
+
+    def test_cmd_str_includes_pargs(self):
+        '''Test that a single arg is included (from bug)'''
+
+        # This is a known bug.
+        self.CMD.attr.req_args = 1
+        self.CMD.attr.req_kwargs = {}
+        self.CMD.attr.req_types = [
+            [(0, 1), ('.bam', )]
+        ]
+        cmd = self.CMD()
+        cmd.input = lambda: ['data/seq.s.bam', 'data/seq2.s.bam']
+
+        cmd_str = cmd.cmd()
+        self.assertIn('data/seq.s.bam', cmd_str)
+        self.assertIn('data/seq2.s.bam', cmd_str)
 
 
 class TestBaseCmd_link(BaseTestCase):

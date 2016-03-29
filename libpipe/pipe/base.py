@@ -250,7 +250,8 @@ class PipeBase(CmdInterface):
         pass
 
     def _write(self, fh):
-        fh.write(self.cmd())
+        fh.write(self.cmd(cmd_sep="\n\n"))
+        fh.write('\n')
         return
 
     def _write_pbs_template(self, fh):

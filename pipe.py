@@ -72,9 +72,9 @@ def summarize_args(args):
             Project: {project}
             Root dir: {root}
             Data dir: {data}
-            Genome:
+            Genome(s):
                 {genome_list}
-            Filters:
+            Filter(s):
                 {filter_list}
             Input (individual):
                 {file_list}
@@ -92,22 +92,23 @@ def summarize_args(args):
 def run_pipes(file_dict, genome_list, data=None):
 
     for genome in genome_list:
+        log.info('Running genome: {}'.format(genome))
         _genome = [genome]
         for name, file_list in sorted(file_dict.items()):
+            log.info('   ...sample: {}'.format(name))
 
             try:
                 _file_list = [os.path.join(data, f) for f in file_list]
                 _input = _genome + _file_list
             except TypeError:
                 _input = _genome + file_list
-            log.debug(_input)
             pipe = align.AlignPipe(input=_input)
             pipe.write('~/dev/tempus/data/test_script.pbs')
-
 
 #
 #   Main
 #
+
 
 def main(args):
 

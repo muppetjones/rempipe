@@ -88,7 +88,6 @@ class TestPipeDriver(LibpipeTestCase):
         with mock.patch('libpipe.pipe.align.AlignPipe') as mock_pipe:
             driver.main(args)
 
-        log.debug(mock_pipe.call_args_list)
         expected = args.genome_list + args.file_list
         mock_pipe.assert_called_once_with(input=expected)
 
@@ -98,7 +97,6 @@ class TestPipeDriver(LibpipeTestCase):
         with mock.patch('libpipe.pipe.align.AlignPipe') as mock_pipe:
             driver.main(args)
 
-        log.debug(mock_pipe.call_args_list)
         expected = args.genome_list + [
             os.path.join('foo/bar', f) for f in args.file_list]
         mock_pipe.assert_called_once_with(input=expected)

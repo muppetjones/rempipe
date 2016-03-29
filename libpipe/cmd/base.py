@@ -180,7 +180,6 @@ class CmdBase(CmdInterface):
         self._check_requirements()
         self._pre_cmd()
         cmd_str = self._cmd(**kwargs)
-
         return cmd_str
 
     def help(self):
@@ -263,8 +262,9 @@ class CmdBase(CmdInterface):
         arg_sep = ' \\\n  ' if verbose else ' '
 
         # make strings from given parameters
+        _args = arg_sep.join(self.args)
         flags = ' '.join(self.flags)  # flags don't need to be separated
-        kwargs = arg_sep.join(
+        _kwargs = arg_sep.join(
             "{}{}{}".format(k, self.attr.flag_sep, v)
             for k, v in sorted(self.kwargs.items())
         )
@@ -276,7 +276,7 @@ class CmdBase(CmdInterface):
         # Filter main command elements
         # NOTE: Redirect is a special case--add later
         cmd_parts = filter(  # remove missing elements
-            None, [self.invoke, priority_args, flags, kwargs, args])
+            None, [self.invoke, priority_args, flags, _kwargs, _args])
 
         cmd_str = arg_sep.join(cmd_parts)
 
@@ -329,6 +329,15 @@ class CmdBase(CmdInterface):
         except Exception as e:
             log.debug(str(e))
             raise
+
+        # We have input...match it up
+        # BUT FIRST -- restore from what we "had"
+        try:
+            self.args = list(self._original_args)
+            self.kwargs = dict.copy(self._original_kwargs)
+        except AttributeError:
+            self._original_args = list(self.args)
+            self._original_kwargs = dict.copy(self.kwargs)
 
         # match with required type
         for req_type in self.attr.req_types:

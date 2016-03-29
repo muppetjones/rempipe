@@ -467,7 +467,9 @@ class TestPipeBase_write(PipeBaseTestCase):
             sh.seek(0)
             result = sh.read()
 
-        self.assertEqual(result, pipe.cmd())
+        # The script should/could insert extra new lines
+        clean_result = result.replace('\n\n', '\n').rstrip()
+        self.assertEqual(clean_result, pipe.cmd().rstrip())
 
     def test_pbs_template_written_if_pbs_or_shell_file_given(self):
         '''Tests pbs template loaded when needed'''
