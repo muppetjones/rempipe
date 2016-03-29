@@ -23,6 +23,12 @@ class TestPipeDriver(LibpipeTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+        # prevents addition of pwd while testing due to abspath
+        # -- (poor?) design choices were made to avoid this checking...
+        patcher = mock.patch('os.path.abspath', side_effect=lambda x: x)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def get_args(self, arg_str, **kwargs):
         '''Setup a paser using child-defined function and return args
 
@@ -57,7 +63,7 @@ class TestPipeDriver(LibpipeTestCase):
         with mock.patch.object(driver, 'run_pipes') as mock_run:
             driver.main(args)
 
-        mock_run.assert_called_once_with(expected)
+        mock_run.assert_called_once_with(expected, None, data=None)
 
     def test_main_passes_dir_dict_to_run_pipes(self):
         dir_files = ['seq{}.fq'.format(i) for i in range(3)]
@@ -74,4 +80,25 @@ class TestPipeDriver(LibpipeTestCase):
 
         with mock.patch.object(driver, 'run_pipes') as mock_run:
             driver.main(args)
-        mock_run.assert_called_once_with(expected)
+        mock_run.assert_called_once_with(expected, None, data=None)
+
+    def test_main_calls_AlignPipe_with_genome_in_input(self):
+        args = self.get_args('--genome genome/hisat_index')
+        setattr(args, 'file_list', ['a.fq'])
+        with mock.patch('libpipe.pipe.align.AlignPipe') as mock_pipe:
+            driver.main(args)
+
+        log.debug(mock_pipe.call_args_list)
+        expected = args.genome_list + args.file_list
+        mock_pipe.assert_called_once_with(input=expected)
+
+    def test_data_dir_is_added_to_file_names_if_given(self):
+        args = self.get_args('--data=foo/bar --genome genome/hisat_index')
+        setattr(args, 'file_list', ['a.fq'])
+        with mock.patch('libpipe.pipe.align.AlignPipe') as mock_pipe:
+            driver.main(args)
+
+        log.debug(mock_pipe.call_args_list)
+        expected = args.genome_list + [
+            os.path.join('foo/bar', f) for f in args.file_list]
+        mock_pipe.assert_called_once_with(input=expected)

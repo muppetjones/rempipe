@@ -43,8 +43,8 @@ def setup_parser(parser=None):
 
 def summarize_args(args):
 
-    value_args = ['project', 'root', 'data', 'genome']
-    list_args = ['filter_list', 'file_list']
+    value_args = ['project', 'root', 'data']
+    list_args = ['filter_list', 'file_list', 'genome_list']
     args_dict = {k: None for k in (value_args + list_args)}
     args_dict.update({k: getattr(args, k) for k in value_args})
     join_str = '\n' + ' ' * 8
@@ -72,7 +72,8 @@ def summarize_args(args):
             Project: {project}
             Root dir: {root}
             Data dir: {data}
-            Genome: {genome}
+            Genome:
+                {genome_list}
             Filters:
                 {filter_list}
             Input (individual):
@@ -88,14 +89,20 @@ def summarize_args(args):
 #   Pipe execution
 #
 
-def run_pipes(file_dict):
+def run_pipes(file_dict, genome_list, data=None):
 
-    for name, file_list in sorted(file_dict.items()):
-        log.debug(name)
-        log.debug(file_list)
-        _input = file_list
-        pipe = align.AlignPipe(input=file_list)
-        pipe.write('~/dev/tempus/data/test_script.pbs')
+    for genome in genome_list:
+        _genome = [genome]
+        for name, file_list in sorted(file_dict.items()):
+
+            try:
+                _file_list = [os.path.join(data, f) for f in file_list]
+                _input = _genome + _file_list
+            except TypeError:
+                _input = _genome + file_list
+            log.debug(_input)
+            pipe = align.AlignPipe(input=_input)
+            pipe.write('~/dev/tempus/data/test_script.pbs')
 
 
 #
@@ -116,7 +123,7 @@ def main(args):
                 os.path.splitext(f)[0]
             ): [f] for f in args.file_list
         }
-    run_pipes(file_dict)
+    run_pipes(file_dict, args.genome_list, data=args.data)
 
     pass
 

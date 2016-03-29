@@ -22,7 +22,7 @@ class TestArgpPipe(ArgpTestCase):
             'root': '~/foo/bar',
             # 'summary': 'path/to/summary.txt',
             'data': 'path/to/data',
-            'genome': 'genome/index_ref',
+            # 'genome': 'genome/index_ref',
             # 'filter': 'genome/index_filter',
             # 'debug': '',  # flag only -- test elsewhere
         }
@@ -51,6 +51,12 @@ class TestArgpPipe(ArgpTestCase):
             mock.call(v) for v in dir_args.values()]
         mock_protect.assert_has_calls(expected, any_order=True)
 
+    def test_pipe_parser_stores_genome_args_in_genome_list(self):
+        args = self.get_args('--genome=gen/idx0 --genome gen/idx1')
+        filters = [os.path.join(os.getcwd(), 'gen/idx{}'.format(i))
+                   for i in range(2)]
+        self.assertEqual(args.genome_list, filters)
+
     def test_pipe_parser_stores_filter_args_in_filter_list(self):
         args = self.get_args('--filter=gen/idx0 --filter gen/idx1')
         filters = [os.path.join(os.getcwd(), 'gen/idx{}'.format(i))
@@ -60,7 +66,8 @@ class TestArgpPipe(ArgpTestCase):
     def test_pipe_parser_opens_args_summary_file(self):
         mock_open = self.setup_mock_read('A\tA1.fq;A2.fq\nB\tB1.fq;B2.fq\n')
         self.get_args('--summary=data/summary.txt')
-        mock_open.assert_called_once_with('data/summary.txt', 'r')
+        mock_open.assert_called_once_with(
+            os.path.abspath('data/summary.txt'), 'r')
 
     def test_pipe_parser_sets_summary_as_dict_of_lists(self):
         dat = 'A\tA1.fq;A2.fq\nB\tB1.fq\n'
