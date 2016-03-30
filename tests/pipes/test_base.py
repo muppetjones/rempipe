@@ -8,13 +8,13 @@ sys.path.append("remsci/")
 import unittest
 from unittest.mock import patch, Mock, MagicMock, mock_open, call
 
-from remsci.lib.utility import path
+from libpipe.utility import path
 
 from libpipe.pipes.base import BasePipe
 
 import logging
-from remsci.lib.utility import customLogging
-customLogging.config()
+from libpipe.utility import logging as pipelog
+pipelog.config()
 log = logging.getLogger(__name__)
 
 

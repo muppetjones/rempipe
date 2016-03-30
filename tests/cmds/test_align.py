@@ -88,7 +88,7 @@ class TestHistatCmd(unittest.TestCase):
 
     def test_addreq_raises_FileNotFoundError_if_n_idx_ne_expected(self):
 
-        with patch('remsci.lib.utility.path.walk_file') as m:
+        with patch('libpipe.utility.path.walk_file') as m:
             for i in [0, 100]:
                 with self.subTest(n_indx=i):
                     m.return_value = [0] * i
@@ -142,7 +142,7 @@ class TestHistatCmd(unittest.TestCase):
     def test_cmd_preserves_kwargs_if_no_input_given(self):
 
         with patch(
-                'remsci.lib.utility.path.walk_file', return_value=([''] * 10)):
+                'libpipe.utility.path.walk_file', return_value=([''] * 10)):
             ihc = self.sample_cmd()
             ihc.cmd()
 

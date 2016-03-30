@@ -9,8 +9,8 @@ from libpipe.cmds.base import BaseCmd, CmdAttributes
 from libpipe.pipes.base import BasePipe
 
 import logging
-from remsci.lib.utility import customLogging
-customLogging.config()
+from libpipe.utility import logging as pipelog
+pipelog.config()
 log = logging.getLogger(__name__)
 
 

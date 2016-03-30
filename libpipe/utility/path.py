@@ -417,8 +417,8 @@ def main(argv=None):
 
 if __name__ == '__main__':
 
-    from libpipe.utility import customLogging
-    customLogging.config()
+    from libpipe.utility import logging as pipelog
+    pipelog.config()
 
     status = main()
     sys.exit(status)
