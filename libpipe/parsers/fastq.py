@@ -2,8 +2,8 @@ import argparse
 import os.path
 import re
 
-import remsci.scripted.base as base
-from remsci.scripted.interface import SubparserBase
+import libpipe.parsers.base as base
+from libpipe.parsers.subparser import SubparserBase
 from libpipe.utility import path
 from libpipe.decorators import file_or_handle
 

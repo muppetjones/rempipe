@@ -5,17 +5,17 @@ import os.path
 import re
 import sys
 
-print("libpipe init -- add 'remsci' to path")
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.dirname(
-        os.path.dirname(os.path.abspath(__file__)))), 'remsci'))
+# print("libpipe init -- add 'remsci' to path")
+# sys.path.insert(
+#     0, os.path.join(os.path.dirname(os.path.dirname(
+#         os.path.dirname(os.path.abspath(__file__)))), 'remsci'))
+#
+# import remsci.scripted.base as remparse
+from libpipe.decorators import file_or_handle
 
-import remsci.scripted.base as remparse
-from remsci.lib.decorators import file_or_handle
 
-
-import remsci.scripted.base as base
-from remsci.scripted.interface import SubparserBase
+import libpipe.parsers.base as pipeparse
+from libpipe.parsers.subparser import SubparserBase
 
 import logging
 log = logging.getLogger(__name__)
@@ -26,15 +26,15 @@ class CoverageScripted(SubparserBase):
     def __init__(self, subparser=None):
 
         if not subparser:
-            subparser = base.get_subparser()
+            subparser = pipeparse.get_subparser()
 
         # create the subparser
         self.subparser = subparser.add_parser(
             'coverage',
             parents=[
-                base.input_file_parser(),
-                base.input_directory_parser(),
-                base.output_file_parser(),
+                pipeparse.input_file_parser(),
+                pipeparse.input_directory_parser(),
+                pipeparse.output_file_parser(),
             ],
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             help='Calculate coverage summaries',
@@ -125,8 +125,8 @@ class CoverageScripted(SubparserBase):
 def setup_logger():
     # setup logger
     import logging
-    from remsci.lib.utility import customLogging
-    customLogging.config()
+    from libpipe.utility import logging as pipelog
+    pipelog.config()
     log = logging.getLogger(__name__)
     return log
 
@@ -134,8 +134,8 @@ if __name__ == '__main__':
 
     log = setup_logger()
 
-    parser = remparse.get_parser()
-    subpar = remparse.get_subparser()
+    parser = pipeparse.get_parser()
+    subpar = pipeparse.get_subparser()
     CoverageScripted(subpar)
 
     args = parser.parse_args()

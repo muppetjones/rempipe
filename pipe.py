@@ -2,7 +2,7 @@
 
 import os.path
 import sys
-sys.path.append("../remsci/")
+# sys.path.append("../remsci/")
 
 from libpipe.parsers import base
 from libpipe.utility import path

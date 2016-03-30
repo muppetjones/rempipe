@@ -4,9 +4,10 @@ import argparse
 import os.path
 import re
 
-import remsci.scripted.base as base
+import libpipe.parsers.base as base
+from libpipe.parsers.subparser import SubparserBase
 import libpipe.utility.path as path
-from remsci.scripted.interface import SubparserBase
+# from remsci.scripted.interface import SubparserBase
 
 import logging
 log = logging.getLogger(__name__)

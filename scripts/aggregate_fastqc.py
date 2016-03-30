@@ -203,20 +203,20 @@ class FastQCAggregator(object):
 def setup_logger():
     # setup logger
     import logging
-    from remsci.lib.utility import customLogging
-    customLogging.config()
+    from libpipe.utility import logging as pipelog
+    pipelog.config()
     log = logging.getLogger(__name__)
     return log
 
 if __name__ == '__main__':
     import sys
-    from os.path import dirname, abspath, join
+    # from os.path import dirname, abspath, join
 
-    print("libpipe init -- add 'remsci' to path")
-    sys.path.insert(
-        0, join(dirname(dirname(dirname(abspath(__file__)))), 'remsci'))
+    # print("libpipe init -- add 'remsci' to path")
+    # sys.path.insert(
+    #     0, join(dirname(dirname(dirname(abspath(__file__)))), 'remsci'))
 
-    from remsci.lib.utility import path
+    from libpipe.utility import path
 
     log = setup_logger()
 

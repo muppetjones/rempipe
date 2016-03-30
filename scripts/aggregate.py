@@ -12,13 +12,13 @@ import sys
 from itertools import cycle
 
 
-print("libpipe init -- add 'remsci' to path")
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.dirname(
-        os.path.dirname(os.path.abspath(__file__)))), 'remsci'))
+# print("libpipe init -- add 'remsci' to path")
+# sys.path.insert(
+#     0, os.path.join(os.path.dirname(os.path.dirname(
+#         os.path.dirname(os.path.abspath(__file__)))), 'remsci'))
 
-import remsci.scripted.base as remparse
-from remsci.lib.decorators import file_or_handle
+import libpipe.parsers.base as remparse
+from libpipe.decorators import file_or_handle
 
 import libpipe.templates
 from libpipe.parsers.aggregate import AggregateScripted
@@ -428,8 +428,8 @@ class CoverageAggregator(Aggregator):
 def setup_logger():
     # setup logger
     import logging
-    from remsci.lib.utility import customLogging
-    customLogging.config()
+    from libpipe.utility import logging as pipelog
+    pipelog.config()
     log = logging.getLogger(__name__)
     return log
 
