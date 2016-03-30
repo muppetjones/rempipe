@@ -1,13 +1,13 @@
-import argparse
+# import argparse
 import os.path
 import re
 
-import libpipe.parsers.base as base
-from libpipe.parsers.subparser import SubparserBase
-from libpipe.utility import path
-from libpipe.decorators import file_or_handle
+# import libpipe.parsers.pipe as base
+# from libpipe.parsers.subparser import SubparserBase
+# from libpipe.utility import path
+# from libpipe.decorators import file_or_handle
 
-from libpipe.parsers.base import BasePipeParser
+from libpipe.parsers.pipe import BasePipeParser
 from libpipe.pipes.assemble import WgsPipe
 from libpipe.pipes.align import RnaSeqPipe
 

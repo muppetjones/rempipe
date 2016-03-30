@@ -72,7 +72,7 @@ _LOGGING = {
             'propogate': True,
             'level': _LOG_LEVEL,
         },
-        'remsci': {
+        'rempipe': {
             'handlers': ['null'],
             'propogate': True,
             'level': _LOG_LEVEL,
