@@ -53,24 +53,26 @@ class RnaseqPipeScripted(BasePipeParser):
         )
 
     def run(self, args):
-        if args.summary_file is not None:
-            return self._get_files_from_summary(
-                args.summary_file, args.data_dir)
+        return super().run(args)
 
-        if args.file_list is None:
-            raise ValueError('No fastq files found')
-
-        # separate paired end
-        try:
-            rx_pe = re.compile(args.paired_end)
-        except TypeError:
-            raise NotImplementedError('Use --paired_end option')
-        else:
-            r1 = [f for f in args.file_list if rx_pe.search(f) is None]
-            r2 = [f for f in args.file_list if f not in r1]
-            pe_files = list(zip(r1, r2))
-            if not pe_files:
-                raise ValueError('Input is not paired end.')
-            log.debug([(os.path.basename(f[0]), os.path.basename(f[1]))
-                       for f in pe_files])
-            return pe_files
+    # def run(self, args):
+    #     if args.summary is not None:
+    #         return self._get_files_from_summary(args.summary_file, args.data_dir)
+    #
+    #     if args.file_list is None:
+    #         raise ValueError('No fastq files found')
+    #
+    #     # separate paired end
+    #     try:
+    #         rx_pe = re.compile(args.paired_end)
+    #     except TypeError:
+    #         raise NotImplementedError('Use --paired_end option')
+    #     else:
+    #         r1 = [f for f in args.file_list if rx_pe.search(f) is None]
+    #         r2 = [f for f in args.file_list if f not in r1]
+    #         pe_files = list(zip(r1, r2))
+    #         if not pe_files:
+    #             raise ValueError('Input is not paired end.')
+    #         log.debug([(os.path.basename(f[0]), os.path.basename(f[1]))
+    #                    for f in pe_files])
+    #         return pe_files
