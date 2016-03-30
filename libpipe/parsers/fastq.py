@@ -53,8 +53,9 @@ class RnaseqPipeScripted(BasePipeParser):
         )
 
     def run(self, args):
-        if args.summary is not None:
-            return self._get_files_from_summary(args.summary, args.data_dir)
+        if args.summary_file is not None:
+            return self._get_files_from_summary(
+                args.summary_file, args.data_dir)
 
         if args.file_list is None:
             raise ValueError('No fastq files found')
