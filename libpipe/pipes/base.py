@@ -7,8 +7,8 @@ import sys
 import time
 from itertools import chain
 
-from remsci.lib.utility import path
-from remsci.lib.decorators import file_or_handle
+from libpipe.utility import path
+from libpipe.decorators import file_or_handle
 
 
 import libpipe.templates

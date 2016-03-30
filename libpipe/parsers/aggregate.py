@@ -6,8 +6,8 @@ from argparse import ArgumentError
 
 import remsci.scripted.base as base
 from remsci.scripted.interface import SubparserBase
-from remsci.lib.utility import path
-from remsci.lib.decorators import file_or_handle
+from libpipe.utility import path
+from libpipe.decorators import file_or_handle
 
 import logging
 log = logging.getLogger(__name__)

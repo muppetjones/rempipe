@@ -417,7 +417,7 @@ def main(argv=None):
 
 if __name__ == '__main__':
 
-    from remsci.lib.utility import customLogging
+    from libpipe.utility import customLogging
     customLogging.config()
 
     status = main()

@@ -5,7 +5,7 @@ import os.path
 import re
 
 import remsci.scripted.base as base
-import remsci.lib.utility.path as path
+import libpipe.utility.path as path
 from remsci.scripted.interface import SubparserBase
 
 import logging

@@ -31,8 +31,8 @@ def add_subparsers():
 def setup_logger():
     # setup logger
     import logging
-    from remsci.lib.utility import customLogging
-    customLogging.config()
+    from libpipe.utility import logging as pipelog
+    pipelog.config()
     log = logging.getLogger(__name__)
     return log
 

@@ -3,7 +3,7 @@ import os.path
 import sys
 import argparse
 
-from remsci.lib.utility import path
+from libpipe.utility import path
 
 import logging
 log = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class DummyParser(argparse.ArgumentParser):
 class RemScripted(object):
 
     parser = DummyParser(
-        description="Scripting interface for REMSCI library",
+        description="Scripting interface for libpiperary",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     subparsers = parser.add_subparsers(
@@ -38,7 +38,7 @@ class RemScripted(object):
     def __reset__(cls):
 
         cls.parser = DummyParser(
-            description="Scripting interface for REMSCI library",
+            description="Scripting interface for libpiperary",
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         )
         cls.subparsers = cls.parser.add_subparsers(

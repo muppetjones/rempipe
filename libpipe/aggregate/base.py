@@ -3,7 +3,7 @@ import abc
 import os.path
 import re
 
-from remsci.lib.decorators import file_or_handle
+from libpipe.decorators import file_or_handle
 
 import libpipe.templates
 

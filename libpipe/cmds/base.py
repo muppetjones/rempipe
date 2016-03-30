@@ -3,7 +3,7 @@ import time
 import abc
 import re
 
-from remsci.lib.decorators import universal_function_decorator
+from libpipe.decorators import universal_function_decorator
 
 from libpipe.cmds.help import HelpCmd
 from libpipe.utility.exceptions import RempipeError

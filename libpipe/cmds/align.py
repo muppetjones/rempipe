@@ -2,7 +2,7 @@
 import os.path
 import time
 
-from remsci.lib.utility import path
+from libpipe.utility import path
 
 from libpipe.utility.exceptions import RempipeError
 from libpipe.cmds.base import BaseCmd, CmdAttributes
