@@ -1,176 +1,262 @@
 
-import abc
-import argparse
 import os.path
-import re
+import sys
+import argparse
 
-import remsci.scripted.base as base
-import remsci.lib.utility.path as path
-from remsci.scripted.interface import SubparserBase
+from remsci.lib.utility import path
 
 import logging
 log = logging.getLogger(__name__)
 
+# =============================================================================
+# Declare parsers
+# =============================================================================
 
-class BasePipeParser(SubparserBase, metaclass=abc.ABCMeta):
 
-    '''Creates a subparser with several predefined arguments for pipes
+class DummyParser(argparse.ArgumentParser):
 
-    Arguments:
-        --paired-end [PATTERN]  Specify that the data is paired-end.
-            Optionally provde a pattern for identifying pairs.
-        --project CHAR  Specify the project name. Must be unique.
-        --extend        Add to existing project (allows non-unique names).
-        --summary FILE  Summary file with sample names and paths.
-        --root PATH     Path to root directory.
-        --data PATH     Specify location of summary file and data.
-                        May omit if summary is an absolute path.
-        --force         Force all commands to re-run (overwrite existing data).
-        --debug         Write files, but do not run.
+    def error(self, message):
+        log.error('error: %s\n\n' % message)
+        self.print_help()
+        sys.exit(message)
 
-    Child must define:
-        pipe attribute: The pipe class to use.
-        subcmd attribute: The name of the subcommand to use when calling.
-        setup method: CALL SUPER! Must implement to differenciate between
-            children parsers.
 
+class RemScripted(object):
+
+    parser = DummyParser(
+        description="Scripting interface for REMSCI library",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(
+        title='Commands',
+        description='Subcommands available for accessing remsci',
+        dest='command',
+        help="additional help",
+    )
+
+    @classmethod
+    def __reset__(cls):
+
+        cls.parser = DummyParser(
+            description="Scripting interface for REMSCI library",
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        )
+        cls.subparsers = cls.parser.add_subparsers(
+            title='Commands',
+            description='Subcommands available for accessing remsci',
+            dest='command',
+            help="additional help",
+        )
+
+
+# =============================================================================
+# Custom argparse classes
+# =============================================================================
+
+
+class UniqueStore(argparse.Action):
+
+    '''http://stackoverflow.com/questions/23032514/
+        argparse-disable-same-argument-occurences'''
+
+    def __call__(self, parser, namespace, values, option_string):
+        # log.debug(namespace)
+        # log.debug(self.dest)
+        # log.debug(self.default)
+        if getattr(namespace, self.dest, self.default) is not None:
+            parser.error(option_string + " appears several times.")
+        setattr(namespace, self.dest, values)
+
+
+class ProtectFileList(argparse._AppendAction):
+
+    '''Protect file strings'''
+
+    def __call__(self, parser, namespace, values, option_string):
+        values = path.protect(values)
+        super(ProtectFileList, self).__call__(
+            parser, namespace, values, option_string)
+
+
+# =============================================================================
+# Parser access
+# =============================================================================
+
+
+def get_parser():
+    return RemScripted.parser
+
+
+def get_subparser():
+    return RemScripted.subparsers
+
+
+def input_file_parser():
+    '''Create a parser with options for file input
+
+    Options:
+        -f, --file <file>
+            File(s) for input. Can be given multiple times.
+        --header, --no-header
+            States whether or not a column header is expected (Default: True).
+        --delim
+            Expected column delimiter.
+
+    Examples:
+        > myprog.py --file file1.txt --file file2.txt
     '''
 
-    def __init__(self, subparser=None):
-        self.subparser = subparser.add_parser(
-            self.subcmd,
-            parents=[
-                base.input_file_parser(),
-                base.input_directory_parser(),
-                base.output_file_parser(),
-            ],
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            help='Run fastqc on a fastq file',
-        )
+    input_parser = argparse.ArgumentParser(
+        description="File input options",
+        add_help=False)
 
-    @abc.abstractmethod
-    def setup(self):
-        super().setup()
+    file_group = input_parser.add_argument_group(
+        'File input options')
+    file_group.add_argument('-f', '--file', dest='file_list',
+                            metavar='FILE',
+                            action=ProtectFileList,
+                            help='The input file path(s).')
+    file_group.add_argument(
+        '--header', dest='header', action='store_true',
+        help='Denotes whether the file contains column names'
+    )
+    file_group.add_argument('--no-header', dest='header', action='store_false')
+    file_group.set_defaults(header=True)
+    file_group.add_argument(
+        '--delim', dest='delim',
+        default=argparse.SUPPRESS,
+        help='Column delimiter in file.',
+    )
+    return input_parser
 
-        self.subparser.add_argument(
-            '--paired_end', dest='paired_end',
-            nargs='?', const=r'_2\.f', type=str,
-            metavar='PATTERN',
-            help=(
-                'Specify paired end data.'
-                + 'Optional: Pattern for identification of 2nd pair.'),
-        )
 
-        # unique project name
-        self.subparser.add_argument(
-            '--project', dest='project',
-            default='new_project',
-            metavar='NAME',
-            help='Name of project. Must be unique unless "--extend" given.',
-        )
+def input_directory_parser():
+    '''Parser with options for directory input_parser
 
-        # add files to project (allows for non-unique name)
-        # -- do we actually use this?
-        self.subparser.add_argument(
-            '--extend', dest='extend',
-            action='store_true',
-            help='Flag to indicate that files should be added to project',
-        )
+    Search a given directory for files matching a given pattern, extension,
+    or both. Patterns and extensions may be used together, but be careful
+    that they do not cancel each other out.
 
-        self.subparser.add_argument(
-            '--summary', dest='summary_file',
-            metavar='FILE',
-            help='Path to file with project summary',
-        )
+    Options:
+        -d, --directory (string): Directory where input files are stored (depth
+            is irrelevant if you use the `get_file_list_from_directory`
+            function).
+        -e, --extension (multiple, string): Input file extension(s).
+        --pattern (multiple, regex string): Input file pattern(s).
 
-        self.subparser.add_argument(
-            '--root', dest='root_dir',
-            help='root directory',
-        )
+    Examples:
+        # search for fastq files from controls in a given directory
+        > myprog.py --directory "~/data" --pattern 'control' -e '.fq'
+    '''
 
-        self.subparser.add_argument(
-            '--data', dest='data_dir',
-            help='data directory. Should contain fastq files and summary.',
-        )
+    input_parser = argparse.ArgumentParser(
+        description="Directory input options",
+        add_help=False)
+    dir_group = input_parser.add_argument_group(
+        'Directory input options')
+    dir_group.add_argument('-d', '--directory', dest='dir_path',
+                           metavar='directory'.upper(),
+                           action=UniqueStore,
+                           help='The directory containing input files')
+    dir_group.add_argument('-e', '--extension', dest='extension_list',
+                           metavar='extension'.upper(),
+                           default=[],
+                           action='append',
+                           help='The desired file extension',
+                           )
+    dir_group.add_argument('--pattern', dest='pattern_list',
+                           metavar='pattern'.upper(),
+                           default=[],
+                           action='append',
+                           help='A substring to look for in files',
+                           )
+    dir_group.set_defaults(find_files=_get_file_list_from_directory)
+    return input_parser
 
-        self.subparser.add_argument(
-            '--force', dest='force',
-            action='store_true',
-            default=False,
-            help=('Force pipe to rerun steps. ' +
-                  'Default: Skip step if output found.'),
-        )
 
-        self.subparser.add_argument(
-            '--debug', dest='debug',
-            action='store_true',
-            default=False,
-            help=('Do not run pipe if set'),
-        )
+def output_file_parser():
+    '''Return parser with options for output files'''
+    output_parser = argparse.ArgumentParser(
+        description="Output file options",
+        add_help=False)
 
-        # only fastq files by default
-        self.subparser.set_defaults(
-            pattern_list=[r'\.f(?:ast)?q', r'fastq\.gz'])
+    group = output_parser.add_argument_group(
+        'Output options')
+    group.add_argument('-o', '--outfile', dest='outfile',
+                       metavar='file'.upper(),
+                       action=UniqueStore,
+                       help='The output file',
+                       )
+    return output_parser
 
+
+def output_directory_parser():
+    output_parser = argparse.ArgumentParser(
+        description="Output directory options",
+        add_help=False)
+    group = output_parser.add_argument_group(
+        'Output', 'options for output')
+    group.add_argument('-o', '--outdir', dest='outdir',
+                       metavar='directory'.upper(),
+                       action=UniqueStore,
+                       help='The output directory',
+                       )
+    return output_parser
+
+# =============================================================================
+# Scripting functions
+# =============================================================================
+
+
+def _get_file_list_from_directory(args):
+    '''Return a list of files from the command line options
+
+    NOTE: This might be redundant...perhaps make remove and let each function
+          do it for themselves?
+    '''
+
+    if not args.dir_path:
         return
 
-    def run(self, args):
-        # protect filenames
-        protect = ['summary_file', 'root_dir', 'data_dir']
-        for p in protect:
-            try:
-                setattr(args, p, path.protect(getattr(args, p)))
-            except TypeError:
-                pass  # arg might not be set (is None)
+    if not args.extension_list and not args.pattern_list:
+        msg = "Use of '-d' also requires either '--extension' or '--pattern'"
+        raise argparse.ArgumentError(None, msg)
+    file_list = path.walk_file(args.dir_path,
+                               extension=args.extension_list,
+                               pattern=args.pattern_list,
+                               )
 
-        # read summary file
-        if args.summary_file is not None:
-            setattr(args, 'summary', self.read_summary(args))
-        else:
-            args.find_files()  # sets file_list attribute
+    log.info("Working with {0} files in \n   {1}".format(
+        len(file_list),
+        os.path.commonprefix(file_list),
+    ))
 
-        # add project directory attribute
-        project_dir = os.path.join(args.root_dir, args.project, 'samples')
-        setattr(args, 'project_dir', project_dir)
+    setattr(args, 'file_list', file_list)
+    del args.dir_path
+    del args.extension_list
+    del args.pattern_list
+    return file_list
 
-        # add pipe attribute
-        # -- use to create pipes!
-        setattr(args, 'pipe', self.pipe)
 
-        return args
+def _get_files(args):
+    '''Return a list of files from the command line options'''
+    try:
+        return [path.protect(f) for f in args.file_path]
+    except AttributeError:
+        if not args.file_extension and not args.file_pattern:
+            raise ValueError('Require file extension or pattern')
+        file_list = path.walk_file(args.dir_path,
+                                   extension=args.file_extension,
+                                   # level=5,
+                                   # patterns=[r'\.bam'],
+                                   pattern=args.file_pattern,
+                                   )
+    except:
+        raise
 
-    def read_summary(self, args):
-        '''Reads a summary file and returns a list of names and files
+    log.info("Working with {0} files in \n   {1}".format(
+        len(file_list),
+        path.common_directory(file_list),
+    ))
 
-        Expected format:
-                <name>  <file>  [<file> ...]    [<data> ...]
-                <name>  <file>[;<file>]         [<data> ...]
-
-        The first column should be the name of the file. The files,
-        should be FASTA or FASTQ format and listed in the following
-        columns (or, preferably, semi-colon separated in a single
-        column). The columns should be space, tab, or comma separated.
-        Semi-colons should only be used within a single column.
-
-        Multiple, consecutive delimiters will be treated as one delimiter.
-        Only files to be included should be listed; multiple files should
-        denote paired-end or mate-pair reads.
-        '''
-
-        with open(args.summary_file, 'r') as fh:
-            rows = [re.split(r'[;,\s]+', line.rstrip()) for line in fh]
-            data_dir = (args.data_dir
-                        if args.data_dir else os.path.dirname(fh.name))
-
-        # compile regex
-        rx_seq = re.compile(r'\.f(?:ast)?[aq]$')
-
-        # add and protect path to second (and third) columns in rows
-        for row in rows:
-            row[1:] = [
-                path.protect(os.path.join(data_dir, col))
-                for col in row[1:]
-                if rx_seq.search(col.lower())
-            ]
-
-        return rows
+    return file_list

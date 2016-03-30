@@ -4,8 +4,8 @@ import os.path
 import sys
 sys.path.append("../remsci/")
 
-import remsci.scripted.base as base
-from remsci.lib.utility import path
+from libpipe.parsers import base
+from libpipe.utility import path
 from libpipe.pipes.align import NestedRnaSeqPipe
 from libpipe.parsers.fastq import RnaseqPipeScripted, WgsPipeParser
 # from libpipe.cmds import (
