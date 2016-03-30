@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 import argparse
 import os.path
@@ -95,7 +96,7 @@ class CoverageScripted(SubparserBase):
 
         Arguments:
             fh          FILE    htseq-count output
-            min_count   INT     minimum count threshold
+            min_count   INT     minimum count threshold (Default=1)
 
         Return:
             [total count, count > min, ratio]
@@ -106,7 +107,7 @@ class CoverageScripted(SubparserBase):
             if line.startswith('__'):
                 total_non_feat = total_non_feat + 1
                 continue
-            if int(line.split()[1]) > min_count:
+            if int(line.split()[-1]) > min_count:
                 total_above = total_above + 1
         i = i - total_non_feat + 1
         return [str(i), str(total_above), '{:.2f}'.format(total_above / i)]
@@ -114,6 +115,7 @@ class CoverageScripted(SubparserBase):
     @file_or_handle(mode='w')
     def write_coverage(self, fh, cov_mat):
         fh.write('# Created by:\n# {}\n'.format(' '.join(sys.argv)))
+        fh.write('# File\tNo. Features\t> Min Count\tRatio\n')
         row_str = '{}\n'
         for row in cov_mat:
             fh.write(row_str.format('\t'.join(row)))
