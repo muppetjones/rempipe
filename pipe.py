@@ -135,4 +135,5 @@ if __name__ == '__main__':
     parser = setup_parser()
     args = parser.parse_args()
     args.find_files(args)
+    args.build_args(args)
     main(args)

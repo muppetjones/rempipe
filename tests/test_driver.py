@@ -51,19 +51,20 @@ class TestPipeDriver(LibpipeTestCase):
         return args
 
     def test_main_passes_summary_arg_dict_to_run_pipes(self):
-        dat = 'A\tA1.fq;A2.fq\nB\tB1.fq\n'
-        self.setup_mock_read(dat)
-        args = self.get_args('--summary=data/summary.txt')
-
-        expected = {
-            'A': ['A1.fq', 'A2.fq'],
-            'B': ['B1.fq', ],
-        }
+        # Do not create an argp object and pass it. Doing so
+        # tests the ability of argp to create a dict from a
+        # summary file. Instead, check that args.summary is
+        # passed to run_pipes.
+        args = mock.MagicMock(
+            summary={k: v for v, k in enumerate(list('abc'))},
+            data=None,
+            genome_list=None,
+        )
 
         with mock.patch.object(driver, 'run_pipes') as mock_run:
             driver.main(args)
 
-        mock_run.assert_called_once_with(expected, None, data=None)
+        mock_run.assert_called_once_with(args.summary, None, data=None)
 
     def test_main_passes_dir_dict_to_run_pipes(self):
         dir_files = ['seq{}.fq'.format(i) for i in range(3)]
