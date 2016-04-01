@@ -3,6 +3,7 @@ import os.path
 
 from libpipe.cmd.attr import CmdAttributes
 from libpipe.cmd.base import CmdBase
+from libpipe.type import index as _index
 from libpipe.util import path
 
 import logging
@@ -25,6 +26,7 @@ class Hisat2Cmd(CmdBase):
 
     '''
 
+    index = _index.IndexType.factory({'.ht2': 8})
     attr = CmdAttributes(
         invoke='hisat2',
         args=[

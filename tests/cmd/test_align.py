@@ -3,15 +3,32 @@ import unittest
 from unittest import mock
 
 import libpipe
-from libpipe.cmd.align import Hisat2Cmd
+from libpipe.cmd import align
 from libpipe.cmd.dummy import CmdDummy
+from libpipe.type import index
+
+from tests.type import test_index
 
 import logging
 log = logging.getLogger(__name__)
 
 
 DEFAULT_INPUT = ['data/sample.1.fq', 'data/sample.2.fq', 'genome/hisat_index']
-TEST_CMD = Hisat2Cmd
+TEST_CMD = align.Hisat2Cmd
+
+
+class TestHisatIndex(test_index.IndexTypeTestCase):
+
+    def test_creates_index_obj(self):
+        self.setup_mock_check_extns()
+        self.setup_mock_check_prefix()
+        obj = align.Hisat2Cmd.index('genome/index')
+        self.assertIsInstance(obj, index.IndexType)
+
+    def test_expects_8_ht2_files(self):
+        cls = align.Hisat2Cmd.index
+        self.assertEqual(cls.extns, ['.ht2'])
+        self.assertEqual(cls.counts, [8])
 
 
 class TestHistatCmd(unittest.TestCase):
@@ -89,7 +106,7 @@ class TestHistatCmd(unittest.TestCase):
 
         with mock.patch('libpipe.cmd.base.log.warning'):
             with mock.patch.object(
-                    Hisat2Cmd,
+                    align.Hisat2Cmd,
                     '_check_for_index_files',
                     side_effect=ValueError
             ) as mock_check:
@@ -114,7 +131,7 @@ class TestHistatCmd(unittest.TestCase):
         self.mock_walk.return_value = [
             'idx.{}.ht2'.format(i) for i in range(5)]
         with self.assertRaises(ValueError):
-            Hisat2Cmd._check_for_index_files('genomes/index_name')
+            align.Hisat2Cmd._check_for_index_files('genomes/index_name')
 
     #
     #   Test _prepcmd
