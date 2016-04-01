@@ -103,8 +103,9 @@ class IndexType(base.TypeBase):
         if not _counts:
             _counts = [1] * len(_extns)
 
-        class IndexSubType(IndexType):
-            extns = _extns
-            counts = _counts
+        _subcls = type('IndexSubType', (IndexType, ), dict(
+            extns=_extns,
+            counts=_counts
+        ))
 
-        return IndexSubType
+        return _subcls
