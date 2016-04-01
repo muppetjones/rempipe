@@ -61,7 +61,7 @@ class IndexType(base.TypeBase):
     #   fatory
     #
 
-    def factory(*args, **kwargs):
+    def factory(*args, name=None, **kwargs):
         '''Create an IndexType with a defined set of extensions.
 
         Define and IndexType that expects a given number of the expected
@@ -103,7 +103,8 @@ class IndexType(base.TypeBase):
         if not _counts:
             _counts = [1] * len(_extns)
 
-        _subcls = type('IndexSubType', (IndexType, ), dict(
+        name = name or 'IndexSubType'
+        _subcls = type(name, (IndexType, ), dict(
             extns=_extns,
             counts=_counts
         ))

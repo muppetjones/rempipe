@@ -41,3 +41,7 @@ class TestTypeBase(TypeBaseTestCase):
         second_child = self.TYPE.factory()
         self.assertIsInstance(first_child_obj, first_child)
         self.assertNotIsInstance(first_child_obj, second_child)
+
+    def test_factory_sets_child_name(self):
+        child_class = self.TYPE.factory(name='Dolly')
+        self.assertEqual(child_class.__name__, 'Dolly')
