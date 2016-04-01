@@ -1,6 +1,6 @@
 
 
-class TypeBase:
+class TypeBase(object):
 
     @classmethod
     def factory(cls):

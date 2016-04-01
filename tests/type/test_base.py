@@ -18,6 +18,13 @@ class TypeBaseTestCase(base.LibpipeTestCase):
             raise unittest.SkipTest("Skip BaseTest tests, it's a base class")
         super(TypeBaseTestCase, cls).setUpClass()
 
+
+class TestTypeBase(TypeBaseTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.TYPE = _type.TypeBase
+
     def test_factory_returns_a_child_TypeBase_class(self):
 
         parent = self.TYPE()
@@ -34,10 +41,3 @@ class TypeBaseTestCase(base.LibpipeTestCase):
         second_child = self.TYPE.factory()
         self.assertIsInstance(first_child_obj, first_child)
         self.assertNotIsInstance(first_child_obj, second_child)
-
-
-class TestTypeBase(TypeBaseTestCase):
-
-    def setUp(self):
-        super().setUp()
-        self.TYPE = _type.TypeBase
