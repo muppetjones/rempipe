@@ -23,7 +23,6 @@ log = logging.getLogger(__name__)
 def setup_logger():
     import libpipe.util.logging as pipe_log
     pipe_log.config()
-    return log
 
 
 def setup_parser(parser=None):
@@ -131,7 +130,7 @@ def main(args):
 
 if __name__ == '__main__':
 
-    log = setup_logger()
+    setup_logger()
     parser = setup_parser()
     args = parser.parse_args()
     args.find_files(args)
