@@ -9,6 +9,16 @@ from libpipe.util import path
 import logging
 log = logging.getLogger(__name__)
 
+#
+#   Indices
+#
+
+Hisat2Index = _index.IndexType.factory({'.ht2': 8}, name='Hisat2Index')
+
+#
+#   Commands
+#
+
 
 class Hisat2Cmd(CmdBase):
 
@@ -26,7 +36,6 @@ class Hisat2Cmd(CmdBase):
 
     '''
 
-    index = _index.IndexType.factory({'.ht2': 8})
     attr = CmdAttributes(
         invoke='hisat2',
         args=[
@@ -60,6 +69,7 @@ class Hisat2Cmd(CmdBase):
             [('-1', '-2'), ('.fastq', '.fq', '.fastq', '.fa'), True],
             [('-U', ), ('.fastq', '.fq', '.fastq', '.fa'), True],
             [('-S', ), ('.sam', )],
+            [('-x', ), (Hisat2Index, )]
         ],
     )
 
@@ -84,21 +94,33 @@ class Hisat2Cmd(CmdBase):
     #
 
     def _match_input_with_args(self):
-        super()._match_input_with_args()
+        print('^' * 500)
+        try:
+            super()._match_input_with_args()
+        except Exception as e:
+            print('*' * 500)
+            log.debug(str(e))
+            raise
+        else:
+            print('V' * 500)
 
         unused_input = [
             _input for _input in self.input()
             if _input not in self.args and _input not in self.kwargs.values()
         ]
+        log.debug(unused_input)
 
-        for unused in unused_input:
-            try:
-                self._check_for_index_files(unused)
-            except ValueError:
-                pass  # not a valid index
-            else:
-                self.kwargs['-x'] = unused
-                break  # only need one!
+        # for unused in unused_input:
+        #     try:
+        #         _index = self.index(unused)
+        #         self._check_for_index_files(unused)
+        #     except ValueError:
+        #         pass  # not a valid index
+        #     else:
+        #         log.debug(_index)
+        #         log.debug(type(_index))
+        #         self.kwargs['-x'] = _index  # unused
+        #         break  # only need one!
 
     def _pre_cmd(self):
 

@@ -341,6 +341,7 @@ class CmdBase(CmdInterface):
 
         # match with required type
         for req_type in self.attr.req_types:
+            log.debug(req_type)
             try:
                 flag_list, type_list, exact_match = req_type
             except ValueError:

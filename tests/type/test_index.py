@@ -93,6 +93,17 @@ class TestIndexType(IndexTypeTestCase):
         _index = self.INDEX('foo/bar')
         self.assertEqual(str(_index), 'foo/bar')
 
+    def test_eq_returns_True_for_given_str(self):
+        _index = self.INDEX('foo/bar')
+        self.assertEqual(_index, 'foo/bar')
+
+    def test_instance_is_string(self):
+        _index = self.INDEX('foo/bar')
+        _types = [str, self.TYPE, self.INDEX]
+        for _type in _types:
+            with self.subTest(_type=_type):
+                self.assertIsInstance(_index, _type)
+
 
 class TestIndexType_factory(base.LibpipeTestCase):
 

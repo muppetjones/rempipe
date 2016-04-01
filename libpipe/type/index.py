@@ -9,7 +9,31 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class IndexType(base.TypeBase):
+class IndexType(str, base.TypeBase):
+
+    '''Alignment index type, e.g., hisat2 index
+
+    Stores and validates a given path as an alignment index.
+
+    Attributes:
+        extns: A list of expected extensions for the index.
+        counts: A list of expected file counts for each extension.
+        _path: The directory where the index is found.
+        _prefix: The "full" path to the index (path + name)
+        _name: The basename of the index.
+
+    Examples:
+        # For a genome with a hisat2 index named GRCh38p5, i.e., GRCh38p5.*.ht2
+        index_class = IndexType.factory({'.ht2': 8}, name="Hisat2Index")
+        index_obj = index_class("path/to/genome/GRCh38p5")
+        print(index_obj._path)
+        print(index_obj._prefix)
+        print(index_obj._name)
+
+            > path/to/genome
+            > path/to/genome/GRCh38p5
+            > GRCh38p5
+    '''
 
     counts = []
     extns = []
@@ -28,6 +52,9 @@ class IndexType(base.TypeBase):
 
     def __str__(self):
         return self._prefix or self._path
+
+    def __eq__(self, other):
+        return str(self) == other
 
     #
     #   Check methods

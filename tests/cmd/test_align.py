@@ -22,11 +22,11 @@ class TestHisatIndex(test_index.IndexTypeTestCase):
     def test_creates_index_obj(self):
         self.setup_mock_check_extns()
         self.setup_mock_check_prefix()
-        obj = align.Hisat2Cmd.index('genome/index')
+        obj = align.Hisat2Index('genome/index')
         self.assertIsInstance(obj, index.IndexType)
 
     def test_expects_8_ht2_files(self):
-        cls = align.Hisat2Cmd.index
+        cls = align.Hisat2Index
         self.assertEqual(cls.extns, ['.ht2'])
         self.assertEqual(cls.counts, [8])
 
@@ -101,6 +101,13 @@ class TestHistatCmd(unittest.TestCase):
         self.assertEqual(cmd.kwargs['-1'], DEFAULT_INPUT[0])
         self.assertEqual(cmd.kwargs['-2'], DEFAULT_INPUT[1])
 
+    def test_match_sets_kwarg_x_to_index_type(self):
+        cmd = self.get_cmd()
+        cmd._match_input_with_args()  # walk_file_patched
+        self.assertIn('-x', cmd.kwargs)
+        self.assertIsInstance(cmd.kwargs['-x'], cmd.index)
+        self.assertEqual(cmd.kwargs['-x'], DEFAULT_INPUT[2])
+
     def test_match_checks_each_unused_input_as_possible_bowtie_index(self):
         '''Test unused input for bowtie index name (check for files)'''
 
@@ -114,7 +121,7 @@ class TestHistatCmd(unittest.TestCase):
                 cmd._match_input_with_args()
             self.assertEqual(mock_check.call_count, 3)
 
-    def test_match_sets_unused_input_as_bowtie_index_if_files_found(self):
+    def test_match_sets_unused_input_as_index_if_files_found(self):
         '''Test matching of -X (implicit check index success)'''
 
         cmd = self.get_cmd()
