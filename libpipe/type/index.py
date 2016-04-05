@@ -88,6 +88,7 @@ class IndexType(str, base.TypeBase):
     #   fatory
     #
 
+    @classmethod
     def factory(*args, name=None, **kwargs):
         '''Create an IndexType with a defined set of extensions.
 
@@ -130,7 +131,7 @@ class IndexType(str, base.TypeBase):
         if not _counts:
             _counts = [1] * len(_extns)
 
-        name = name or 'IndexSubType'
+        name = name if name else 'IndexSubType'
         _subcls = type(name, (IndexType, ), dict(
             extns=_extns,
             counts=_counts
