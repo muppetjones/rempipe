@@ -1,4 +1,5 @@
 
+from libpipe.type import index
 
 import logging
 log = logging.getLogger(__name__)
@@ -135,6 +136,16 @@ class CmdAttributes(object):
                 raise ValueError(msg)
         except KeyError:
             pass  # don't require 'defaults' as input
+
+        # # Ensure only a single IndexType is given
+        # req_index_types = [
+        #     _type
+        #     for req in kwargs['req_types']
+        #     for _type in req[1]
+        #     if isinstance(_type, index.IndexMeta)
+        # ]
+        # if len(req_index_types) > 1:
+        #     raise ValueError('Cmd requires multiple index types')
 
         # Define allowable attributes
         # -- pseudo deep copy dicts and lists (not their elements)

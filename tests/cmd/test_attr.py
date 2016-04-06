@@ -101,3 +101,24 @@ class TestCmdAttributes(unittest.TestCase):
         ca = CmdAttributes(**self.kwargs)
         self.assertIsNotNone(ca.defaults)
         self.assertIsInstance(ca.defaults, dict)
+
+    # def test_init_throws_ValueError_if_multiple_IndexTypes_required(self):
+    #     '''Ensure that each cmd can require only one index type
+    #
+    #     Ensure that a command cannot be initialized if the attribute
+    #     requirements list more than one index.
+    #     NOTE: This may be limiting, but, e.g., hisat2 should only
+    #         expect hisat2 indices.
+    #     '''
+    #
+    #     import libpipe.type.index as index
+    #
+    #     extns = list('abc')
+    #     counts = [2] * len(extns)
+    #     i1 = index.factory(extns=extns, counts=counts)
+    #     i2 = index.factory(extns=extns, counts=counts)
+    #     self.kwargs['req_types'] = [
+    #         [('-x', ), (i1, i2)],
+    #     ]
+    #     with self.assertRaisesRegex(ValueError, 'multiple.*type'):
+    #         CmdAttributes(**self.kwargs)
