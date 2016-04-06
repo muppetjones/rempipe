@@ -300,6 +300,14 @@ class CmdBase(CmdInterface):
             positional arguments set in attr.req_types will be set
             regardless of attr.req_args if the expected type is found.
 
+        NOTE: Matching essentially does the same thing as subsequent
+            requirement checks--ensure we have the right type of data
+            in the right place. Unfortunately, this means that we
+            *could* (likely) be performing the same tests twice.
+            However, not all arguments may be matched, and pre_req
+            may change some values (hopefully not detrimentally).
+        TODO(sjbush): Merge match and requirement checking.
+
         Uses attr.req_types to match linked input to a keyword or
         positional argument, e.g.,
             input: ['a.txt', 'a.fq', 'b.fq']
@@ -342,7 +350,6 @@ class CmdBase(CmdInterface):
 
         # match with required type
         for req_type in self.attr.req_types:
-            log.debug(req_type)
             try:
                 flag_list, type_list, exact_match = req_type
             except ValueError:
@@ -355,7 +362,7 @@ class CmdBase(CmdInterface):
             #    b) we do want an exact match, AND we got it!
             # -- also remove input already matched
             filtered = self._filter_by_type(linked_input, type_list)
-            log.debug(filtered)
+
             if not exact_match or len(filtered) == len(flag_list):
                 self.kwargs.update(dict(zip(flag_list, filtered)))
                 linked_input = [a for a in linked_input if a not in filtered]
@@ -599,33 +606,53 @@ class CmdBase(CmdInterface):
             self._filter_by_type(['a.txt', 'b.fq'], ['.fq'])
         '''
 
+        # TODO(sjbush): Easier(?) (and more pythonic) rewrite. Try to convert
+        #   each vaue to the given type. If no exception, it's good.
+
+        # 1. Identify WHICH types we are looking for:
+        #   -- index type (from index.IndexType)
+        #   -- file type (determined--currently--by extension)
+        #   -- basic type (callable, e.g., int)
+
         # IndexTypes ARE strings, so we need an additional step here
         # TODO(sjbush): Update to catch all libpipe.types
         index_type = [
-            # _type for _type in types
-            # if isinstance(_type, _index.IndexType)
+            _type for _type in types
+            if isinstance(_type, _index.IndexMeta)
         ]
 
         file_type = [
             _type for _type in types
             if isinstance(_type, str) and _type not in index_type
         ]
-        basic_type = [_type for _type in types if _type not in file_type]
-
-        log.debug(index_type)
-        log.debug(file_type)
-        log.debug(basic_type)
-
-        if basic_type:
-            for val in vals:
-                log.debug('{} is {}?  {}'.format(
-                    val, basic_type[0], isinstance(val, basic_type[0])
-                ))
-                # log.debug(type(basic_type[0]))
-
-        filtered = [
-            val for val in vals
-            if type(val) in basic_type
-            or (isinstance(val, str) and os.path.splitext(val)[1] in file_type)
+        basic_type = [
+            _type for _type in types
+            if _type not in file_type and _type not in index_type
         ]
+
+        # 2. Filter by checking each value
+
+        filtered = []
+        for val in vals:
+            if type(val) in basic_type:
+                # expected basic type
+                filtered.append(val)
+                continue
+
+            try:
+                if os.path.splitext(val)[1] in file_type:
+                    # expected file type
+                    filtered.append(val)
+                else:
+                    # expected index type
+                    itypes = [
+                        itype for itype in index_type
+                        if isinstance(val, itype)
+                    ]
+                    filtered.append(itypes[0](val))
+            except AttributeError:
+                pass  # not a string type (no rfind)
+            except IndexError:
+                pass  # no valid index type found
+
         return filtered

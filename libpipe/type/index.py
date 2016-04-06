@@ -30,12 +30,6 @@ class IndexMeta(base.TypeMeta):
         of expected number of specific files with a given extension.
         '''
 
-        # log.debug(instance)
-        # log.debug(self)
-        # log.debug(type(self))
-        # log.debug(type(instance))
-        # log.debug(type(type(instance)))
-        # log.debug(super(IndexMeta, self).__instancecheck__(instance))
         if type(type(instance)) == IndexMeta:
             # The given instance is of the type.
             # Use the parent check.
