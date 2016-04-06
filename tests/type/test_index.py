@@ -44,13 +44,13 @@ class TestIndexType__TypeBase(test_base.TestTypeBase):
         self.FACTORY = index.factory
         self.CHILD = self.FACTORY('IndexSubType')
 
-        patcher = mock.patch('libpipe.util.path.walk_file')
+        # patcher = mock.patch('libpipe.util.path.walk_file')
+        # m = patcher.start()
+        # self.addCleanup(patcher.stop)
+
+        patcher = mock.patch.object(index.IndexType, '_check_extns')
         patcher.start()
         self.addCleanup(patcher.stop)
-
-        # patcher = mock.patch.object(index.IndexType, '_check_extns')
-        # patcher.start()
-        # self.addCleanup(patcher.stop)
 
     def test_factory_sets_child_name(self):
         child_class = self.FACTORY(name='Dolly')
@@ -177,3 +177,23 @@ class TestIndexSubType(IndexTypeTestCase):
             )
             with self.assertRaises(ValueError):
                 self.child('test/dir')
+
+    def test_isinstance_returns_True_if_expected_files_found(self):
+        self.setup_mock_walk_file()
+        self.assertTrue(
+            isinstance('some/path/to/index', self.child),
+            'isinstance returns False instead of True'
+        )
+
+    def test_isinstance_returns_False_if_expected_files_not_found(self):
+        m = self.setup_mock_walk_file()
+        m.return_value = list('abc')
+        self.assertFalse(
+            isinstance('some/path/to/index', self.child),
+            'isinstance returns True instead of False'
+        )
+
+    def test_isinstance_uses_super_if_instance_not_str(self):
+        m = self.setup_mock_walk_file()
+        isinstance(self.PARENT, self.child)
+        self.assertEqual(m.call_count, 0, 'walk_file was called')

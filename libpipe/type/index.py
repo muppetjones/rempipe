@@ -21,7 +21,38 @@ def factory(name='IndexSubType', extns=[], counts=[]):
 
 
 class IndexMeta(base.TypeMeta):
-    pass
+
+    def __instancecheck__(self, instance):
+        '''Customize return value for `isinstance`
+
+        If the given instance can be initialized to the type, we
+        return True. IndexType restrictively checks for presence
+        of expected number of specific files with a given extension.
+        '''
+
+        # log.debug(instance)
+        # log.debug(self)
+        # log.debug(type(self))
+        # log.debug(type(instance))
+        # log.debug(type(type(instance)))
+        # log.debug(super(IndexMeta, self).__instancecheck__(instance))
+        if type(type(instance)) == IndexMeta:
+            # The given instance is of the type.
+            # Use the parent check.
+            # -- largely needed b/c IndexType is subclassed from str
+            return super().__instancecheck__(instance)
+    #
+        try:
+            _is = self(instance)
+        except ValueError:
+            # Files with expected extns and count not found
+            return False
+        except (AttributeError, TypeError):
+            # Most likely due to issue with rfind
+            # -- i.e., not a string, so use the parent method.
+            return super().__instancecheck__(instance)
+        else:
+            return True
 
 
 class IndexType(metaclass=IndexMeta):
@@ -58,6 +89,10 @@ class IndexType(metaclass=IndexMeta):
     def _check_extns(self):
         files = path.walk_file(
             self.path, extension=self.extns, pattern=[self.name])
+
+        if not self.extns:
+            msg = 'No extensions set'
+            raise ValueError(msg)
 
         errs = []
         for extn, cnt in zip(self.extns, self.counts):

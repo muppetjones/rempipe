@@ -80,17 +80,25 @@ class TestTypeBase(base.LibpipeTestCase):
         bar = self.FACTORY('First')
         self.assertNotEqual(foo, bar)
 
-    def test_factory_classes_create_unrelated_objects(self):
+    def test_subsequent_factory_calls_return_different_subclasses(self):
+        foo = self.FACTORY('Foo')
+        bar = self.FACTORY('Bar')
+        self.assertEqual(type(foo), type(bar))  # Same type
+        self.assertFalse(isinstance(bar, foo))  # Not inherited
+        self.assertNotEqual(foo, bar)  # Not the same class
+
+    def test_subseq_factory_classes_create_sister_objects(self):
         foo = self.FACTORY('Foo')
         bar = self.FACTORY('Bar')
 
         fobj = foo('foo')
         bobj = bar('bar')
 
-        self.assertIsInstance(bobj, bar)
-        self.assertIsInstance(fobj, foo)
-        self.assertNotIsInstance(bobj, foo)
-        self.assertNotIsInstance(fobj, bar)
+        # NOTE: both obj are same super-type, i.e., IndexMeta
+        self.assertTrue(isinstance(bobj, bar))
+        self.assertTrue(isinstance(fobj, foo))
+        self.assertFalse(isinstance(bobj, foo))
+        self.assertFalse(isinstance(fobj, bar))
 
     def test_factory_sets_child_name(self):
         child_class = self.FACTORY(name='Dolly')
