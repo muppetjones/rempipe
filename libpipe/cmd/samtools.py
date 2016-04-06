@@ -1,14 +1,15 @@
 
 import os.path
 
-from libpipe.cmd.attr import CmdAttributes
-from libpipe.cmd.base import CmdBase
+from libpipe.cmd import attr
+from libpipe.cmd import base
+from libpipe.type import index
 
 import logging
 log = logging.getLogger(__name__)
 
 
-class SamtoolsIndexCmd(CmdBase):
+class SamtoolsIndexCmd(base.CmdBase):
 
     '''Samtools Index
 
@@ -26,7 +27,7 @@ class SamtoolsIndexCmd(CmdBase):
             does not match up input to the arg.
     '''
 
-    attr = CmdAttributes(
+    attr = attr.CmdAttributes(
         name='samtools_index',
         invoke='samtools index',
 
@@ -52,10 +53,15 @@ class SamtoolsIndexCmd(CmdBase):
             self.flags.append('-b')
 
     def output(self):
-        return [self.args[0]]
+        '''Return given BAM file (unchanged) and genome index (if given)'''
+        index_list = [
+            i for i in self.input()
+            if isinstance(i, index.IndexType)
+        ]
+        return [self.args[0]] + index_list
 
 
-class SamtoolsSortCmd(CmdBase):
+class SamtoolsSortCmd(base.CmdBase):
 
     '''Samtools Sort
 
@@ -74,7 +80,7 @@ class SamtoolsSortCmd(CmdBase):
         samtools sort [options...] <in> <out.prefix>
     '''
 
-    attr = CmdAttributes(
+    attr = attr.CmdAttributes(
         name='samtools_sort',
         invoke='samtools sort',
 
@@ -98,7 +104,12 @@ class SamtoolsSortCmd(CmdBase):
     #
 
     def output(self):
-        return [self.kwargs['-o']]
+        '''Return sorted BAM file and genome index (if given)'''
+        index_list = [
+            i for i in self.input()
+            if isinstance(i, index.IndexType)
+        ]
+        return [self.kwargs['-o']] + index_list
 
     #
     #   Overrides

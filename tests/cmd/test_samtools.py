@@ -2,9 +2,9 @@ import unittest
 from unittest import mock
 
 import libpipe
-from libpipe.cmd.dummy import CmdDummy
-from libpipe.cmd.samtools import SamtoolsIndexCmd
-from libpipe.cmd.samtools import SamtoolsSortCmd
+from libpipe.cmd import align
+from libpipe.cmd import dummy
+from libpipe.cmd import samtools
 
 import logging
 log = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class SamtoolsTestCase(unittest.TestCase):
         '''Initialize the basic command'''
         if not _input:
             _input = self.default_input
-        self.dummy = CmdDummy(*_input)
+        self.dummy = dummy.CmdDummy(*_input)
         cmd = self.CMD(*args, **kwargs)
         return self.dummy.link(cmd)
 
@@ -33,7 +33,7 @@ class TestSamtoolsIndexCmd(SamtoolsTestCase):
 
     def setUp(self):
         self.default_input = ['data/sample.s.bam', ]
-        self.CMD = SamtoolsIndexCmd
+        self.CMD = samtools.SamtoolsIndexCmd
 
     def test_cmd_raises_IndexError_if_not_given_bam_parg(self):
         cmd = self.get_cmd(_input=['not/a/bam', ])
@@ -65,6 +65,13 @@ class TestSamtoolsIndexCmd(SamtoolsTestCase):
 
         self.assertEqual(cmd.output(), cmd.args)
 
+    def test_output_includes_IndexType_from_input_if_any(self):
+        with mock.patch.object(align.Hisat2Index, '_check_extns'):
+            idx = align.Hisat2Index('path/to/index')
+        cmd = self.get_cmd(_input=[idx] + self.default_input)
+        cmd.cmd()
+        self.assertIn(idx, cmd.output())
+
 
 class TestSamtoolsSortCmd(SamtoolsTestCase):
 
@@ -78,7 +85,7 @@ class TestSamtoolsSortCmd(SamtoolsTestCase):
         # mimic expected hisat2 output
         self.default_input = [
             'data/sample.sam', 'data/sample_unal.fq', 'genome/hisat_index']
-        self.CMD = SamtoolsSortCmd
+        self.CMD = samtools.SamtoolsSortCmd
 
     def test_cmd_raises_IndexError_if_not_given_bam_or_sam_parg(self):
         cmd = self.get_cmd(_input=['not/a/bam', ])
@@ -140,3 +147,10 @@ class TestSamtoolsSortCmd(SamtoolsTestCase):
 
         expected = [self.default_input[0].replace('.sam', '.s.bam')]
         self.assertEqual(cmd.output(), expected)
+
+    def test_output_includes_IndexType_from_input_if_any(self):
+        with mock.patch.object(align.Hisat2Index, '_check_extns'):
+            idx = align.Hisat2Index('path/to/index')
+        cmd = self.get_cmd(_input=[idx] + self.default_input)
+        cmd.cmd()
+        self.assertIn(idx, cmd.output())
