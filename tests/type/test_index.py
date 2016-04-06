@@ -21,6 +21,13 @@ class IndexTypeTestCase(base.LibpipeTestCase):
         self.FACTORY = index.factory
         self.CHILD = self.FACTORY('IndexSubType')
 
+    def setup_mock_check_extns(self, obj=None):
+        obj = obj if obj else self.CHILD
+        patcher = mock.patch.object(obj, '_check_extns')
+        m = patcher.start()
+        self.addCleanup(patcher.stop)
+        return m
+
 #
 # test base and factory
 #
@@ -121,13 +128,6 @@ class TestIndexSubType(IndexTypeTestCase):
             m.return_value = retval
             self.addCleanup(patcher.stop)
             return m
-
-    def setup_mock_check_extns(self, obj=None):
-        obj = obj if obj else self.CHILD
-        patcher = mock.patch.object(obj, '_check_extns')
-        m = patcher.start()
-        self.addCleanup(patcher.stop)
-        return m
 
     #
     #   Tests

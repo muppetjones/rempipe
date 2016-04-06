@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 #   Indices
 #
 
-Hisat2Index = _index.IndexType.factory({'.ht2': 8}, name='Hisat2Index')
+Hisat2Index = _index.factory(name='Hisat2Index', extns=['.ht2'], counts=[8])
 
 #
 #   Commands
@@ -92,35 +92,6 @@ class Hisat2Cmd(CmdBase):
     #
     #   Overrides
     #
-
-    def _match_input_with_args(self):
-        print('^' * 500)
-        try:
-            super()._match_input_with_args()
-        except Exception as e:
-            print('*' * 500)
-            log.debug(str(e))
-            raise
-        else:
-            print('V' * 500)
-
-        unused_input = [
-            _input for _input in self.input()
-            if _input not in self.args and _input not in self.kwargs.values()
-        ]
-        log.debug(unused_input)
-
-        # for unused in unused_input:
-        #     try:
-        #         _index = self.index(unused)
-        #         self._check_for_index_files(unused)
-        #     except ValueError:
-        #         pass  # not a valid index
-        #     else:
-        #         log.debug(_index)
-        #         log.debug(type(_index))
-        #         self.kwargs['-x'] = _index  # unused
-        #         break  # only need one!
 
     def _pre_cmd(self):
 
