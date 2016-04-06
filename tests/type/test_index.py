@@ -1,9 +1,10 @@
 
-# import unittest
+import unittest
 from unittest import mock
 
 
 # from libpipe.util import path
+from libpipe.type import base as _type
 from libpipe.type import index
 from tests import base
 from tests.type import test_base
@@ -13,6 +14,15 @@ log = logging.getLogger(__name__)
 
 
 class IndexTypeTestCase(base.LibpipeTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.PARENT = index.IndexBase
+        self.FACTORY = index.factory
+        self.CHILD = self.FACTORY('IndexSubType')
+
+
+class IndexTypeTestCase__deprecated(base.LibpipeTestCase):
 
     def setUp(self):
         # create our test index
@@ -61,12 +71,23 @@ class IndexTypeTestCase(base.LibpipeTestCase):
 # test base and factory
 #
 
+class TestIndexMeta(base.LibpipeTestCase):
+
+    def test_IndexMeta_inherits_from_TypeMeta(self):
+        self.assertTrue(
+            issubclass(index.IndexMeta, _type.TypeMeta),
+            "IndexMeta is NOT subclassed from TypeMeta",
+        )
+
+
 class TestIndexType__TypeBase(test_base.TestTypeBase):
     pass
 
     def setUp(self):
         super().setUp()
-        self.TYPE = index.IndexType
+        self.PARENT = index.IndexBase
+        self.FACTORY = index.factory
+        self.CHILD = self.FACTORY('IndexSubType')
 
         patcher = mock.patch.object(index.IndexType, '_check_prefix')
         patcher.start()
@@ -76,7 +97,47 @@ class TestIndexType__TypeBase(test_base.TestTypeBase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_factory_sets_child_name(self):
+        child_class = self.FACTORY(name='Dolly')
+        self.assertEqual(child_class.__name__, 'Dolly')
 
+    def test_child_is_still_TypeMeta(self):
+        self.assertIsInstance(self.CHILD, _type.TypeMeta)
+
+
+class TestIndexFactory(IndexTypeTestCase):
+
+    def test_factory_stores_extensions_on_child_class(self):
+        extn = ['.foo', '.bar']
+        child = self.FACTORY(extn=extn)
+        self.assertEqual(child.extn, extn)
+
+    def test_factory_stores_counts_on_child_class(self):
+        extn = ['.foo', '.bar']
+        counts = [3, 5]
+        child = self.FACTORY(extn=extn, counts=counts)
+        self.assertEqual(child.counts, counts)
+
+    def test_factory_assumes_all_counts_eq_1_iff_not_given(self):
+        extn = ['.foo', '.bar']
+        counts = [1] * len(extn)
+        child = self.FACTORY(extn=extn)
+        self.assertEqual(child.counts, counts)
+
+    def test_factory_raises_ValueError_if_n_counts_ne_n_extn(self):
+        extn = ['.foo', '.bar']
+        counts = [1, ]
+        with self.assertRaises(ValueError):
+            self.FACTORY(extn=extn, counts=counts)
+
+
+def TestIndexSubType(IndexTypeTestCase):
+
+    def setUp(self):
+        super().setUp()
+
+
+@unittest.skip('all')
 class TestIndexType(IndexTypeTestCase):
 
     '''Test that IndexType fulfills TypeBase tests'''
@@ -100,11 +161,12 @@ class TestIndexType(IndexTypeTestCase):
     def test_instance_is_string(self):
         _index = self.INDEX('foo/bar')
         _types = [str, self.TYPE, self.INDEX]
-        for _type in _types:
-            with self.subTest(_type=_type):
-                self.assertIsInstance(_index, _type)
+        for _t in _types:
+            with self.subTest(_type=_t):
+                self.assertIsInstance(_index, _t)
 
 
+@unittest.skip('all')
 class TestIndexType_factory(base.LibpipeTestCase):
 
     def test_factory_sets_expected_extns_attr_to_empty_list(self):
@@ -169,7 +231,7 @@ class TestIndexType_factory(base.LibpipeTestCase):
 #   Test index checking
 #
 
-
+@unittest.skip('all')
 class TestIndexType__check_extns(IndexTypeTestCase):
 
     def test_init_calls_walk_file_with_extensions(self):
@@ -198,6 +260,7 @@ class TestIndexType__check_extns(IndexTypeTestCase):
                 _index._path, extension=_index.extns, pattern=[_index._name])
 
 
+@unittest.skip('all')
 class TestIndexType__check_prefix(IndexTypeTestCase):
 
     def test_prefix_and_name_are_None_if_dir_given(self):

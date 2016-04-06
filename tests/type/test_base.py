@@ -16,17 +16,23 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class TypeBaseTestCase(base.LibpipeTestCase):
-    pass
+class TestTypeBase(base.LibpipeTestCase):
 
+    '''A set of restrictive tests for metaclass factories
 
-class TestTypeBase(TypeBaseTestCase):
+    These tests are intentionally over-restrictive. Metaclasses
+    are nasty, trick-sy little things. Ease up later.
+    '''
 
     @classmethod
     def setUpClass(cls):
         if cls is TestTypeBase:
             raise unittest.SkipTest("Skip BaseTest tests, it's a base class")
             super(TestTypeBase, cls).setUpClass()
+
+    def setUp(self):
+        super().setUp()
+        self.META = _type.TypeMeta
 
     def print_summary(self):
         meta = self.META

@@ -9,6 +9,27 @@ import logging
 log = logging.getLogger(__name__)
 
 
+def factory(name='IndexSubType', extn=[], counts=[]):
+    if not counts:
+        counts = [1] * len(extn)  # assume only one of each extn required!
+    elif counts and len(extn) != len(counts):
+        msg = 'Unequal num of extn ({}) vs counts ({})'.format(
+            len(extn), len(counts))
+        raise ValueError(msg)
+    _subcls = type(name, (IndexBase, ), dict(extn=extn, counts=counts))
+    return _subcls
+
+
+class IndexMeta(base.TypeMeta):
+    pass
+
+
+class IndexBase(metaclass=IndexMeta):
+
+    def __init__(self, stem):
+        pass
+
+
 class IndexType(str, base.TypeBase):
 
     '''Alignment index type, e.g., hisat2 index

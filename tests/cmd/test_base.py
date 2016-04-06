@@ -17,6 +17,7 @@ from unittest import mock
 import libpipe
 from libpipe.cmd.attr import CmdAttributes
 from libpipe.cmd.base import CmdBase
+from libpipe.type import index as _index
 
 import logging
 log = logging.getLogger(__name__)
@@ -487,6 +488,28 @@ class TestBaseCmd_link(BaseTestCase):
         self.assertEqual(cmd.kwargs['-1'], 'file1.txt')
         self.assertEqual(cmd.kwargs['-2'], 'file2.txt')
         self.assertNotIn('-U', cmd.kwargs)
+
+    def test_match_custom_types(self):
+        '''Test that a custom type is matched appropriately'''
+        # TODO(sjbush): replace index type with the base type
+
+        log.debug('-' * 200)
+
+        SampleIndex = _index.IndexType.factory({'.bt2': 2}, name='SampleIndex')
+        log.debug(type(SampleIndex))
+        log.debug(isinstance(SampleIndex, _index.IndexType))
+        self.CMD.attr.req_types = [
+            [('-U', ), (SampleIndex, )],
+        ]
+        cmd = self.CMD()
+        cmd.input = lambda: ['file1.txt', 'path/to/idx']
+
+        with mock.patch('libpipe.util.path.walk_file', ) as mock_walk:
+            mock_walk.return_value = ['idx.1.bt2', 'idx.2.bt2', 'idx.txt']
+            cmd._match_input_with_args()
+        log.debug('-' * 200)
+        self.assertEqual(cmd.kwargs['-x'], 'path/to/idx')
+        self.assertIsInstance(cmd.kwargs['-x'], SampleIndex)
 
 
 class TestCmdBase_requirements(BaseTestCase):

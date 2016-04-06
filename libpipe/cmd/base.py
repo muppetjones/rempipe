@@ -5,6 +5,7 @@ import time
 
 
 from libpipe.cmd.interface import CmdInterface
+from libpipe.type import index as _index
 
 import logging
 log = logging.getLogger(__name__)
@@ -354,6 +355,7 @@ class CmdBase(CmdInterface):
             #    b) we do want an exact match, AND we got it!
             # -- also remove input already matched
             filtered = self._filter_by_type(linked_input, type_list)
+            log.debug(filtered)
             if not exact_match or len(filtered) == len(flag_list):
                 self.kwargs.update(dict(zip(flag_list, filtered)))
                 linked_input = [a for a in linked_input if a not in filtered]
@@ -597,8 +599,29 @@ class CmdBase(CmdInterface):
             self._filter_by_type(['a.txt', 'b.fq'], ['.fq'])
         '''
 
-        file_type = [_type for _type in types if isinstance(_type, str)]
+        # IndexTypes ARE strings, so we need an additional step here
+        # TODO(sjbush): Update to catch all libpipe.types
+        index_type = [
+            # _type for _type in types
+            # if isinstance(_type, _index.IndexType)
+        ]
+
+        file_type = [
+            _type for _type in types
+            if isinstance(_type, str) and _type not in index_type
+        ]
         basic_type = [_type for _type in types if _type not in file_type]
+
+        log.debug(index_type)
+        log.debug(file_type)
+        log.debug(basic_type)
+
+        if basic_type:
+            for val in vals:
+                log.debug('{} is {}?  {}'.format(
+                    val, basic_type[0], isinstance(val, basic_type[0])
+                ))
+                # log.debug(type(basic_type[0]))
 
         filtered = [
             val for val in vals
