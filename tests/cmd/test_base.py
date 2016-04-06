@@ -519,6 +519,25 @@ class TestBaseCmd_CustomTypes(BaseTestCase):
         self.assertEqual(cmd.kwargs['-x'], 'path/to/idx')
         self.assertIsInstance(cmd.kwargs['-x'], SampleIndex)
 
+    def test_match_converts_index_path_str_to_index_type(self):
+        SampleIndex = _index.factory(
+            name='SampleIndex', extns=['.bt2'], counts=[2])
+        self.CMD.attr.req_types = [
+            [('-x', ), (SampleIndex, )],
+        ]
+        cmd = self.CMD()
+        cmd.input = lambda: ['file1.txt', 'path/to/idx']
+
+        with mock.patch('libpipe.util.path.walk_safe', ) as mock_walk:
+            mock_walk.return_value = {
+                'file': ['idx.1.bt2', 'idx.2.bt2', 'idx.txt']}
+            cmd._match_input_with_args()
+        self.assertTrue(
+            issubclass(cmd.kwargs['-x'].__class__, SampleIndex),
+            "Given path not converted to IndexType",
+        )
+        self.assertTrue(hasattr(cmd.kwargs['-x'], 'extns'))
+
 
 class TestCmdBase_requirements(BaseTestCase):
 

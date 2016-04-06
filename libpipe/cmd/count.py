@@ -1,14 +1,15 @@
 
 import os.path
 
-from libpipe.cmd.attr import CmdAttributes
-from libpipe.cmd.base import CmdBase
+from libpipe.cmd import align
+from libpipe.cmd import attr
+from libpipe.cmd import base
 
 import logging
 log = logging.getLogger(__name__)
 
 
-class HtseqCountCmd(CmdBase):
+class HtseqCountCmd(base.CmdBase):
 
     '''HT-Seq command line invocation
 
@@ -31,7 +32,7 @@ class HtseqCountCmd(CmdBase):
 
     '''
 
-    attr = CmdAttributes(
+    attr = attr.CmdAttributes(
         name='htseq-count',
         invoke='htseq-count',
 
@@ -59,7 +60,7 @@ class HtseqCountCmd(CmdBase):
         req_args=2,
         req_types=[
             [(0, ), ('.bam', '.sam')],
-            [(1, ), ('.gff', '.gtf', '.gff3')],
+            [(1, ), (align.Hisat2Index, '.gff', '.gtf', '.gff3')],
             [('-o',), ('.sam', )],
         ],
     )
@@ -85,14 +86,13 @@ class HtseqCountCmd(CmdBase):
 
         # swap args if the first pos arg is NOT a bam or sam
         # -- naive: does not check anything else, including no. args!
-        extn = os.path.splitext(self.args[0])
+        prefix, extn = os.path.splitext(self.args[0])
         if extn not in ('.bam', '.sam'):
             self.args.reverse()
 
         # set the format based on the alignment file extension
         # -- even if not BAM or SAM, will catch during check requirements
         # -- re-check extn (may have been swapped!)
-        extn = os.path.splitext(self.args[0])[1]
         self.kwargs['-f'] = extn[1:].lower()  # remove leading dot
 
         # add a gtf extension to the second pos arg if missing

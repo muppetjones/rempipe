@@ -88,6 +88,11 @@ class TestHisat2Cmd(unittest.TestCase):
         unal_files = [o for o in cmd.output() if 'unal' in o]
         self.assertEqual(unal_files, expected)
 
+    def test_output_includes_given_index(self):
+        cmd = self.get_cmd()
+        cmd.cmd()
+        self.assertIn(cmd.kwargs['-x'], cmd.output())
+
     #
     #   Test match
     #

@@ -78,7 +78,7 @@ class Hisat2Cmd(CmdBase):
     #
 
     def output(self):
-        _output = [self.kwargs['-S'], ]
+        _output = [self.kwargs['-S'], self.kwargs['-x']]
         try:
             _output.append(self.kwargs['--un'])
         except KeyError:

@@ -2,8 +2,9 @@ import os.path
 import unittest
 from unittest import mock
 
-from libpipe.cmd.count import HtseqCountCmd
-from libpipe.cmd.dummy import CmdDummy
+from libpipe.cmd import align
+from libpipe.cmd import count
+from libpipe.cmd import dummy
 
 import logging
 log = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ class CountTestCase(unittest.TestCase):
         '''Initialize the basic command'''
         if not _input:
             _input = self.default_input
-        self.dummy = CmdDummy(*_input)
+        self.dummy = dummy.CmdDummy(*_input)
         cmd = self.CMD(*args, **kwargs)
         return self.dummy.link(cmd)
 
@@ -31,8 +32,13 @@ class TestHtseqCountCmd(CountTestCase):
     '''
 
     def setUp(self):
-        self.default_input = ['data/sample.s.bam', ]
-        self.CMD = HtseqCountCmd
+        patcher = mock.patch.object(align.Hisat2Index, '_check_extns')
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        index = align.Hisat2Index('genome/index')
+        self.default_input = ['data/sample.s.bam', index]
+        self.CMD = count.HtseqCountCmd
 
     def test_init_sets_order_arg_r_to_pos_by_defaults(self):
         '''Test that the default alignment order is pos'''
@@ -62,6 +68,15 @@ class TestHtseqCountCmd(CountTestCase):
 
         self.assertEqual(cmd.args, expected)
 
+    def test_pre_req_does_not_reverse_args_if_bam_or_sam_listed_first(self):
+        cmd = self.get_cmd()
+
+        cmd.args = ['data/sample.bam', 'genome/genome.gtf']
+        expected = list(cmd.args)
+        cmd._pre_req()
+
+        self.assertEqual(cmd.args, expected)
+
     def test_pre_req_automatically_sets_f_flag_with_lc_input_extn(self):
 
         cmd = self.get_cmd()
@@ -74,18 +89,16 @@ class TestHtseqCountCmd(CountTestCase):
     def test_pre_req_adds_gff_extn_to_arg_if_missing(self):
         '''Test 2nd arg given gff extn if missing (in case of hisat index)'''
 
-        genome = 'genome/hisat_index'
-        cmd = self.get_cmd(**{'genome': genome})
+        cmd = self.get_cmd()
         cmd._match_input_with_args()
 
         cmd._pre_req()
-        self.assertEqual(cmd.args[1], genome + '.gtf')
+        self.assertEqual(cmd.args[1], self.default_input[1] + '.gtf')
 
     def test_pre_cmd_sets_redirect_to_align_file_w_count_extn(self):
         '''Test redirect points to a count file'''
 
-        genome = 'genome/hisat_index'
-        cmd = self.get_cmd(**{'genome': genome})
+        cmd = self.get_cmd()
         cmd._match_input_with_args()
         cmd._pre_req()
         cmd._pre_cmd()
@@ -96,8 +109,8 @@ class TestHtseqCountCmd(CountTestCase):
 
     def test_output_contains_only_redirect_file(self):
 
-        genome = 'genome/hisat_index'
-        cmd = self.get_cmd(**{'genome': genome})
+        cmd = self.get_cmd()
+        cmd._match_input_with_args()
         cmd.cmd()
 
         count_file = os.path.splitext(cmd.args[0])[0] + '.count'

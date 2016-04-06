@@ -24,8 +24,9 @@ class AlignPipe(PipeBase):
         # HACK: Explicitly add index used by _align to _count args
         #   Better than some of the alternatives, at least until
         #   genome pass through is working
-        self.cmds[0].cmd()
-        self.cmds[-1].args.append(self.cmds[0].kwargs['-x'])
+        # CRITICAL: No longer needed due to IndexType pass through!
+        # self.cmds[0].cmd()
+        # self.cmds[-1].args.append(self.cmds[0].kwargs['-x'])
 
     #
     #   Cmd Interface
