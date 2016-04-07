@@ -9,20 +9,47 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def factory(name='IndexSubType', extns=[], counts=[]):
+def factory(name='IndexSubType', extns=[], counts=[], parent=None):
+    '''Create an IndexType class
+
+    Create and return an IndexMeta type, subclassed to str and parent.
+
+    Arguments:
+        name: A string indicating the name that the new class should have.
+        extns: A list of string extensions expected, e.g., ['.txt'].
+        counts: The number of each extension expected. Defaults to 1 each.
+    Returns:
+        The new subclass.
+    Raises:
+        ValueError if no extensions given
+        or if the number of counts does not match the number of given extns.
+    '''
+
+    # Verify lineage
+    if not parent:
+        parent = IndexType
+    if not issubclass(parent, IndexType):
+        msg = 'Parent must be an IndexType'
+        raise ValueError(msg)
+
+    if not extns:
+        msg = 'No extensions given. Try factory(extns=[".fa", ...])'
+        raise ValueError(msg)
+
     if not counts:
         counts = [1] * len(extns)  # assume only one of each extn required!
-    elif counts and len(extns) != len(counts):
+    if counts and len(extns) != len(counts):
         msg = 'Unequal num of extns ({}) vs counts ({})'.format(
             len(extns), len(counts))
         raise ValueError(msg)
-    _subcls = type(name, (str, IndexType, ), dict(extns=extns, counts=counts))
+
+    _subcls = type(name, (parent, str), dict(extns=extns, counts=counts))
     return _subcls
 
 
 class IndexMeta(base.TypeMeta):
 
-    def __instancecheck__(self, instance):
+    def __instancecheck__(self, inst):
         '''Customize return value for `isinstance`
 
         If the given instance can be initialized to the type, we
@@ -30,23 +57,22 @@ class IndexMeta(base.TypeMeta):
         of expected number of specific files with a given extension.
         '''
 
-        if type(type(instance)) == IndexMeta:
-            # The given instance is of the type.
-            # Use the parent check.
-            # -- largely needed b/c IndexType is subclassed from str
-            return super().__instancecheck__(instance)
-    #
-        try:
-            _is = self(instance)
-        except ValueError:
-            # Files with expected extns and count not found
-            return False
-        except (AttributeError, TypeError):
-            # Most likely due to issue with rfind
-            # -- i.e., not a string, so use the parent method.
-            return super().__instancecheck__(instance)
-        else:
-            return True
+        _check = any(
+            self.__subclasscheck__(c)
+            for c in {type(inst), inst.__class__}
+            if c != str
+        )
+
+        # type(inst) should return inst.__class__,
+        # so not str unless actually a str
+        if not _check and type(inst) == str:
+            try:
+                self(inst)
+                _check = True  # if we can instantiate, then True!
+            except ValueError:
+                pass  # already False--just leave it
+
+        return _check
 
 
 class IndexType(metaclass=IndexMeta):
@@ -97,3 +123,22 @@ class IndexType(metaclass=IndexMeta):
         if errs:
             msg = 'Bad index: {}'.format('; '.join(errs))
             raise ValueError(msg)
+
+    def __eq__(self, other):
+        '''Test for equality with an IndexType object
+
+        Arguments:
+            other: The object to compare against.
+        Returns:
+            True if str values equal, False otherwise.
+            For IndexTypes, compares extns and counts, too.
+        '''
+
+        try:
+            return sorted(self.extns) == sorted(other.extns) \
+                and super().__eq__(other)
+        except AttributeError:
+            return super().__eq__(other)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
