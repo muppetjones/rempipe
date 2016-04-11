@@ -403,8 +403,8 @@ class CmdBase(CmdInterface):
 
         n_missing = self.attr.req_args - len(self.args)
         if n_missing > 0:
-            msg = 'Missing positional arguments: {} of {}'.format(
-                n_missing, self.attr.req_args)
+            msg = '[{}] Missing positional arguments: {} of {}'.format(
+                self.attr.name, n_missing, self.attr.req_args)
             raise IndexError(msg)
         return
 

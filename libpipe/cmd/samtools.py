@@ -1,6 +1,7 @@
 
 import os.path
 
+from libpipe.cmd import align  # HOTFIX: remove ASAP
 from libpipe.cmd import attr
 from libpipe.cmd import base
 from libpipe.type import index
@@ -56,7 +57,7 @@ class SamtoolsIndexCmd(base.CmdBase):
         '''Return given BAM file (unchanged) and genome index (if given)'''
         index_list = [
             i for i in self.input()
-            if isinstance(i, index.IndexType)
+            if isinstance(i, align.Hisat2Index)  # index.IndexType)  # HOTFIX
         ]
         return [self.args[0]] + index_list
 
@@ -107,7 +108,7 @@ class SamtoolsSortCmd(base.CmdBase):
         '''Return sorted BAM file and genome index (if given)'''
         index_list = [
             i for i in self.input()
-            if isinstance(i, index.IndexType)
+            if isinstance(i, align.Hisat2Index)  # index.IndexType)  # HOTFIX
         ]
         return [self.kwargs['-o']] + index_list
 

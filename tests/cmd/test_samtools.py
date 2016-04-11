@@ -5,6 +5,7 @@ import libpipe
 from libpipe.cmd import align
 from libpipe.cmd import dummy
 from libpipe.cmd import samtools
+from libpipe.type import index
 
 import logging
 log = logging.getLogger(__name__)
@@ -141,16 +142,19 @@ class TestSamtoolsSortCmd(SamtoolsTestCase):
             'Temporary flag not set with .tmp extension',
         )
 
-    def test_output_contains_only_o_flag(self):
+    def test_output_contains_o_flag(self):
         cmd = self.get_cmd()
         cmd.cmd()
 
         expected = [self.default_input[0].replace('.sam', '.s.bam')]
-        self.assertEqual(cmd.output(), expected)
+        m = mock.MagicMock(side_effect=ValueError)  # no index matching
+        with mock.patch.object(align.Hisat2Index, '_check_extns', m):
+            self.assertEqual(cmd.output(), expected)
 
     def test_output_includes_IndexType_from_input_if_any(self):
-        with mock.patch.object(align.Hisat2Index, '_check_extns'):
-            idx = align.Hisat2Index('path/to/index')
-        cmd = self.get_cmd(_input=[idx] + self.default_input)
+        cmd = self.get_cmd(_input=self.default_input)
         cmd.cmd()
-        self.assertIn(idx, cmd.output())
+        with mock.patch.object(libpipe.util.path, 'walk_safe') as m:
+            m.return_value = {
+                'file': ['hisat_index{}.ht2'.format(i) for i in range(8)]}
+            self.assertIn('genome/hisat_index', cmd.output())
