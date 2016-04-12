@@ -152,6 +152,8 @@ class TestSamtoolsSortCmd(SamtoolsTestCase):
             self.assertEqual(cmd.output(), expected)
 
     def test_output_includes_IndexType_from_input_if_any(self):
+        # NOTE: The same test from SamtoolsIndexCmd did NOT pass...
+        #   Why not?
         cmd = self.get_cmd(_input=self.default_input)
         cmd.cmd()
         with mock.patch.object(libpipe.util.path, 'walk_safe') as m:
