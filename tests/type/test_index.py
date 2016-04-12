@@ -25,6 +25,10 @@ class IndexTypeTestCase(base.LibpipeTestCase):
         self.CHILD = self.FACTORY(
             name='TestIndex', extns=['.bar', '.foo'], counts=[n_bar, n_foo])
 
+        # clean up registry before each call
+        index.IndexType.registry = {}
+        index.IndexType.children = {}
+
     #
     #   Mock setup
     #
@@ -142,9 +146,19 @@ class TestIndexFactory(IndexTypeTestCase):
         with self.assertRaises(ValueError):
             self.FACTORY(extns=[])
 
-    def test_facctory_raises_ValueError_if_parent_is_not_an_IndexType(self):
+    def test_factory_raises_ValueError_if_parent_is_not_an_IndexType(self):
         with self.assertRaises(ValueError):
             self.FACTORY(extns=list('abc'), parent=int)
+
+    def test_raises_ValueError_if_name_already_exists_w_diff_extn(self):
+        self.FACTORY(name='HelloWorld', extns=list('ab'))
+        with self.assertRaises(ValueError):
+            self.FACTORY(name='HelloWorld', extns=list('cd'))
+
+    def test_returns_existing_class_if_same_name_and_extn_given(self):
+        a = self.FACTORY(name='HelloWorld', extns=list('ab'))
+        b = self.FACTORY(name='HelloWorld', extns=list('ab'))
+        self.assertEqual(a, b)
 
 
 class TestIndexSubType(IndexTypeTestCase):
@@ -226,7 +240,7 @@ class TestIndexSubType__eq(IndexTypeTestCase):
         self.setup_mock_check_extns(index.IndexType)
 
         _cls1 = self.FACTORY('IndexSubType1', extns=list('abc'))
-        _cls2 = self.FACTORY('IndexSubType2', extns=list('abd'))
+        _cls2 = self.FACTORY('IndexSubType2', extns=list('abx'))
         _idx1 = _cls1('foo/bar')
         _idx2 = _cls2('foo/bar')
         self.assertNotEqual(_idx1, _idx2)
@@ -300,3 +314,59 @@ class TestIndexSubType__instancecheck(IndexTypeTestCase):
         _idx1 = self.FACTORY('SubIndex', extns=list('abc'))
         _idx2 = self.FACTORY('SubIndex2', extns=list('abc'), parent=_idx1)
         self.assertNotIsInstance(_idx1(), _idx2)
+
+
+class TestIndexSubType__register(IndexTypeTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.FACTORY = partial(index.factory, extns=['.foo'])
+
+        patcher = mock.patch.object(index.IndexType, '_check_extns')
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_new_subclasses_added_to_registry(self):
+        subcls = self.FACTORY()
+        self.assertIn(subcls.__name__.lower(), index.IndexType.registry)
+
+    def test_new_subclass_name_added_to_parent_class_children_registry(self):
+        subcls = self.FACTORY()
+        itype_name = index.IndexType.__name__.lower()
+        subcls_name = subcls.__name__.lower()
+        self.assertIn(subcls.__name__.lower(), subcls.children[itype_name])
+
+    def test_subsub_name_added_to_sub_children_registry(self):
+        subcls = self.FACTORY()
+        subsub = self.FACTORY(name='letslipthedogsofwar', parent=subcls)
+
+        itype_name = index.IndexType.__name__.lower()
+        subcls_name = subcls.__name__.lower()
+        subsub_name = subsub.__name__.lower()
+
+        self.assertIn(subsub_name, subcls.children[subcls_name])
+        self.assertNotIn(subsub_name, subcls.children[itype_name])
+
+    def test_only_IndexType_parents_added_to_children_registry(self):
+        '''Test that only add child list to IndexMeta
+
+        index.factory automatically adds str class as a parent--we
+        should NOT modify it
+        '''
+
+        subcls = self.FACTORY()
+        with self.assertRaises(AttributeError):
+            str.children
+        self.assertNotIn('str', subcls.children)
+
+    def test_get_children_returns_list_of_self_children(self):
+        subcls = self.FACTORY()
+        subsub = self.FACTORY(name='letslipthedogsofwar', parent=subcls)
+
+        itype_name = index.IndexType.__name__.lower()
+        subcls_name = subcls.__name__.lower()
+        subsub_name = subsub.__name__.lower()
+
+        self.assertEqual(index.IndexType.get_children(), [subcls_name])
+        self.assertEqual(subcls.get_children(), [subsub_name])
+        self.assertEqual(subsub.get_children(), [])

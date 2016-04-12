@@ -38,6 +38,18 @@ def factory(name='IndexSubType', extns=[], counts=[], parent=None):
 
     if not counts:
         counts = [1] * len(extns)  # assume only one of each extn required!
+
+    # Check for existing type
+    # -- return the type if found
+    # -- raise ValueError if same name, different extensions
+    if name.lower() in IndexType.registry:
+        existing = IndexType.registry[name.lower()]
+        if existing.extns == extns and existing.counts == counts:
+            return existing
+
+        msg = 'IndexType with name {} already exists'.format(name)
+        raise ValueError(msg)
+
     if counts and len(extns) != len(counts):
         msg = 'Unequal num of extns ({}) vs counts ({})'.format(
             len(extns), len(counts))
@@ -48,6 +60,38 @@ def factory(name='IndexSubType', extns=[], counts=[], parent=None):
 
 
 class IndexMeta(base.TypeMeta):
+
+    def __init__(mcl, name, parents, dct):
+        '''Add Registry and Children to new classes
+
+        Adds a simple registry {name: cls} for all sub classes.
+        Also creates a child lookup {name: [child name ...]}.
+        '''
+
+        try:
+            class_id = name.lower()
+            mcl.registry[class_id] = mcl
+        except AttributeError:
+            mcl.registry = {class_id: mcl}
+
+        # New type might not be registered yet
+        try:
+            mcl.children[class_id] = []
+        except AttributeError:
+            mcl.children = {class_id: []}
+
+        for parent in parents:
+            if not type(parent) == IndexMeta:
+                continue  # only add children lookup to IndexMeta
+
+            # add new class to parent registry
+            try:
+                parent_id = parent.__name__.lower()
+                mcl.children[parent_id].append(class_id)
+            except KeyError:
+                mcl.children[parent_id] = [class_id]
+
+        super(IndexMeta, mcl).__init__(name, parents, dct)
 
     def __instancecheck__(self, inst):
         '''Customize return value for `isinstance`
@@ -106,6 +150,29 @@ class IndexType(metaclass=IndexMeta):
             self.path, self.name = os.path.split(value)
             self._check_extns()
 
+    def __eq__(self, other):
+        '''Test for equality with an IndexType object
+
+        Arguments:
+        other: The object to compare against.
+        Returns:
+        True if str values equal, False otherwise.
+        For IndexTypes, compares extns and counts, too.
+        '''
+
+        try:
+            return sorted(self.extns) == sorted(other.extns) \
+                and super().__eq__(other)
+        except AttributeError:
+            return super().__eq__(other)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    @classmethod
+    def get_children(cls):
+        return cls.children[cls.__name__.lower()]
+
     def _check_extns(self):
         files = path.walk_file(
             self.path, extension=self.extns, pattern=[self.name])
@@ -123,22 +190,3 @@ class IndexType(metaclass=IndexMeta):
         if errs:
             msg = 'Bad index: {}'.format('; '.join(errs))
             raise ValueError(msg)
-
-    def __eq__(self, other):
-        '''Test for equality with an IndexType object
-
-        Arguments:
-            other: The object to compare against.
-        Returns:
-            True if str values equal, False otherwise.
-            For IndexTypes, compares extns and counts, too.
-        '''
-
-        try:
-            return sorted(self.extns) == sorted(other.extns) \
-                and super().__eq__(other)
-        except AttributeError:
-            return super().__eq__(other)
-
-    def __ne__(self, other):
-        return not self.__eq__(other)

@@ -76,8 +76,8 @@ class TestTypeBase(base.LibpipeTestCase):
         self.assertIsInstance(obj, self.CHILD)
 
     def test_factory_classes_are_unique(self):
-        foo = self.FACTORY('First')
-        bar = self.FACTORY('First')
+        foo = self.FACTORY('Foo')
+        bar = self.FACTORY('Bar')
         self.assertNotEqual(foo, bar)
 
     def test_subsequent_factory_calls_return_different_subclasses(self):
