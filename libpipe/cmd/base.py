@@ -1,11 +1,13 @@
 '''Define the base class for command-line objects'''
 
 import os.path
+import subprocess
 import time
 
 
 from libpipe.cmd.interface import CmdInterface
 from libpipe.type import index as _index
+from libpipe.decorators.io import file_or_handle
 
 import logging
 log = logging.getLogger(__name__)
@@ -33,9 +35,16 @@ class CmdBase(CmdInterface):
         timestamp: A timestamp string. Default: init time. Useful for
             creating a unique time id that is syncronized within a pipe.
 
-        strict: A bool indicating that only known arguments should be used.
-        complain: A bool indicating whether or not strict violations should
-            raise an exception (usually debugging only).
+        strict: A bool indicating whether enforcement of requirements
+            should be stricly enforced. In most cases, strict usage will
+            only log a warning.
+            Examples:
+                * Giving unknown flags to a command (warning)
+                * Unused input from linked commands (warning)
+        complain: A bool indicating whether or not strict (or unexpected)
+            violoations should be a bigger deal. In general, if it's a
+            strict violation, an exception will be raised. If it's a
+            potential problem, a warning will be logged.
 
     Class methods for override (in call order)
             NOTE: The 'cmd' method calls several functions that may be
@@ -98,15 +107,18 @@ class CmdBase(CmdInterface):
 
         # remove unknown flags and kwargs if strict (default)
         if strict:
-            if complain:
-                _unk_flags = [v for v in _flags if v not in expected_flags]
-                _unk_kw = [k for k in kwargs.keys() if k not in expected_flags]
-                if _unk_flags or _unk_kw:
-                    msg = 'Unknown arguments: {}'.format(
-                        ', '.join(_unk_kw + _unk_flags))
-                    raise ValueError(msg)
             _flags = [v for v in _flags if v in expected_flags]
             _kwargs = {k: v for k, v in kwargs.items() if k in expected_flags}
+
+            # alert the user
+            _unk_flags = [v for v in _flags if v not in expected_flags]
+            _unk_kw = [k for k in kwargs.keys() if k not in expected_flags]
+            if _unk_flags or _unk_kw:
+                msg = 'Unknown arguments: {}'.format(
+                    ', '.join(_unk_kw + _unk_flags))
+                log.warning(msg)
+                if complain:
+                    raise ValueError(msg)
 
         self.redirect = None
         self.args = _args  # deep copy list--but not elements
@@ -167,13 +179,14 @@ class CmdBase(CmdInterface):
             TypeError if link input is bad/unusable or if wrong file type.
             AttributeError if bad kwargs.
             IndexError if bad args.
+            ValueError if linked input is not matched.
         '''
 
         try:
             self._match_input_with_args()
         except AttributeError:
             pass  # not linked...Strange, but ignore
-        except TypeError:
+        except (TypeError, ValueError):
             raise  # bad link...let someone know
 
         self._pre_req()
@@ -185,6 +198,8 @@ class CmdBase(CmdInterface):
 
     def help(self):
         '''Return usage text'''
+        # extraneous?
+        # possibly use when a command errors out?
         raise NotImplementedError()
 
     def link(self, next_cmd):
@@ -199,8 +214,11 @@ class CmdBase(CmdInterface):
         next_cmd.input = self.output
         return next_cmd
 
-    def run(self):
-        raise NotImplementedError('Cmd cannot be run directly (yet)')
+    def run(self, *args, **kwargs):
+        if 'queue' in kwargs:
+            self._run_queue(*args, **kwargs)
+        else:
+            self._run_local(*args, **kwargs)
 
     #
     #   To override
@@ -383,6 +401,36 @@ class CmdBase(CmdInterface):
             if self.complain:
                 raise ValueError(msg)
         return
+
+    def _run_local(self, log_file=None):
+        '''Submit the command straight to the shell'''
+        cmd_str = self.cmd()
+        try:
+            lf = open(log_file, 'w')
+            kwargs = dict(stdout=lf, stderr=lf)
+        except TypeError:
+            kwargs = {}
+        finally:
+            subprocess.check_call(cmd_str, **kwargs)
+
+        try:
+            lf.close()
+        except UnboundLocalError:
+            pass  # file didn't open...probably not given
+        # self.script_file, stdout=self.log_file, stderr=self.log_file)
+        # except subprocess.CalledProcessError:
+        # raise
+
+    def _run_queue(self, queue=None):
+        '''Submit the command to a resource manager'''
+
+        # CRITICAL: This is not implemented yet!
+        #   -- separate class?
+
+        known_queues = []
+        if queue not in known_queues:
+            msg = 'Unknown resource manager queue {}'.format(queue)
+            raise ValueError(msg)
 
     #
     #   Private methods

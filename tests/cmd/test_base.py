@@ -11,6 +11,7 @@ Indirect tests are in alphabetical order, with the exception of init tests.
     * requirements
 '''
 
+import subprocess
 import unittest
 from unittest import mock
 
@@ -18,6 +19,8 @@ import libpipe
 from libpipe.cmd.attr import CmdAttributes
 from libpipe.cmd.base import CmdBase
 from libpipe.type import index as _index
+
+from tests.base import LibpipeTestCase  # includes read and write mock
 
 import logging
 log = logging.getLogger(__name__)
@@ -57,7 +60,7 @@ sample_attributes = {
 #   Base test case
 
 
-class BaseTestCase(unittest.TestCase):
+class BaseTestCase(LibpipeTestCase):
 
     '''Setup a dummy base command for testing'''
 
@@ -114,6 +117,18 @@ class TestCmdBase(unittest.TestCase):
             output = lambda x: None
         with self.assertRaises(AttributeError):
             FakeCmd()  # should not raise!
+
+    def test_name_property_returns_attr_name(self):
+        FakeCmd = type('FakeCmd', (CmdBase,), dict(
+            attr=self.cmd_attr, output=lambda: []))
+        cmd = FakeCmd()
+        self.assertEqual(cmd.name, cmd.attr.name)
+
+    def test_invoke_property_returns_attr_invoke(self):
+        FakeCmd = type('FakeCmd', (CmdBase,), dict(
+            attr=self.cmd_attr, output=lambda: []))
+        cmd = FakeCmd()
+        self.assertEqual(cmd.invoke, cmd.attr.invoke)
 
 
 #-----------------------------------------------------------------------------
@@ -438,13 +453,13 @@ class TestBaseCmd_link(BaseTestCase):
     def test_match_raises_AttributeError_if_not_linked(self):
         cmd = self.CMD()
         with self.assertRaises(AttributeError):
-            cmd._match_input_with_args()
+            cmd._match_input_with_args()  # ignored by cmd!
 
     def test_match_raises_TypeError_if_input_not_callable(self):
         cmd = self.CMD()
         cmd.input = list('abc')
         with self.assertRaises(TypeError):
-            cmd._match_input_with_args()
+            cmd.cmd()  # raised by match, caught and raised by cmd
 
     def test_match_warns_if_input_not_used_and_strict(self):
         logger = logging.getLogger('libpipe.cmd.base')
@@ -459,7 +474,7 @@ class TestBaseCmd_link(BaseTestCase):
         cmd = self.CMD(complain=True)
         cmd.input = lambda: ['file.txt']
         with self.assertRaises(ValueError):
-            cmd._match_input_with_args()
+            cmd.cmd()  # raised by match, caught and raised by cmd
 
     def test_match_exact_sets_args_with_perfect_match_1(self):
         '''Test for exact match single file to '-U' arg'''
@@ -696,3 +711,65 @@ class TestCmdBase_requirements(BaseTestCase):
         cmd = self.CMD(*args)
         cmd.cmd()  # should not raise
         self.assertNotEqual(cmd.args, args)  # reversed!
+
+
+class TestCmdBase_run(BaseTestCase):
+
+    def setUp(self):
+        super().setUp()
+
+        # prevent actually calling any commands
+        patcher = mock.patch('subprocess.check_call')
+        self.mock_call = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    #
+    #   Locally
+    #
+
+    def test_runs_locally_by_default(self):
+        cmd = self.CMD()
+        with mock.patch.object(cmd, '_run_local') as m:
+            cmd.run()
+        m.assert_called_once_with()
+
+    def test_local_run_calls_subprocess_with_cmd_str(self):
+        cmd = self.CMD()
+        cmd.run()
+
+        cmd_str = cmd.cmd()
+        self.mock_call.assert_called_once_with(cmd_str)
+
+    def test_local_opens_and_writes_to_logfile_if_given(self):
+        mock_open = self.setup_mock_write()
+        cmd = self.CMD()
+
+        log_file = 'cmd.log'
+        cmd_str = cmd.cmd()
+        cmd.run(log_file=log_file)
+
+        mock_open.assert_called_once_with(log_file, 'w')
+        self.mock_call.assert_called_once_with(
+            cmd_str, stdout=mock_open(), stderr=mock_open())
+
+    def test_local_raises_CalledProcessError_if_problem(self):
+        self.mock_call.side_effect = subprocess.CalledProcessError(1, 'AH!')
+
+        cmd = self.CMD()
+        with self.assertRaises(subprocess.CalledProcessError):
+            cmd.run()
+
+    #
+    #   Resource management queue
+    #
+
+    def test_calls_run_queue_if_queue_given(self):
+        cmd = self.CMD()
+        with mock.patch.object(cmd, '_run_queue') as m:
+            cmd.run(queue='qsub')
+        m.assert_called_once_with(queue='qsub')
+
+    def test_run_queue_raises_ValueError_if_unknown_queue(self):
+        cmd = self.CMD()
+        with self.assertRaises(ValueError):
+            cmd.run(queue='qsub')

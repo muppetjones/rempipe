@@ -303,10 +303,6 @@ class TestPipeBase_run(PipeBaseTestCase):
         self.mock_call = patcher.start()
         self.addCleanup(patcher.stop)
 
-        # log test name (for debugging)
-        # id_split = self.id().split('.')
-        # log.debug('-' * 50 + '\n\t' + '.'.join(id_split[-2:]))
-
     def test_run_calls_each_cmd_run_if_no_script_file(self):
         '''Test each cmd is run sep. if script_file not set'''
         pipe = PipeBase(cmds=self.get_n_cmds(3))
