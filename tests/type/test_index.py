@@ -16,6 +16,8 @@ log = logging.getLogger(__name__)
 
 class IndexTypeTestCase(base.LibpipeTestCase):
 
+    '''Define default setup and helper functions'''
+
     def setUp(self):
         super().setUp()
         self.PARENT = index.IndexType
@@ -25,9 +27,16 @@ class IndexTypeTestCase(base.LibpipeTestCase):
         self.CHILD = self.FACTORY(
             name='TestIndex', extns=['.bar', '.foo'], counts=[n_bar, n_foo])
 
-        # clean up registry before each call
+        # save, then clean up registry before each call
+        # -- not efficient, but a simple fix.
+        self.old_registry = dict.copy(index.IndexType.registry)
+        self.old_children = dict.copy(index.IndexType.children)
         index.IndexType.registry = {}
         index.IndexType.children = {}
+
+    def tearDown(self):
+        index.IndexType.registry = self.old_registry
+        index.IndexType.children = self.old_children
 
     #
     #   Mock setup
@@ -73,6 +82,8 @@ class IndexTypeTestCase(base.LibpipeTestCase):
 
 class TestIndexMeta(base.LibpipeTestCase):
 
+    '''Tests against the meta directly'''
+
     def test_IndexMeta_inherits_from_TypeMeta(self):
         self.assertTrue(
             issubclass(index.IndexMeta, _type.TypeMeta),
@@ -82,25 +93,38 @@ class TestIndexMeta(base.LibpipeTestCase):
 
 class TestIndexType__TypeBase(test_base.TestTypeBase):
 
+    '''Test against IndexType directly (inherits from TypeBase tests)'''
+
     def setUp(self):
         super().setUp()
+
+        # define variables used by TypeBase tests
+        # -- note the partial factory declaration!
         self.PARENT = index.IndexType
         self.FACTORY = partial(index.factory, extns=['.foo'])
         self.CHILD = self.FACTORY('IndexFooType')  # includes extns=['.foo']
 
-        patcher = mock.patch.object(index.IndexType, '_check_extns')
-        patcher.start()
+        # mock out walk_file so we can test check_extns
+        patcher = mock.patch('libpipe.util.path.walk_file')
+        m = patcher.start()
         self.addCleanup(patcher.stop)
-
-    def test_factory_sets_child_name(self):
-        child_class = self.FACTORY(name='Dolly')
-        self.assertEqual(child_class.__name__, 'Dolly')
+        m.return_value = ['file.foo']
 
     def test_child_is_still_TypeMeta(self):
         self.assertIsInstance(self.CHILD, _type.TypeMeta)
 
+    def test_IndexType_cannot_be_called_directly(self):
+        with self.assertRaises(TypeError):
+            index.IndexType('path/to/nowhere')
+
 
 class TestIndexFactory(IndexTypeTestCase):
+
+    '''Test index factory'''
+
+    def test_factory_sets_child_name(self):
+        child_class = self.FACTORY(name='Dolly', extns=list('ab'))
+        self.assertEqual(child_class.__name__, 'Dolly')
 
     def test_factory_return_is_subclassed_from_str_by_default(self):
         subtype = self.FACTORY(extns=list('ab'))
@@ -163,9 +187,7 @@ class TestIndexFactory(IndexTypeTestCase):
 
 class TestIndexSubType(IndexTypeTestCase):
 
-    #
-    #   Tests
-    #
+    '''Test children types created by the factory'''
 
     def test_init_with_no_args_returns_empty_string(self):
         self.assertEqual(self.CHILD(), '')
@@ -211,9 +233,7 @@ class TestIndexSubType(IndexTypeTestCase):
 
 class TestIndexSubType__eq(IndexTypeTestCase):
 
-    #
-    #   __eq__
-    #
+    '''Test __eq__'''
 
     def test_eq_True_for_matching_str(self):
         self.setup_mock_check_extns(self.CHILD)
@@ -263,8 +283,22 @@ class TestIndexSubType__eq(IndexTypeTestCase):
         _idx2 = _cls2('foo/bar')
         self.assertEqual(_idx1, _idx2)
 
+    def test_eq_False_if_no_extns_set(self):
+        '''Test eq False if no extn to check'''
+        self.setup_mock_check_extns(index.IndexType)
+
+        _cls1 = self.FACTORY('IndexSubType1', extns=list('abc'))
+        _cls2 = self.FACTORY('IndexSubType2', extns=list('abc'))
+        _idx1 = _cls1('foo/bar')
+        _idx2 = _cls2('foo/bar')
+        _cls1.extns = []
+        _cls2.extns = []
+        self.assertNotEqual(_idx1, _idx2)
+
 
 class TestIndexSubType__instancecheck(IndexTypeTestCase):
+
+    '''Test isinstance override'''
 
     def setUp(self):
         super().setUp()
@@ -280,8 +314,7 @@ class TestIndexSubType__instancecheck(IndexTypeTestCase):
     #
 
     def test_returns_True_for_str_if_index_files_found(self):
-
-        m = self.setup_mock_walk_file(self.default_file_list)
+        self.setup_mock_walk_file(self.default_file_list)
         self.assertTrue(
             isinstance('some/path/to/index', self.CHILD),
             'isinstance returns False instead of True'
@@ -315,8 +348,19 @@ class TestIndexSubType__instancecheck(IndexTypeTestCase):
         _idx2 = self.FACTORY('SubIndex2', extns=list('abc'), parent=_idx1)
         self.assertNotIsInstance(_idx1(), _idx2)
 
+    def test_against_base_propagates_to_child(self):
+        self.setup_mock_walk_file(['.foo'])
+        _idx1 = self.FACTORY('SubIndex', extns=['.foo'])
+
+        with mock.patch.object(_idx1, '_check_extns') as m:
+            index.IndexType.__instancecheck__('path/to/prefix')
+
+        m.assert_called_once_with('path/to/prefix')
+
 
 class TestIndexSubType__register(IndexTypeTestCase):
+
+    '''Test the registries'''
 
     def setUp(self):
         super().setUp()
@@ -333,7 +377,6 @@ class TestIndexSubType__register(IndexTypeTestCase):
     def test_new_subclass_name_added_to_parent_class_children_registry(self):
         subcls = self.FACTORY()
         itype_name = index.IndexType.__name__.lower()
-        subcls_name = subcls.__name__.lower()
         self.assertIn(subcls.__name__.lower(), subcls.children[itype_name])
 
     def test_subsub_name_added_to_sub_children_registry(self):
@@ -359,14 +402,10 @@ class TestIndexSubType__register(IndexTypeTestCase):
             str.children
         self.assertNotIn('str', subcls.children)
 
-    def test_get_children_returns_list_of_self_children(self):
+    def test_get_children_returns_list_of_self_children_classes(self):
         subcls = self.FACTORY()
         subsub = self.FACTORY(name='letslipthedogsofwar', parent=subcls)
 
-        itype_name = index.IndexType.__name__.lower()
-        subcls_name = subcls.__name__.lower()
-        subsub_name = subsub.__name__.lower()
-
-        self.assertEqual(index.IndexType.get_children(), [subcls_name])
-        self.assertEqual(subcls.get_children(), [subsub_name])
+        self.assertEqual(index.IndexType.get_children(), [subcls])
+        self.assertEqual(subcls.get_children(), [subsub])
         self.assertEqual(subsub.get_children(), [])
