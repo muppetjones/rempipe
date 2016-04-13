@@ -121,23 +121,3 @@ class Hisat2Cmd(CmdBase):
         unal_base = os.path.splitext(self.kwargs['-S'])[0].replace('_unal', '')
         unal = unal_base + '_unal.fastq'
         self.kwargs.update({unal_key: unal})
-
-    #
-    #   Class methods
-    #
-
-    @classmethod
-    def _check_for_index_files(
-            cls, index_name, expected_file_count=8, extension='.ht2'):
-        # ensure the index exists
-        genome_dir, genome_base = os.path.split(index_name)
-        if not genome_dir:
-            genome_dir = './'
-
-        index_pattern = r'{}\..*{}'.format(genome_base, extension)
-        index_files = path.walk_file(genome_dir, pattern=index_pattern)
-
-        if len(index_files) != expected_file_count:
-            msg = 'Fewer index files ({}) than expected ({})'.format(
-                len(index_files), expected_file_count)
-            raise ValueError(msg)

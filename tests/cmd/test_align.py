@@ -117,7 +117,7 @@ class TestHisat2Cmd(unittest.TestCase):
         self.assertIsInstance(cmd.kwargs['-x'], align.Hisat2Index)
         self.assertEqual(cmd.kwargs['-x'], DEFAULT_INPUT[2])
 
-    def test_check_index_raises_ValueError_if_bad_index(self):
+    def test_check_req_raises_ValueError_if_bad_index(self):
         '''Test for exception if index not as expected (8 *.ht2 files)
 
         NOTE: if not *.ht2, won't be returned by walk_file (empty list)
@@ -125,8 +125,13 @@ class TestHisat2Cmd(unittest.TestCase):
 
         self.mock_walk.return_value = [
             'idx.{}.ht2'.format(i) for i in range(5)]
+        cmd = align.Hisat2Cmd()
+        cmd.kwargs.update({
+            '-x': 'genomes/index_name',
+            '-U': 'something.fq',
+        })
         with self.assertRaises(ValueError):
-            align.Hisat2Cmd._check_for_index_files('genomes/index_name')
+            cmd.cmd()
 
     #
     #   Test _prepcmd

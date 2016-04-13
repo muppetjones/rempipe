@@ -482,7 +482,7 @@ class CmdBase(CmdInterface):
             elif isinstance(cmpd, list):
                 found = [kw for kw in cmpd if kw in self.kwargs]
                 if len(found) != 1:
-                    missing.append('XOR({})'.format(', '.join(found)))
+                    missing.append('XOR({})'.format(', '.join(cmpd)))
 
         if missing:
             msg = 'Missing required keyword arg: {}'.format(', '.join(missing))
