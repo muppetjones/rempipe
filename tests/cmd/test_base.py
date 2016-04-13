@@ -206,6 +206,7 @@ class TestCmdBase_init(BaseTestCase):
 
     def test_init_ignores_unknown_kwarg_if_strict(self):
         '''Test that unknown kwargs are ignored by default'''
+        self.mock_log_warning()
 
         kwargs = {'--unknown': 'bad_kwarg'}
         cmd = self.CMD(**kwargs)
@@ -226,6 +227,7 @@ class TestCmdBase_init(BaseTestCase):
 
     def test_init_raises_ValueError_if_unknown_kwarg_and_complain(self):
         '''Test init fails if unknown kwarg and complain=True'''
+        self.mock_log_warning()
 
         kwargs = {'--unknown': 'bad_kwarg'}
         with self.assertRaises(ValueError):

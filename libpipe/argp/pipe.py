@@ -35,28 +35,6 @@ class ProtectAbsPathList(argparse._AppendAction):
             parser, namespace, values, option_string)
 
 
-class ParseSummaryArg(argparse.Action):
-    '''Custom argparse.Action for reading a summary file.
-
-    [Deprecated] Read in a summary file and set `summary` with
-    a dict of the results.
-
-    CRITICAL: This is what NOT to do. It works, but it's poor design.
-        It will be difficult to maintain, and this design pattern
-        will result in MANY specialized actions.
-    '''
-
-    def __call__(self, parser, namespace, summary_file, option_string):
-        raise(DeprecationWarning('Do not use this argparse.Action'))
-        summary_file = path.protect(summary_file)
-        summary = {}
-        with open(summary_file, 'r') as fh:
-            rows = [line.lstrip().rstrip().split() for line in fh]
-            summary = {col[0]: col[1].split(';') for col in rows}
-
-        setattr(namespace, self.dest, summary)
-
-
 #
 #   Define pipe argparse objects
 #

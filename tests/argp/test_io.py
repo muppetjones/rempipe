@@ -23,7 +23,8 @@ class TestArgpInput(ArgpTestCase):
     def test_input_parser_calls_path_protect_for_each_input_file(self):
         with mock.patch('libpipe.util.path.protect') as mock_protect:
             self.get_args('-f file0.txt --file file1.txt')
-        expected = [mock.call('file{}.txt'.format(i)) for i in range(2)]
+        expected = [
+            mock.call('file{}.txt'.format(i), abspath=True) for i in range(2)]
         mock_protect.assert_has_calls(expected)
 
     def test_input_parser_stores_d_and_dir_args_in_dir_list(self):
@@ -39,6 +40,10 @@ class TestArgpInput(ArgpTestCase):
         with mock.patch('libpipe.util.path.walk_file', m):
             args.find_files(args)
         self.assertEqual(args.file_list, ['file.txt'] + dir_files)
+
+    def test_find_files_returns_None_if_dir_list_not_set(self):
+        args = self.get_args('-f file.txt')
+        self.assertIsNone(args.find_files(args))
 
     def test_find_files_deletes_dir_list_attribute(self):
         args = self.get_args('-d data/foo')

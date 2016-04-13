@@ -27,22 +27,12 @@ class AddLeadingPeriodList(argparse._AppendAction):
             parser, namespace, val, option_string)
 
 
-class ProtectRelPathList(argparse._AppendAction):
-
-    '''Protect path strings'''
-
-    def __call__(self, parser, namespace, values, option_string):
-        values = path.protect(values, abspath=False)
-        super(ProtectRelPathList, self).__call__(
-            parser, namespace, values, option_string)
-
-
 class ProtectAbsPathList(argparse._AppendAction):
 
     '''Protect path strings'''
 
     def __call__(self, parser, namespace, values, option_string):
-        values = path.protect(values)
+        values = path.protect(values, abspath=True)
         super(ProtectAbsPathList, self).__call__(
             parser, namespace, values, option_string)
 
