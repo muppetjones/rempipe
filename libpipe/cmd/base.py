@@ -7,7 +7,6 @@ import time
 
 from libpipe.cmd.interface import CmdInterface
 from libpipe.type import index as _index
-from libpipe.decorators.io import file_or_handle
 
 import logging
 log = logging.getLogger(__name__)
