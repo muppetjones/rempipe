@@ -119,8 +119,8 @@ def unique_suffix(file_list, strict=True, suffix_terminator='_'):
 def avoid_overwrite(filename, max_attempts=20, allow_empty=True):
     '''Return an overwrite-safe filename
 
-    NOTE: If max number of attempts is hit, will return filename of earliest
-          file.
+    NOTE: If max number of attempts is hit, will return filename of
+          oldest file.
 
     Arguments:
         filename (string)
@@ -141,7 +141,7 @@ def avoid_overwrite(filename, max_attempts=20, allow_empty=True):
         if not os.path.exists(check):
             return check
 
-        elif os.path.isfile(check) and allow_empty:
+        elif allow_empty and os.path.isfile(check):
             try:
                 file_size = os.path.getsize(check)
                 if file_size == 0:
@@ -193,13 +193,15 @@ def walk_safe_generator(dir_str, level=None):
     num_sep = dir_str.count(os.path.sep)
 
     for root, d, f in os.walk(dir_str, topdown=True):
-        yield root, d, f  # makes this a generator function!
 
         # ----------------------------------------------- check depth recursion
         if level is not None:
             num_sep_this = root.count(os.path.sep)
             if num_sep + level <= num_sep_this:
                 del d[:]
+                continue
+
+        yield root, d, f  # makes this a generator function!
 
     return
 
@@ -228,7 +230,6 @@ def walk_safe(dir_str, level=None):
 
     contents = {'dir': [], 'file': []}
     for root, d, f in walk_safe_generator(dir_str, level=level):
-        # yield root, d, f # makes this a generator function!
 
         d_path = [os.path.join(root, x) for x in d]
         f_path = [os.path.join(root, x) for x in f]
@@ -286,10 +287,6 @@ def walk_file(directory, level=None, extension=[], pattern=[]):
         pattern_match = lambda f: True if pattern_re.search(f) else False
 
     # ----------------------------------------------------- find matching files
-#     for f in files:
-#         print("   : [{1}, {2}]  {0}".format(
-#             os.path.relpath(f, protect(directory)),
-#             extension_match(f), pattern_match(f)))
     matched_files = [f for f in files
                      if extension_match(f) and pattern_match(f)]
 
@@ -308,7 +305,7 @@ def walk_dir(directory, level=None, pattern=[]):
         pattern (string or list): Regex pattern to match dirs against.
 
     Returns:
-        A list of matching files found in the given directory
+        A list of matching dirs found in the given directory
 
     Raises:
         None
@@ -347,7 +344,7 @@ def makedirs(dir_str, mode_oct=0o755):
     # ensure kosher path
     try:
         dir_str = protect(dir_str)
-    except ValueError as e:
+    except AssertionError as e:
         raise OSError(str(e))
 
     # attempt to make dir
@@ -359,19 +356,3 @@ def makedirs(dir_str, mode_oct=0o755):
             raise
 
     return True
-
-'''
-Declare 'main' function for script usage.
-'''
-
-
-def main(argv=None):
-    pass
-
-if __name__ == '__main__':
-
-    from remsci.lib.utility import customLogging
-    customLogging.config()
-
-    status = main()
-    sys.exit(status)
