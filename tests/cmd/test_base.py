@@ -11,6 +11,7 @@ Indirect tests are in alphabetical order, with the exception of init tests.
     * requirements
 '''
 
+import copy
 import subprocess
 import unittest
 from unittest import mock
@@ -508,6 +509,22 @@ class TestBaseCmd_link(BaseTestCase):
 
 
 class TestBaseCmd_CustomTypes(BaseTestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.old_registry = copy.deepcopy(_index.IndexType.registry)
+        cls.old_children = copy.deepcopy(_index.IndexType.children)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Reload saved registries after each test
+        _index.IndexType.registry = copy.deepcopy(cls.old_registry)
+        _index.IndexType.children = copy.deepcopy(cls.old_children)
+
+    def tearDown(self):
+        # Reload saved registries after each test
+        _index.IndexType.registry = copy.deepcopy(self.old_registry)
+        _index.IndexType.children = copy.deepcopy(self.old_children)
 
     def test_match_custom_types(self):
         '''Test that a custom type is matched appropriately'''

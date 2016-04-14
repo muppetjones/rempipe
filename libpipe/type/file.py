@@ -48,13 +48,14 @@ class FileMeta(base.TypeMeta):
         class_id = name.lower()
 
         try:
-            if class_id in mcl.registry:
-                msg = 'Duplicate FileType found: {}'.format(class_id)
-                raise ValueError(msg)
+            mcl.registry[class_id]
         except AttributeError:
             mcl.registry = {}  # init main registry
-        except ValueError:
-            raise
+        except KeyError:
+            pass  # class is not registered. Good!
+        else:
+            msg = 'Duplicate FileType found: {}'.format(class_id)
+            raise ValueError(msg)
 
         mcl.registry[class_id] = mcl
 

@@ -1,4 +1,5 @@
 
+import copy
 import os.path
 
 from functools import partial
@@ -18,25 +19,46 @@ class IndexTypeTestCase(base.LibpipeTestCase):
 
     '''Define default setup and helper functions'''
 
+    @classmethod
+    def setUpClass(cls):
+        cls.old_registry = copy.deepcopy(index.IndexType.registry)
+        cls.old_children = copy.deepcopy(index.IndexType.children)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Reload saved registries after each test
+        index.IndexType.registry = copy.deepcopy(cls.old_registry)
+        index.IndexType.children = copy.deepcopy(cls.old_children)
+
     def setUp(self):
         super().setUp()
+
+        self.META = index.IndexMeta
         self.PARENT = index.IndexType
         self.FACTORY = index.factory
 
         n_foo, n_bar = (4, 2)
         self.CHILD = self.FACTORY(
-            name='TestIndex', extns=['.bar', '.foo'], counts=[n_bar, n_foo])
+            name='TestIndex',
+            extns=['.bar', '.foo'],
+            counts=[n_bar, n_foo]
+        )
 
         # save, then clean up registry before each call
         # -- not efficient, but a simple fix.
-        self.old_registry = dict.copy(index.IndexType.registry)
-        self.old_children = dict.copy(index.IndexType.children)
-        index.IndexType.registry = {}
-        index.IndexType.children = {}
+    #     self.old_registry = dict.copy(index.IndexType.registry)
+    #     self.old_children = dict.copy(index.IndexType.children)
+    #     index.IndexType.registry = {}
+    #     index.IndexType.children = {}
+    #
+    # def tearDown(self):
+    #     index.IndexType.registry = self.old_registry
+    #     index.IndexType.children = self.old_children
 
     def tearDown(self):
-        index.IndexType.registry = self.old_registry
-        index.IndexType.children = self.old_children
+        # Reload saved registries after each test
+        index.IndexType.registry = copy.deepcopy(self.old_registry)
+        index.IndexType.children = copy.deepcopy(self.old_children)
 
     #
     #   Mock setup
@@ -91,15 +113,27 @@ class TestIndexMeta(base.LibpipeTestCase):
         )
 
 
-class TestIndexType__TypeBase(test_base.TestTypeBase):
+class TestIndexType__TypeBase(base.LibpipeTestCase, test_base.TestTypeBase):
 
     '''Test against IndexType directly (inherits from TypeBase tests)'''
+
+    @classmethod
+    def setUpClass(cls):
+        cls.old_registry = copy.deepcopy(index.IndexType.registry)
+        cls.old_children = copy.deepcopy(index.IndexType.children)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Reload saved registries after each test
+        index.IndexType.registry = copy.deepcopy(cls.old_registry)
+        index.IndexType.children = copy.deepcopy(cls.old_children)
 
     def setUp(self):
         super().setUp()
 
         # define variables used by TypeBase tests
         # -- note the partial factory declaration!
+        self.META = index.IndexMeta
         self.PARENT = index.IndexType
         self.FACTORY = partial(index.factory, extns=['.foo'])
         self.CHILD = self.FACTORY('IndexFooType')  # includes extns=['.foo']
@@ -109,6 +143,11 @@ class TestIndexType__TypeBase(test_base.TestTypeBase):
         m = patcher.start()
         self.addCleanup(patcher.stop)
         m.return_value = ['file.foo']
+
+    def tearDown(self):
+        # Reload saved registries after each test
+        index.IndexType.registry = copy.deepcopy(self.old_registry)
+        index.IndexType.children = copy.deepcopy(self.old_children)
 
     def test_child_is_still_TypeMeta(self):
         self.assertIsInstance(self.CHILD, _type.TypeMeta)
@@ -358,54 +397,9 @@ class TestIndexSubType__instancecheck(IndexTypeTestCase):
         m.assert_called_once_with('path/to/prefix')
 
 
-class TestIndexSubType__register(IndexTypeTestCase):
-
-    '''Test the registries'''
+class TestSubType__register(
+        IndexTypeTestCase, test_base.TestTypeMixin__register):
 
     def setUp(self):
         super().setUp()
-        self.FACTORY = partial(index.factory, extns=['.foo'])
-
-        patcher = mock.patch.object(index.IndexType, '_check_extns')
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def test_new_subclasses_added_to_registry(self):
-        subcls = self.FACTORY()
-        self.assertIn(subcls.__name__.lower(), index.IndexType.registry)
-
-    def test_new_subclass_name_added_to_parent_class_children_registry(self):
-        subcls = self.FACTORY()
-        itype_name = index.IndexType.__name__.lower()
-        self.assertIn(subcls.__name__.lower(), subcls.children[itype_name])
-
-    def test_subsub_name_added_to_sub_children_registry(self):
-        subcls = self.FACTORY()
-        subsub = self.FACTORY(name='letslipthedogsofwar', parent=subcls)
-
-        itype_name = index.IndexType.__name__.lower()
-        subcls_name = subcls.__name__.lower()
-        subsub_name = subsub.__name__.lower()
-
-        self.assertIn(subsub_name, subcls.children[subcls_name])
-        self.assertNotIn(subsub_name, subcls.children[itype_name])
-
-    def test_only_IndexType_parents_added_to_children_registry(self):
-        '''Test that only add child list to IndexMeta
-
-        index.factory automatically adds str class as a parent--we
-        should NOT modify it
-        '''
-
-        subcls = self.FACTORY()
-        with self.assertRaises(AttributeError):
-            str.children
-        self.assertNotIn('str', subcls.children)
-
-    def test_get_children_returns_list_of_self_children_classes(self):
-        subcls = self.FACTORY()
-        subsub = self.FACTORY(name='letslipthedogsofwar', parent=subcls)
-
-        self.assertEqual(index.IndexType.get_children(), [subcls])
-        self.assertEqual(subcls.get_children(), [subsub])
-        self.assertEqual(subsub.get_children(), [])
+        self.FACTORY = partial(self.FACTORY, extns=['.par'])

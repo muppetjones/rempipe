@@ -9,7 +9,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def factory(name='IndexSubType', extns=[], counts=[], parent=None):
+def factory(name=None, extns=[], counts=[], parent=None):
     '''Create an IndexType class
 
     Create and return an IndexMeta type, subclassed to str and parent.
@@ -65,23 +65,38 @@ def factory(name='IndexSubType', extns=[], counts=[], parent=None):
     if not counts:
         counts = [1] * len(extns)  # assume only one of each extn required!
 
+    if not name:
+        name = 'IndexType_{}'.format('_'.join(
+            extn if not extn.startswith('.') else extn[1:] for extn in extns
+        ))
+
     # Check for existing type
     # -- return the type if found
     # -- raise ValueError if same name, different extensions
-    if name.lower() in IndexType.registry:
-        existing = IndexType.registry[name.lower()]
-        if existing.extns == extns and existing.counts == counts:
-            return existing
-
-        msg = 'IndexType with name {} already exists'.format(name)
-        raise ValueError(msg)
+    # if name.lower() in IndexType.registry:
+    #     existing = IndexType.registry[name.lower()]
+    #     if existing.extns == extns and existing.counts == counts:
+    #         return existing
+    #
+    #     msg = 'IndexType with name {} already exists'.format(name)
+    #     raise ValueError(msg)
 
     if counts and len(extns) != len(counts):
         msg = 'Unequal num of extns ({}) vs counts ({})'.format(
             len(extns), len(counts))
         raise ValueError(msg)
 
-    _subcls = type(name, (parent, str), dict(extns=extns, counts=counts))
+    try:
+        _subcls = IndexMeta(
+            name, (parent, str), dict(extns=extns, counts=counts))
+    except ValueError:
+        # Could be a class with the same name exists
+        # -- if so, and the extensions are the same, just return the original
+        possible_dup = IndexType.registry[name.lower()]
+        if extns == possible_dup.extns:
+            _subcls = possible_dup
+        else:
+            raise
     return _subcls
 
 
@@ -129,11 +144,20 @@ class IndexMeta(base.TypeMeta):
         Also creates a child lookup {name: [child name ...]}.
         '''
 
+        class_id = name.lower()
+
+        # check for existing entry or missing registry
         try:
-            class_id = name.lower()
-            mcl.registry[class_id] = mcl
+            mcl.registry[class_id]
         except AttributeError:
-            mcl.registry = {class_id: mcl}
+            mcl.registry = {}  # init main registry
+        except KeyError:
+            pass  # not a bug! this is actually what we want!
+        else:
+            msg = 'Duplicate IndexType found: {}'
+            raise ValueError(msg)
+
+        mcl.registry[class_id] = mcl
 
         # New type might not be registered yet
         try:
@@ -142,15 +166,12 @@ class IndexMeta(base.TypeMeta):
             mcl.children = {class_id: []}
 
         for parent in parents:
-            if not type(parent) == IndexMeta:
+            if type(parent) != IndexMeta:
                 continue  # only add children lookup to IndexMeta
 
             # add new class to parent registry
-            try:
-                parent_id = parent.__name__.lower()
-                mcl.children[parent_id].append(class_id)
-            except KeyError:
-                mcl.children[parent_id] = [class_id]
+            parent_id = parent.__name__.lower()
+            mcl.children[parent_id].append(class_id)
 
         super(IndexMeta, mcl).__init__(name, parents, dct)
 
