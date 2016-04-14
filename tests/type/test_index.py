@@ -170,8 +170,8 @@ class TestIndexFactory(IndexTypeTestCase):
         with self.assertRaises(ValueError):
             self.FACTORY(extns=[])
 
-    def test_factory_raises_ValueError_if_parent_is_not_an_IndexType(self):
-        with self.assertRaises(ValueError):
+    def test_factory_raises_TypeError_if_parent_is_not_an_IndexType(self):
+        with self.assertRaises(TypeError):
             self.FACTORY(extns=list('abc'), parent=int)
 
     def test_raises_ValueError_if_name_already_exists_w_diff_extn(self):

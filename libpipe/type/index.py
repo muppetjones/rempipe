@@ -27,6 +27,7 @@ def factory(name='IndexSubType', extns=[], counts=[], parent=None):
     Raises:
         ValueError if no extensions given or if the number of counts
         does not match the number of given extns.
+        TypeError if the given parent is not of type IndexMeta.
 
     Examples:
         # For a genome with a hisat2 index named GRCh38p5, i.e., GRCh38p5.*.ht2
@@ -53,9 +54,9 @@ def factory(name='IndexSubType', extns=[], counts=[], parent=None):
     # Verify lineage
     if not parent:
         parent = IndexType
-    if not issubclass(parent, IndexType):
+    if not type(parent) == IndexMeta:
         msg = 'Parent must be an IndexType'
-        raise ValueError(msg)
+        raise TypeError(msg)
 
     if not extns:
         msg = 'No extensions given. Try factory(extns=[".fa", ...])'
