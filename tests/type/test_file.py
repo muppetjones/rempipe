@@ -1,4 +1,5 @@
-import os.path
+
+import copy
 
 from functools import partial
 from unittest import mock
@@ -17,13 +18,30 @@ class FileTypeTestCase(base.LibpipeTestCase):
 
     '''Define default setup and helper functions'''
 
+    @classmethod
+    def setUpClass(cls):
+        cls.old_registry = copy.deepcopy(_file.FileType.registry)
+        cls.old_children = copy.deepcopy(_file.FileType.children)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Reload saved registries after each test
+        _file.FileType.registry = copy.deepcopy(cls.old_registry)
+        _file.FileType.children = copy.deepcopy(cls.old_children)
+
     def setUp(self):
         super().setUp()
+
         self.PARENT = _file.FileType
         self.FACTORY = _file.factory
 
         self.CHILD = self.FACTORY(
             name='TestFile', extns=['.bar', '.foo'])
+
+    def tearDown(self):
+        # Reload saved registries after each test
+        _file.FileType.registry = copy.deepcopy(self.old_registry)
+        _file.FileType.children = copy.deepcopy(self.old_children)
 
 
 class TestFileMeta(base.LibpipeTestCase):
@@ -41,7 +59,19 @@ class TestFileType__TypeBase(test_base.TestTypeBase):
 
     '''Test against FileType directly (inherits from TypeBase tests)'''
 
+    @classmethod
+    def setUpClass(cls):
+        cls.old_registry = copy.deepcopy(_file.FileType.registry)
+        cls.old_children = copy.deepcopy(_file.FileType.children)
+
+    @classmethod
+    def tearDownClass(cls):
+        # Reload saved registries after each test
+        _file.FileType.registry = copy.deepcopy(cls.old_registry)
+        _file.FileType.children = copy.deepcopy(cls.old_children)
+
     def setUp(self):
+
         super().setUp()
 
         # define variables used by TypeBase tests
@@ -54,6 +84,11 @@ class TestFileType__TypeBase(test_base.TestTypeBase):
         patcher = mock.patch('libpipe.type.file.FileType._check_extns')
         self.mock_check_extns = patcher.start()
         self.addCleanup(patcher.stop)
+
+    def tearDown(self):
+        # Reload saved registries after each test
+        _file.FileType.registry = copy.deepcopy(self.old_registry)
+        _file.FileType.children = copy.deepcopy(self.old_children)
 
     def test_child_is_still_TypeMeta(self):
         self.assertIsInstance(self.CHILD, _type.TypeMeta)
@@ -75,6 +110,11 @@ class TestFileType__factory(FileTypeTestCase):
         child_class = self.FACTORY(name='Dolly', extns=list('ab'))
         self.assertEqual(child_class.__name__, 'Dolly')
 
+    def test_factory_creates_custom_name_via_extns_if_not_given(self):
+        # also tests removal of leading periods
+        child_class = self.FACTORY(extns=['.a', 'b'])
+        self.assertTrue(child_class.__name__.endswith('_a_b'))
+
     def test_factory_return_is_subclassed_from_str_by_default(self):
         subtype = self.FACTORY(extns=list('ab'))
         self.assertTrue(issubclass(subtype, str), 'Not subclassed from str')
@@ -85,7 +125,7 @@ class TestFileType__factory(FileTypeTestCase):
 
     def test_factory_class_is_subtype_of_given_parent(self):
         subtype = self.FACTORY(extns=list('ab'))
-        subsub = self.FACTORY(extns=list('ab'), parent=subtype)
+        subsub = self.FACTORY(extns=list('ac'), parent=subtype)
         self.assertTrue(issubclass(subsub, subtype), 'Parent not set')
 
     def test_factory_raises_TypeError_if_non_Meta_parent_given(self):
@@ -100,13 +140,19 @@ class TestFileType__factory(FileTypeTestCase):
         with self.assertRaises(ValueError):
             self.FACTORY()
 
-    #
-    #   Factory--returned class instance
-    #
-
-    def test_factory_object_is_str_instance_by_default(self):
+    def test_factory_class_is_str_subclass_by_default(self):
         subtype = self.FACTORY(extns=list('ab'))
         self.assertTrue(issubclass(subtype, str), 'Factory class is not str')
+
+    def test_raises_ValueError_if_name_already_exists_w_diff_extn(self):
+        self.FACTORY(name='HelloWorld', extns=list('ab'))
+        with self.assertRaises(ValueError):
+            self.FACTORY(name='HelloWorld', extns=list('cd'))
+
+    def test_returns_existing_class_if_same_name_and_extn_given(self):
+        a = self.FACTORY(name='HelloWorld', extns=list('ab'))
+        b = self.FACTORY(name='HelloWorld', extns=list('ab'))
+        self.assertEqual(a, b)
 
 
 class TestSubType(FileTypeTestCase):
@@ -237,5 +283,91 @@ class TestSubType__instancecheck(FileTypeTestCase):
 
     def test_str_w_invalid_extn_returns_isinstance_false(self):
         self.assertNotIsInstance('hello_my_baby', self.CHILD)
+
+
+class TestSubType__register(FileTypeTestCase):
+
+    def setUp(self):
+        super().setUp()
+
+        self.FACTORY = partial(self.FACTORY, extns=['.par'])
+
+    def test_registry_shared_across_all_class(self):
+        i1 = self.FACTORY(name='I_1')
+        i2 = self.FACTORY(name='I_2')
+        ii1 = self.FACTORY(name='II_1', parent=i1)
+        ii2 = self.FACTORY(name='II_2', parent=i2)
+
+        ii2.registry.update({'brave': 'world'})
+        clses = [_file.FileType, i1, i2, ii1, ii2]
+        for cls in clses:
+            with self.subTest(class_test=cls):
+                self.assertIn('brave', cls.registry)
+                self.assertEqual(cls.registry['brave'], 'world')
+
+    def test_child_class_added_to_registry(self):
+        name = 'FauxPas'
+        cls = self.FACTORY(name=name)
+        name = name.lower()
+        self.assertIn(name, cls.registry)
+        self.assertEqual(cls.registry[name], cls)
+
+    def test_grandchild_class_added_to_registry(self):
+        name = 'FauxPas'
+        cls = self.FACTORY(name='Meh')
+        subcls = self.FACTORY(name=name, parent=cls)
+        name = name.lower()
+        self.assertIn(name, cls.registry)
+        self.assertEqual(cls.registry[name], subcls)
+
+    def test_existing_name_raises_ValueError(self):
+        name = 'FauxPas'
+        _file.FileMeta(name, (_file.FileType,), dict())
+        with self.assertRaisesRegex(ValueError, '[Dd]uplicate'):
+            _file.FileMeta(name, (_file.FileType,), dict())
+
+    def test_only_FileMeta_types_added_to_registry(self):
+        name = 'FauxPas'
+        cls = self.FACTORY(name=name)
+        self.assertNotIn('str', cls.registry)
+        for clsobj in cls.registry.values():
+            self.assertIsInstance(clsobj, _file.FileMeta)
+
+    def test_child_registry_initialized_with_no_children(self):
+        name = 'FauxPas'
+        cls = self.FACTORY(name=name)
+        name = name.lower()
+        self.assertIn(name, cls.children)
+        self.assertEqual(cls.children[name], [])
+
+    def test_child_adds_self_name_to_immediate_parental_child_lists(self):
+        child = self.FACTORY(name='ChildClass')
+        gchild = self.FACTORY(name='GchildClass', parent=child)
+
+        gchild_name = gchild.__name__.lower()
+        child_name = child.__name__.lower()
+        parent_name = _file.FileType.__name__.lower()
+
+        self.assertIn(gchild_name, child.children[child_name])
+        self.assertNotIn(gchild_name, child.children[parent_name])
+
+    def test_non_file_type_not_stored_in_child_registry(self):
+        name = 'FauxPas'
+        cls = self.FACTORY(name=name)
+        self.assertNotIn('str', cls.children)
+
+        # test that all of the parents in the child registry
+        # are also in the main registry ()
+        children_keys = sorted(cls.children.keys())
+        registry_keys = sorted(cls.registry.keys())
+        self.assertEqual(registry_keys, children_keys)
+
+    def test_get_children_returns_list_of_self_children_classes(self):
+        subcls = self.FACTORY()
+        subsub = self.FACTORY(name='letslipthedogsofwar', parent=subcls)
+
+        self.assertEqual(self.PARENT.get_children(), [self.CHILD, subcls])
+        self.assertEqual(subcls.get_children(), [subsub])
+        self.assertEqual(subsub.get_children(), [])
 
 # __END__
