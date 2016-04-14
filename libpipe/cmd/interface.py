@@ -5,6 +5,7 @@ import abc
 
 
 class CmdInterface(metaclass=abc.ABCMeta):
+
     '''Define an interface for command-like objects
 
     Abstract methods:
@@ -14,6 +15,7 @@ class CmdInterface(metaclass=abc.ABCMeta):
         output: Return a list of command output. Should be string paths
             in *most* cases.
     '''
+
     @abc.abstractmethod
     def cmd(self):
         pass

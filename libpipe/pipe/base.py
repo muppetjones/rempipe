@@ -142,8 +142,13 @@ class PipeBase(CmdInterface):
     #   Overrideable
     #
 
-    def _setup(self):
-        '''Function used to create preset pipes--Implement in children'''
+    def _setup(self, *args, **kwargs):
+        '''Function used to create preset pipes--Implement in children
+
+        This function is used to add commands to preset pipes.
+        To avoid potentially masking true exceptions, the base function
+        accepts any parameters, but will raise a NotImplementedError.
+        '''
         raise NotImplementedError('Implement in children')
 
     #

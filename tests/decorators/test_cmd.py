@@ -19,6 +19,12 @@ log = logging.getLogger(__name__)
 
 class TestUniversalFallThroughDecorator(unittest.TestCase):
 
+    '''Test the universal_fall_through decorator
+
+    Due to the implementation, it really doesn't need to be universal.
+    It should only ever be used on bound class methods.
+    '''
+
     def setUp(self):
         patcher = mock.patch(
             'libpipe.cmd.attr.CmdAttributes',

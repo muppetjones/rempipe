@@ -20,8 +20,6 @@ def universal_fall_through(func):
 
     @universal_function_decorator
     def _fall_through(func, instance, args, kwargs):
-        if instance is None:
-            instance = func.__self__
         return instance.input() + func()
     return _fall_through(func)
 
@@ -29,7 +27,7 @@ def universal_fall_through(func):
 def fall_through(func):
     '''Causes cmd.output to include cmd.input
 
-    NOTE: This simpler version works without the @decorator syntax.
+    NOTE: This simpler version works (only) without the @decorator syntax.
 
     Wrap the output function of a CmdBase object to cause
     any input to be included in the output.
