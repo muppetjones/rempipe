@@ -85,6 +85,7 @@ def factory(name='IndexSubType', extns=[], counts=[], parent=None):
 
 
 class IndexMeta(base.TypeMeta):
+
     '''Define a metaclass for handling file indexes
 
     (Most?) sequence aligners require users to create a multi-file index
