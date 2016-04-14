@@ -12,6 +12,9 @@ def factory(name=None, extns=[], parent=None):
     if not extns:
         msg = 'No extensions given. Try factory(extns=[".fa", ...])'
         raise ValueError(msg)
+    else:
+        # store as lowercase!
+        extns = [extn.lower() for extn in extns]
 
     if not name:
         name = 'FileType_{}'.format('_'.join(
@@ -104,12 +107,13 @@ class FileType(metaclass=FileMeta):
     def _check_extns(cls, value):
         '''Check given value for the presence of an expected extension.
 
+        Performs a case insensitive check for the presence of an
+        expected extension at the end of the given value.
+
         Instead of using os.path.splitext, use str.endswith. This allows
         for simpler checking given more complex extension types,
         e.g., *.rev.bt2. The downside is looping through the extensions
         instead of checking if the extension is in the set.
-
-        Alternate method: Split by periods. More fragile.
 
         Arguments:
             value: The value to check.
@@ -119,6 +123,7 @@ class FileType(metaclass=FileMeta):
             ValueError if a valid extension not found.
         '''
 
+        value = value.lower()  # case insensitive!
         for extn in cls.extns:
             if value.endswith(extn):
                 return  # found a valid extension
@@ -130,3 +135,5 @@ class FileType(metaclass=FileMeta):
     def get_children(cls):
         names = cls.children[cls.__name__.lower()]
         return [cls.registry[name] for name in names]
+
+# __END__

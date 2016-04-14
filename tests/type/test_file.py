@@ -124,6 +124,10 @@ class TestFileType__factory(FileTypeTestCase):
         subtype = self.FACTORY(extns=list('ab'))
         self.assertEqual(subtype.extns, list('ab'))
 
+    def test_factory_converts_extns_to_lowercase(self):
+        subtype = self.FACTORY(extns=list('AB'))
+        self.assertEqual(subtype.extns, list('ab'))
+
     def test_factory_class_is_subtype_of_given_parent(self):
         subtype = self.FACTORY(extns=list('ab'))
         subsub = self.FACTORY(extns=list('ac'), parent=subtype)
@@ -183,6 +187,9 @@ class TestSubType(FileTypeTestCase):
         self.CHILD('foo/file.3.bt2')  # does not raise -- matches .3.bt2
         with self.assertRaises(ValueError):
             self.CHILD('foo/file.4.bt2')  # requires complete match to .3.bt2
+
+    def test_check_extns_is_case_insensitive(self):
+        self.CHILD('foo/file.FOO')  # should not raise
 
     def test_invalid_extn_err_is_informative(self):
         try:
@@ -293,89 +300,5 @@ class TestSubType__register(
         super().setUp()
         self.FACTORY = partial(self.FACTORY, extns=['.par'])
 
-# class TestSubType__register(FileTypeTestCase):
-#
-#     def setUp(self):
-#         super().setUp()
-#
-#         self.FACTORY = partial(self.FACTORY, extns=['.par'])
-#
-#     def test_registry_shared_across_all_class(self):
-#         i1 = self.FACTORY(name='I_1')
-#         i2 = self.FACTORY(name='I_2')
-#         ii1 = self.FACTORY(name='II_1', parent=i1)
-#         ii2 = self.FACTORY(name='II_2', parent=i2)
-#
-#         ii2.registry.update({'brave': 'world'})
-#         clses = [_file.FileType, i1, i2, ii1, ii2]
-#         for cls in clses:
-#             with self.subTest(class_test=cls):
-#                 self.assertIn('brave', cls.registry)
-#                 self.assertEqual(cls.registry['brave'], 'world')
-#
-#     def test_child_class_added_to_registry(self):
-#         name = 'FauxPas'
-#         cls = self.FACTORY(name=name)
-#         name = name.lower()
-#         self.assertIn(name, cls.registry)
-#         self.assertEqual(cls.registry[name], cls)
-#
-#     def test_grandchild_class_added_to_registry(self):
-#         name = 'FauxPas'
-#         cls = self.FACTORY(name='Meh')
-#         subcls = self.FACTORY(name=name, parent=cls)
-#         name = name.lower()
-#         self.assertIn(name, cls.registry)
-#         self.assertEqual(cls.registry[name], subcls)
-#
-#     def test_existing_name_raises_ValueError(self):
-#         name = 'FauxPas'
-#         _file.FileMeta(name, (_file.FileType,), dict())
-#         with self.assertRaisesRegex(ValueError, '[Dd]uplicate'):
-#             _file.FileMeta(name, (_file.FileType,), dict())
-#
-#     def test_only_FileMeta_types_added_to_registry(self):
-#         name = 'FauxPas'
-#         cls = self.FACTORY(name=name)
-#         self.assertNotIn('str', cls.registry)
-#         for clsobj in cls.registry.values():
-#             self.assertIsInstance(clsobj, _file.FileMeta)
-#
-#     def test_child_registry_initialized_with_no_children(self):
-#         name = 'FauxPas'
-#         cls = self.FACTORY(name=name)
-#         name = name.lower()
-#         self.assertIn(name, cls.children)
-#         self.assertEqual(cls.children[name], [])
-#
-#     def test_child_adds_self_name_to_immediate_parental_child_lists(self):
-#         child = self.FACTORY(name='ChildClass')
-#         gchild = self.FACTORY(name='GchildClass', parent=child)
-#
-#         gchild_name = gchild.__name__.lower()
-#         child_name = child.__name__.lower()
-#         parent_name = _file.FileType.__name__.lower()
-#
-#         self.assertIn(gchild_name, child.children[child_name])
-#         self.assertNotIn(gchild_name, child.children[parent_name])
-#
-#     def test_non_file_type_not_stored_in_child_registry(self):
-#         name = 'FauxPas'
-#         cls = self.FACTORY(name=name)
-#         self.assertNotIn('str', cls.children)
-#
-#         # test that all of the parents in the child registry
-#         # are also in the main registry ()
-#         children_keys = sorted(cls.children.keys())
-#         registry_keys = sorted(cls.registry.keys())
-#         self.assertEqual(registry_keys, children_keys)
-#
-#     def test_get_children_returns_list_of_self_children_classes(self):
-#         subcls = self.FACTORY()
-#         subsub = self.FACTORY(name='letslipthedogsofwar', parent=subcls)
-#
-#         self.assertEqual(self.PARENT.get_children(), [self.CHILD, subcls])
-#         self.assertEqual(subcls.get_children(), [subsub])
-#         self.assertEqual(subsub.get_children(), [])
 
 # __END__

@@ -19,7 +19,7 @@ from unittest import mock
 import libpipe
 from libpipe.cmd.attr import CmdAttributes
 from libpipe.cmd.base import CmdBase
-from libpipe.type import index as _index
+from libpipe.type import index as index
 
 from tests.base import LibpipeTestCase  # includes read and write mock
 
@@ -512,28 +512,28 @@ class TestBaseCmd_CustomTypes(BaseTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.old_registry = copy.deepcopy(_index.IndexType.registry)
-        cls.old_children = copy.deepcopy(_index.IndexType.children)
+        cls.old_registry = copy.deepcopy(index.IndexType.registry)
+        cls.old_children = copy.deepcopy(index.IndexType.children)
 
     @classmethod
     def tearDownClass(cls):
         # Reload saved registries after each test
-        _index.IndexType.registry = copy.deepcopy(cls.old_registry)
-        _index.IndexType.children = copy.deepcopy(cls.old_children)
+        index.IndexType.registry = copy.deepcopy(cls.old_registry)
+        index.IndexType.children = copy.deepcopy(cls.old_children)
 
     def tearDown(self):
         # Reload saved registries after each test
-        _index.IndexType.registry = copy.deepcopy(self.old_registry)
-        _index.IndexType.children = copy.deepcopy(self.old_children)
+        index.IndexType.registry = copy.deepcopy(self.old_registry)
+        index.IndexType.children = copy.deepcopy(self.old_children)
 
     def test_match_custom_types(self):
         '''Test that a custom type is matched appropriately'''
         # TODO(sjbush): replace index type with the base type
 
-        SampleIndex = _index.factory(
+        SampleIndex = index.factory(
             name='SampleIndex', extns=['.bt2'], counts=[2])
         # log.debug(type(SampleIndex))
-        # log.debug(isinstance(SampleIndex, _index.IndexType))
+        # log.debug(isinstance(SampleIndex, index.IndexType))
         self.CMD.attr.req_types = [
             [('-x', ), (SampleIndex, )],
         ]
@@ -554,7 +554,7 @@ class TestBaseCmd_CustomTypes(BaseTestCase):
         self.assertIsInstance(cmd.kwargs['-x'], SampleIndex)
 
     def test_match_converts_index_path_str_to_index_type(self):
-        SampleIndex = _index.factory(
+        SampleIndex = index.factory(
             name='SampleIndex', extns=['.bt2'], counts=[2])
         self.CMD.attr.req_types = [
             [('-x', ), (SampleIndex, )],
