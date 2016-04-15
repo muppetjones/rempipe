@@ -10,3 +10,25 @@ FastqType = _file.factory(
     parent=SeqType,
     extns=['.fq', '.fastq'],
 )
+
+FastaType = _file.factory(
+    name='FastaType',
+    parent=SeqType,
+    extns=['.fa', '.fasta', '.seq', '.fna', '.faa', '.ffn'],
+)
+
+
+class SeqMapType(_file.FileType):
+    pass
+
+BamType = _file.factory(
+    name='BamType',
+    parent=SeqMapType,
+    extns=['.bam', ],
+)
+
+SamType = _file.factory(
+    name='SamType',
+    parent=SeqMapType,
+    extns=['.sam', ],
+)
