@@ -93,15 +93,18 @@ class FileType(metaclass=FileMeta):
 
     def __init__(self, value=''):
 
-        if self.__class__ == FileType:
-            msg = 'Cannot call base FileType directly.'
-            raise TypeError(msg)
-
         if value:
             # Allowing an empty value matches other types, e.g.,
             # -- int() --> 0
             # -- str() --> ''
-            self._check_extns(value)
+            try:
+                self._check_extns(value)
+            except AttributeError:
+                # no extensions set--try children
+                self._check_child_extns(value)
+                # msg = 'Cannot call {} directly--no extension set'.format(
+                #     self.__class__.__name__)
+                # raise TypeError(msg)
 
     @classmethod
     def _check_extns(cls, value):
@@ -130,6 +133,31 @@ class FileType(metaclass=FileMeta):
         msg = 'Invalid extension (file: {}) for type {} [{}]'.format(
             os.path.basename(value), cls.__name__, ', '.join(cls.extns))
         raise ValueError(msg)
+
+    @classmethod
+    def _check_child_extns(cls, value):
+        checked_extns = []
+        for child in cls.get_children():
+            try:
+                child._check_extns(value)
+            except ValueError:
+                checked_extns.extend(child.extns)
+            except AttributeError:
+                pass  # child doesn't have extns either
+            else:
+                return  # we have a match!
+
+        if not checked_extns:
+            # No valid extensions at all!
+            msg = 'Cannot call {} directly--no extensions set'.format(
+                cls.__name__)
+            raise TypeError(msg)
+        else:
+            msg = 'Invalid extension (file: {}) for type {} [{}]'.format(
+                os.path.basename(value),
+                cls.__name__, ', '.join(checked_extns)
+            )
+            raise ValueError(msg)
 
     @classmethod
     def get_children(cls):

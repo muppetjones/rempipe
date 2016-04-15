@@ -11,6 +11,13 @@ class TestSeqType(base.LibpipeTestCase):
     def test_SeqType_type_is_FileMeta(self):
         self.assertEqual(type(seq.SeqType), _file.FileMeta)
 
+    def test_SeqType_accepts_valid_extensions(self):
+        valid_extns = ['.fastq', '.fq', '.FASTQ', '.FQ', '.FastQ']
+        for extn in valid_extns:
+            with self.subTest(extn=extn):
+                # should not raise!
+                seq.SeqType('path/to/file{}'.format(extn))
+
 
 class TestFastqType(base.LibpipeTestCase):
 

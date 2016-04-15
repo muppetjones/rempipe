@@ -29,14 +29,15 @@ class FileTypeTestCase(base.LibpipeTestCase):
         _file.FileType.registry = copy.deepcopy(cls.old_registry)
         _file.FileType.children = copy.deepcopy(cls.old_children)
 
-    def setUp(self):
+    def setUp(self, child=True):
         super().setUp()
 
         self.META = _file.FileMeta
         self.PARENT = _file.FileType
         self.FACTORY = _file.factory
-        self.CHILD = self.FACTORY(
-            name='TestFile', extns=['.bar', '.foo'])
+        if child:
+            self.CHILD = self.FACTORY(
+                name='TestFile', extns=['.bar', '.foo'])
 
     def tearDown(self):
         # Reload saved registries after each test
@@ -94,9 +95,35 @@ class TestFileType__TypeBase(base.LibpipeTestCase, test_base.TestTypeBase):
     def test_child_is_still_TypeMeta(self):
         self.assertIsInstance(self.CHILD, _type.TypeMeta)
 
-    def test_FileType_cannot_be_called_directly(self):
-        with self.assertRaises(TypeError):
-            _file.FileType('path/to/nowhere')
+
+class TestFileType(FileTypeTestCase):
+
+    def setUp(self):
+        super().setUp(child=False)
+
+    def test_class_wo_any_valid_extns_raises_TypeError(self):
+        child = self.META('ChildWoExtn', (self.PARENT, ), dict())
+        for cls in [self.PARENT, child]:
+            with self.subTest(no_extn=cls):
+                with self.assertRaises(TypeError):
+                    cls('path/to/know.where')
+
+    def test_class_wo_extns_accepts_any_immediate_child_extn(self):
+        child = self.META('ChildWoExtn', (self.PARENT, ), dict())
+        gchild1 = _file.factory(extns=['.foo'], parent=child)
+        _file.factory(extns=['.bar'], parent=child)
+        _file.factory(extns=['.baz'], parent=gchild1)
+
+        valid_extns = ['.foo', '.bar']
+        invalid_extns = ['.baz']
+        for extn in valid_extns:
+            with self.subTest(valid_extn=extn):
+                # should not raise!
+                child('path/to/file{}'.format(extn))
+        for extn in invalid_extns:
+            with self.subTest(invalid_extn=extn):
+                with self.assertRaises(ValueError):
+                    child('path/to/file{}'.format(extn))
 
 
 class TestFileType__factory(FileTypeTestCase):
