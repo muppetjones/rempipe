@@ -485,7 +485,7 @@ class TestPipeBase_write(PipeBaseTestCase):
                 _file = 'script' + extn
                 pipe.write(_file)
                 self.mock_write().write.assert_any_call(
-                    pipe.pbs_template + "\n")  # don't forget the new line!
+                    pipe.pbs_template + "\n\n")  # don't forget the new line!
 
     def test_write_attempts_to_update_permissions_if_filename_given(self):
         _file = 'script.pbs'
@@ -520,7 +520,7 @@ class TestPipeBase_write(PipeBaseTestCase):
         pipe = PipeBase(cmds=self.get_n_cmds(3))
 
         fake_argv = ['ABC', '--easy as', '123', '*' * 70]
-        with io.StringIO() as sh, mock.patch('sys.argv', fake_argv) as m:
+        with io.StringIO() as sh, mock.patch('sys.argv', fake_argv):
             pipe.write(sh)  # should not raise!
             sh.seek(0)
             result = sh.read()

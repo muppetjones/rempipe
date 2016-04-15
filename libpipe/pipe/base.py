@@ -1,4 +1,5 @@
 
+import datetime
 import os
 import os.path
 import stat
@@ -271,15 +272,30 @@ class PipeBase(CmdInterface):
         information directly into the output. Wow!
         '''
 
+        # split the command by kwarg if longer than 80 char
         cmd = ' '.join(sys.argv)
         if len(cmd) > 80:
             cmd = cmd.replace(' -', ' \\\n#   -')
-        fh.write('# Created from\n# {}\n\n'.format(cmd))
+
+        # reformat the timestamp to something more readable
+        time_fmt = datetime.datetime.strptime(
+            self.timestamp, "%y%m%d-%H%M%S").strftime('%Y-%m-%d @ %H:%M:%S')
+
+        # parse together the statement and write it
+        blurb = '\n# '.join([
+            'Created from dir [{cwd}]',
+            'on [{timestamp}] with the command',
+            cmd
+        ]).format(
+            cwd=os.getcwd(),
+            timestamp=time_fmt,
+        )
+        fh.write('# {}\n\n'.format(blurb))
         return
 
     def _write_pbs_template(self, fh):
         self._load_pbs_template()
-        fh.write(self.pbs_template + "\n")
+        fh.write(self.pbs_template + "\n\n")
         return
 
     #
