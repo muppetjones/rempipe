@@ -4,7 +4,7 @@ import os.path
 from libpipe.cmd import align  # HOTFIX: remove ASAP
 from libpipe.cmd import attr
 from libpipe.cmd import base
-from libpipe.type import index
+from libpipe.type import seq
 
 import logging
 log = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class SamtoolsIndexCmd(base.CmdBase):
         req_kwargs=[],
         req_args=1,
         req_types=[
-            [(0, ), ('.bam', )]
+            [(0, ), (seq.BamType, )]
         ],
     )
 

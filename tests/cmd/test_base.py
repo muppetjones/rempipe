@@ -11,7 +11,6 @@ Indirect tests are in alphabetical order, with the exception of init tests.
     * requirements
 '''
 
-import copy
 import subprocess
 import unittest
 from unittest import mock
@@ -19,7 +18,6 @@ from unittest import mock
 import libpipe
 from libpipe.cmd.attr import CmdAttributes
 from libpipe.cmd.base import CmdBase
-from libpipe.type import index as index
 
 from tests.base import LibpipeTestCase  # includes read and write mock
 
@@ -506,71 +504,6 @@ class TestBaseCmd_link(BaseTestCase):
         self.assertEqual(cmd.kwargs['-1'], 'file1.txt')
         self.assertEqual(cmd.kwargs['-2'], 'file2.txt')
         self.assertNotIn('-U', cmd.kwargs)
-
-
-class TestBaseCmd_CustomTypes(BaseTestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        cls.old_registry = copy.deepcopy(index.IndexType.registry)
-        cls.old_children = copy.deepcopy(index.IndexType.children)
-
-    @classmethod
-    def tearDownClass(cls):
-        # Reload saved registries after each test
-        index.IndexType.registry = copy.deepcopy(cls.old_registry)
-        index.IndexType.children = copy.deepcopy(cls.old_children)
-
-    def tearDown(self):
-        # Reload saved registries after each test
-        index.IndexType.registry = copy.deepcopy(self.old_registry)
-        index.IndexType.children = copy.deepcopy(self.old_children)
-
-    def test_match_custom_types(self):
-        '''Test that a custom type is matched appropriately'''
-        # TODO(sjbush): replace index type with the base type
-
-        SampleIndex = index.factory(
-            name='SampleIndex', extns=['.bt2'], counts=[2])
-        # log.debug(type(SampleIndex))
-        # log.debug(isinstance(SampleIndex, index.IndexType))
-        self.CMD.attr.req_types = [
-            [('-x', ), (SampleIndex, )],
-        ]
-        cmd = self.CMD()
-        cmd.input = lambda: ['file1.txt', 'path/to/idx']
-
-        # CRITICAL: Mocking 'walk_file' does NOT restrict checking
-        #   based on the given argument. This will cause issues as
-        #   any str type WILL be identified as an index.
-        #   Therefore, we mock 'walk_safe' to allow selection based
-        #   on the given value. Unfortunately, this is partially testing
-        #   walk_file.
-        with mock.patch('libpipe.util.path.walk_safe', ) as mock_walk:
-            mock_walk.return_value = {
-                'file': ['idx.1.bt2', 'idx.2.bt2', 'idx.txt']}
-            cmd._match_input_with_args()
-        self.assertEqual(cmd.kwargs['-x'], 'path/to/idx')
-        self.assertIsInstance(cmd.kwargs['-x'], SampleIndex)
-
-    def test_match_converts_index_path_str_to_index_type(self):
-        SampleIndex = index.factory(
-            name='SampleIndex', extns=['.bt2'], counts=[2])
-        self.CMD.attr.req_types = [
-            [('-x', ), (SampleIndex, )],
-        ]
-        cmd = self.CMD()
-        cmd.input = lambda: ['file1.txt', 'path/to/idx']
-
-        with mock.patch('libpipe.util.path.walk_safe', ) as mock_walk:
-            mock_walk.return_value = {
-                'file': ['idx.1.bt2', 'idx.2.bt2', 'idx.txt']}
-            cmd._match_input_with_args()
-        self.assertTrue(
-            issubclass(cmd.kwargs['-x'].__class__, SampleIndex),
-            "Given path not converted to IndexType",
-        )
-        self.assertTrue(hasattr(cmd.kwargs['-x'], 'extns'))
 
 
 class TestCmdBase_requirements(BaseTestCase):

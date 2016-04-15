@@ -6,7 +6,7 @@ import time
 
 
 from libpipe.cmd.interface import CmdInterface
-from libpipe.type import index as _index
+from libpipe.type import base as _type
 
 import logging
 log = logging.getLogger(__name__)
@@ -607,9 +607,9 @@ class CmdBase(CmdInterface):
         '''
         possible_type_error = None
         valid = False
-        for _type in types:
+        for typ in types:
             try:
-                if str(_type(val)) != str(val):
+                if str(typ(val)) != str(val):
                     raise ValueError('second check')
             except ValueError as e:
                 err = e
@@ -663,18 +663,18 @@ class CmdBase(CmdInterface):
 
         # IndexTypes ARE strings, so we need an additional step here
         # TODO(sjbush): Update to catch all libpipe.types
-        index_type = [
-            _type for _type in types
-            if isinstance(_type, _index.IndexMeta)
+        custom_type = [
+            typ for typ in types
+            if isinstance(typ, _type.TypeMeta)
         ]
 
         file_type = [
-            _type for _type in types
-            if isinstance(_type, str) and _type not in index_type
+            typ for typ in types
+            if isinstance(typ, str) and typ not in custom_type
         ]
         basic_type = [
-            _type for _type in types
-            if _type not in file_type and _type not in index_type
+            typ for typ in types
+            if typ not in file_type and typ not in custom_type
         ]
 
         # 2. Filter by checking each value
@@ -693,7 +693,7 @@ class CmdBase(CmdInterface):
                 else:
                     # expected index type
                     itypes = [
-                        itype for itype in index_type
+                        itype for itype in custom_type
                         if isinstance(val, itype)
                     ]
                     filtered.append(itypes[0](val))

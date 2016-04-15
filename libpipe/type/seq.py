@@ -2,6 +2,10 @@
 from libpipe.type import file as _file
 
 
+#
+#   Pure Sequence formats
+#
+
 class SeqType(_file.FileType):
     pass
 
@@ -17,6 +21,10 @@ FastaType = _file.factory(
     extns=['.fa', '.fasta', '.seq', '.fna', '.faa', '.ffn'],
 )
 
+
+#
+#   Sequence Alignment formats
+#
 
 class SeqMapType(_file.FileType):
     pass

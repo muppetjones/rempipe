@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 
 
 class TestGtfType(base.LibpipeTestCase, cft.TestFileTypeMixin):
+
     TYPE = anno.GtfType
     META = _file.FileMeta
     PARENT = anno.AnnotationType
@@ -19,6 +20,7 @@ class TestGtfType(base.LibpipeTestCase, cft.TestFileTypeMixin):
 
 
 class TestGffType(base.LibpipeTestCase, cft.TestFileTypeMixin):
+
     TYPE = anno.GffType
     META = _file.FileMeta
     PARENT = anno.AnnotationType

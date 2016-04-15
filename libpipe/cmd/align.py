@@ -3,8 +3,8 @@ import os.path
 
 from libpipe.cmd.attr import CmdAttributes
 from libpipe.cmd.base import CmdBase
-from libpipe.type import index as _index
-from libpipe.util import path
+from libpipe.type import index as index
+from libpipe.type import seq
 
 import logging
 log = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 #   Indices
 #
 
-Hisat2Index = _index.factory(name='Hisat2Index', extns=['.ht2'], counts=[8])
+Hisat2Index = index.factory(name='Hisat2Index', extns=['.ht2'], counts=[8])
 
 #
 #   Commands
@@ -66,9 +66,9 @@ class Hisat2Cmd(CmdBase):
         req_kwargs=['-x', ('-1', '-2'), ['-1', '-U']],
         req_args=0,
         req_types=[
-            [('-1', '-2'), ('.fastq', '.fq', '.fastq', '.fa'), True],
-            [('-U', ), ('.fastq', '.fq', '.fastq', '.fa'), True],
-            [('-S', ), ('.sam', )],
+            [('-1', '-2'), (seq.FastqType, ), True],
+            [('-U', ), (seq.FastqType, ), True],
+            [('-S', ), (seq.SamType, )],
             [('-x', ), (Hisat2Index, )]
         ],
     )
