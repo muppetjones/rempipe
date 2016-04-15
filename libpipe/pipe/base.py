@@ -258,7 +258,7 @@ class PipeBase(CmdInterface):
 
     def _write(self, fh):
         fh.write(self.cmd(cmd_sep="\n\n"))
-        fh.write('\n')
+        fh.write('\n')  # add trailing new line
         return
 
     def _write_calling_command(self, fh):

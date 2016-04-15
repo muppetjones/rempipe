@@ -44,5 +44,3 @@ else
 fi
 
 set -e
-
-# directories
