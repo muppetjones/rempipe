@@ -3,6 +3,7 @@ import os
 import os.path
 import stat
 import subprocess
+import sys
 import time
 
 
@@ -226,6 +227,7 @@ class PipeBase(CmdInterface):
             # Not a file handle (StringIO or otherwise)
             filename = None
         finally:
+            self._write_calling_command(fh)
             self._write(fh)
 
         self._update_file_permissions(filename)  # nothing if filename = None
@@ -257,6 +259,22 @@ class PipeBase(CmdInterface):
     def _write(self, fh):
         fh.write(self.cmd(cmd_sep="\n\n"))
         fh.write('\n')
+        return
+
+    def _write_calling_command(self, fh):
+        '''Add the calling command to the script
+
+        Ever wonder what command was used to generate data? (or in this
+        case, to generate a script to generate data)
+        Never fear! Now you, too, can easily recall what you did when
+        you were too tired to think. The write-o-matic pastes the
+        information directly into the output. Wow!
+        '''
+
+        cmd = ' '.join(sys.argv)
+        if len(cmd) > 80:
+            cmd = cmd.replace(' -', ' \\\n#   -')
+        fh.write('# Created from\n# {}\n\n'.format(cmd))
         return
 
     def _write_pbs_template(self, fh):

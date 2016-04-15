@@ -3,6 +3,7 @@
 import io
 import os.path
 import random
+import re
 import subprocess
 from unittest import mock
 
@@ -404,7 +405,6 @@ class TestPipeBase_write(PipeBaseTestCase):
 
     def test_default_pbs_template_actually_exists(self):
         pipe = PipeBase()
-        log.debug(pipe.pbs_template_path)
         self.assertTrue(
             os.path.exists(pipe.pbs_template_path),
             'Default template ({}) does not exist'.format(
@@ -468,8 +468,9 @@ class TestPipeBase_write(PipeBaseTestCase):
             sh.seek(0)
             result = sh.read()
 
-        # The script should/could insert extra new lines
-        clean_result = result.replace('\n\n', '\n').rstrip()
+        # The script should/could insert extra new lines or comments
+        no_comments = re.sub(r'\#.*\n', '', result)
+        clean_result = no_comments.replace('\n\n', '\n').lstrip().rstrip()
         self.assertEqual(clean_result, pipe.cmd().rstrip())
 
     def test_pbs_template_written_if_pbs_or_shell_file_given(self):
@@ -514,6 +515,20 @@ class TestPipeBase_write(PipeBaseTestCase):
         pipe = PipeBase(cmds=self.get_n_cmds(3))
         pipe.write(_file)
         self.assertEqual(pipe.script_file, self.mock_write().name)
+
+    def test_write_includes_cmd_str_that_generated_the_file(self):
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+
+        fake_argv = ['ABC', '--easy as', '123', '*' * 70]
+        with io.StringIO() as sh, mock.patch('sys.argv', fake_argv) as m:
+            pipe.write(sh)  # should not raise!
+            sh.seek(0)
+            result = sh.read()
+
+        # replace consecutive spaces, backslashes, and crunches
+        # -- the latter two in case the line is broken apart
+        result = re.sub(r'[\\\#\s\n]+', ' ', result)
+        self.assertIn(' '.join(fake_argv), result)
 
 
 # ENDFILE
