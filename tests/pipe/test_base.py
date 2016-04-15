@@ -384,10 +384,6 @@ class TestPipeBase_write(PipeBaseTestCase):
         self.mock_osstat = patcher.start()
         self.addCleanup(patcher.stop)
 
-        # log test name (for debugging)
-        # id_split = self.id().split('.')
-        # log.debug('-' * 50 + '\n\t' + '.'.join(id_split[-2:]))
-
     def mock_splitext(self, _file):
         '''Mock out splitext--cannot easily get filename from mock handle'''
         split_tuple = os.path.splitext(_file)
@@ -405,6 +401,15 @@ class TestPipeBase_write(PipeBaseTestCase):
     #
     #   PBS template setup
     #
+
+    def test_default_pbs_template_actually_exists(self):
+        pipe = PipeBase()
+        log.debug(pipe.pbs_template_path)
+        self.assertTrue(
+            os.path.exists(pipe.pbs_template_path),
+            'Default template ({}) does not exist'.format(
+                pipe.pbs_template_path)
+        )
 
     def test_init_sets_default_template_path(self):
         pipe = PipeBase()
