@@ -6,6 +6,7 @@ Functions for setting up and adding to a single parser.
 
 import argparse
 
+from libpipe.type import seq
 from libpipe.util import path
 
 import logging
@@ -145,9 +146,29 @@ def __add_pipe_group(parser):
 #
 
 def __read_summary(args):
+    '''Read a summary file and return a dict of names => files
+
+    Given an argparse result, read the summary file and store the
+    first two columns in a key pair, where the first column is
+    the sample name, and the second column is a semi-colon delimited
+    list of one (single-end) or two (paired-end) FASTQ files.
+
+    To avoid the row header, the first row, second column is checked
+    as a SequenceType
+    '''
+
     setattr(args, 'summary_file', args.summary)
     with open(args.summary_file, 'r') as fh:
         rows = [line.lstrip().rstrip().split() for line in fh]
-        summary = {col[0]: col[1].split(';') for col in rows}
+    summary = {col[0]: col[1].split(';') for col in rows}
+
+    try:
+        # ensure first file could be a seq file
+        first_name = rows[0][0]
+        first_file = summary[first_name][0]
+        seq.SeqType(first_file)
+    except ValueError:
+        del summary[first_name]  # Nope! Remove it.
+
     setattr(args, 'summary', summary)
     return args

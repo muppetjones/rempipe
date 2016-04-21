@@ -143,6 +143,14 @@ class TestArgpPipe__build_args(TestArgpPipeTestCase):
         with self.assertRaises(FileNotFoundError):
             args = argp.pipe.build_args(args)
 
+    def test_build_args_removes_a_file_header_from_summary(self):
+        self.setup_mock_read(
+            'Name\tFile\nA\tA1.fq;A2.fq\nB\tB1.fq;B2.fq\n')
+        args = self.get_args('--summary=data/summary.txt')
+
+        args.build_args(args)
+        self.assertNotIn('Name', args.summary)
+
     def test_build_args_sets_summary_as_dict_of_lists(self):
         dat = 'A\tA1.fq;A2.fq\nB\tB1.fq\n'
         self.setup_mock_read(dat)
