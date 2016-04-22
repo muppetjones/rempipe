@@ -29,6 +29,12 @@ class TestPipeDriver(LibpipeTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def mock_protect(self):
+        patcher = mock.patch(
+            'libpipe.util.path.protect', side_effect=lambda x: x)
+        self.addCleanup(patcher.stop)
+        return patcher.start()
+
     def get_args(self, arg_str, **kwargs):
         '''Setup a paser using child-defined function and return args
 
@@ -59,12 +65,15 @@ class TestPipeDriver(LibpipeTestCase):
             summary={k: v for v, k in enumerate(list('abc'))},
             data=None,
             genome_list=None,
+            project='project',
+            root='root',
         )
 
         with mock.patch.object(driver, 'run_pipes') as mock_run:
             driver.main(args)
 
-        mock_run.assert_called_once_with(args.summary, None, data=None)
+        mock_run.assert_called_once_with(
+            args.summary, None, data=None, odir='root/project/samples')
 
     def test_main_passes_dir_dict_to_run_pipes(self):
         dir_files = ['seq{}.fq'.format(i) for i in range(3)]
@@ -81,7 +90,16 @@ class TestPipeDriver(LibpipeTestCase):
 
         with mock.patch.object(driver, 'run_pipes') as mock_run:
             driver.main(args)
-        mock_run.assert_called_once_with(expected, None, data=None)
+        mock_run.assert_called_once_with(expected, None, data=None, odir=None)
+
+    def test_main_passes_out_dir_to_run_pipes(self):
+        self.mock_protect()
+        args = self.get_args('--project foo --root ~/projects')
+        setattr(args, 'summary', {})
+        expected = os.path.join('~/projects', 'foo', 'samples')
+        with mock.patch.object(driver, 'run_pipes') as mock_run:
+            driver.main(args)
+        mock_run.assert_called_once_with({}, None, data=None, odir=expected)
 
     def test_main_calls_AlignPipe_with_genome_in_input(self):
         args = self.get_args('--genome genome/hisat_index')

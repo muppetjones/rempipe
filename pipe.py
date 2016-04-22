@@ -88,7 +88,7 @@ def summarize_args(args):
 #   Pipe execution
 #
 
-def run_pipes(file_dict, genome_list, data=None):
+def run_pipes(file_dict, genome_list, data=None, odir=None):
 
     for genome in genome_list:
         log.info('Running genome: {}'.format(genome))
@@ -104,10 +104,12 @@ def run_pipes(file_dict, genome_list, data=None):
             pipe = align.AlignPipe(input=_input)
             pipe.write('~/dev/tempus/data/test_script.pbs')
 
+    return
+
+
 #
 #   Main
 #
-
 
 def main(args):
 
@@ -123,7 +125,13 @@ def main(args):
                 os.path.splitext(f)[0]
             ): [f] for f in args.file_list
         }
-    run_pipes(file_dict, args.genome_list, data=args.data)
+
+    try:
+        odir = os.path.join(args.root, args.project, 'samples')
+    except AttributeError:
+        odir = None  # output will go directly to input folder
+
+    run_pipes(file_dict, args.genome_list, data=args.data, odir=odir)
 
     pass
 
