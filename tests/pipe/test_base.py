@@ -39,6 +39,12 @@ class PipeBaseTestCase(LibpipeTestCase):
     def get_n_cmds(self, n):
         return [self.create_mock_cmd(i) for i in range(n)]
 
+    def mock_protect(self):
+        patcher = mock.patch(
+            'libpipe.util.path.protect', side_effect=lambda x: x)
+        self.addCleanup(patcher.stop)
+        return patcher.start()
+
 
 class TestPipeBase(PipeBaseTestCase):
 
@@ -65,6 +71,14 @@ class TestPipeBase(PipeBaseTestCase):
     def test_init_saves_a_timestamp_if_not_given(self):
         pipe = PipeBase()
         self.assertRegex(pipe.timestamp, '\d{6}-\d{6}')
+
+    def test_init_sets_jobname_to_class_name_if_not_given(self):
+        pipe = PipeBase()
+        self.assertEqual(pipe.job_name, pipe.__class__.__name__.lower())
+
+    def test_init_sets_jobname_if_given(self):
+        pipe = PipeBase(job_name="foo_bar")
+        self.assertEqual(pipe.job_name, 'foo_bar')
 
     def test_init_creates_a_dummy_cmd_for_linking(self):
         '''Test that init creates a cmd obj to use for linking'''
@@ -432,7 +446,7 @@ class TestPipeBase_write(PipeBaseTestCase):
 
         pipe = PipeBase()
         with mock.patch.object(pipe, '_load_pbs_template') as mock_load, \
-                mock.patch.object(pipe, '_write'):
+                mock.patch.object(pipe, '_write_cmds'):
             pipe.write(_file)
         self.assertIsNone(pipe.pbs_template)
         self.assertEqual(mock_load.call_count, 0)
@@ -459,6 +473,24 @@ class TestPipeBase_write(PipeBaseTestCase):
 
         pipe.write(_file)
         self.mock_write.assert_any_call(_file, 'w')
+
+    def test_write_opens_self_named_file_if_not_given(self):
+        self.mock_protect()
+        odir = 'foo/bar'
+        self.mock_splitext('meh.pbs')
+        pipe = PipeBase(cmds=self.get_n_cmds(3), odir=odir)
+        _file = os.path.join(odir, '{}__{}.pbs'.format(
+            pipe.job_name, pipe.timestamp))
+
+        pipe.write()
+        self.mock_write.assert_any_call(_file, 'w')
+
+    def test_write_raises_ValueError_if_no_file_or_output_dir_given(self):
+        self.mock_protect()
+        pipe = PipeBase(cmds=self.get_n_cmds(3))
+
+        with self.assertRaises(ValueError):
+            pipe.write()
 
     def test_pipe_writes_all_commands_to_handle(self):
         pipe = PipeBase(cmds=self.get_n_cmds(3))
@@ -493,7 +525,7 @@ class TestPipeBase_write(PipeBaseTestCase):
         pipe = PipeBase(cmds=self.get_n_cmds(3))
         pipe.pbs_template = 'You fustilarian!'  # prevent template loading
 
-        with mock.patch.object(pipe, '_write'):  # prevent write
+        with mock.patch.object(pipe, '_write_cmds'):  # prevent write
             pipe.write(_file)
 
         self.mock_oschmod.assert_called_once_with(

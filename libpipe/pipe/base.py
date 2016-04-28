@@ -31,22 +31,14 @@ class PipeBase(CmdInterface):
     PipeBase also impements a full command-line interface:
         * cmd, link, output
 
-    TODO(sjbush): Add 'job_name' attribute and use (+ timestamp) for files.
-    TODO(sjbush): Add Torque and GridEngine handling (both individually
-        and through a pbs script).
-    TODO(sjbush): Add direct execution via subprocesses (via cmd.run)
-    TODO(sjbush): Allow commands to be skipped if their output is detected.
-    TODO(sjbush): Implement pass_through (soft_output on rempipe) to
-        collect unique output from all cmds. (as decorator)
-    TODO(sjbush): Maintain a symbolic link to current (i.e., self) script
-        and log files (named with timestamp).
-
-    Arguments:
+    Arguments/Attributes:
         fall_through: A boolean indicating whether input should be
             included in the output.
-
-    Attributes:
         cmds: A list of commands in the pipeline
+        odir/output_dir: The dir for output. In most cases, the Cmd
+            should handle this itself.
+        template_path: The path to the script template.
+        timestamp: A timestamp string.
 
     Notable Methods:
         add: Accepts command objects, links and synchronizes them, and
@@ -54,10 +46,21 @@ class PipeBase(CmdInterface):
             commands given in a list. Chainable.
 
     '''
+    # TODO(sjbush): Add 'job_name' attribute and use (+ timestamp) for files.
+    # TODO(sjbush): Add Torque and GridEngine handling (both individually
+    #   and through a pbs script).
+    # TODO(sjbush): Add direct execution via subprocesses (via cmd.run)
+    # TODO(sjbush): Allow commands to be skipped if their output is detected.
+    # TODO(sjbush): Implement pass_through (soft_output on rempipe) to
+    #   collect unique output from all cmds. (as decorator)
+    # TODO(sjbush): Maintain a symbolic link to current (i.e., self) script
+    #   and log files (named with timestamp).
 
     def __init__(
             self,
-            cmds=None, fall_through=False, template_path=None, timestamp=None,
+            cmds=None, fall_through=False,
+            job_name=None, odir=None,
+            template_path=None, timestamp=None,
             **kwargs):
 
         # save a timestamp, given or generated
@@ -88,6 +91,16 @@ class PipeBase(CmdInterface):
             self.pbs_template_path = os.path.join(
                 os.path.dirname(templates.__file__), 'template.pbs')
         self.pbs_template = None
+
+        # set the output dir (if given)
+        # -- children must worry about input_dir
+        self.output_dir = odir
+
+        # set the job name
+        if job_name:
+            self.job_name = job_name
+        else:
+            self.job_name = self.__class__.__name__.lower()
 
         # pass all leftover kwargs to setup
         # -- rather, all that weren't deleted
@@ -204,34 +217,33 @@ class PipeBase(CmdInterface):
             for cmd in self.cmds:
                 cmd.run()
 
-    @file_or_handle(mode='w')
-    def write(self, fh, fmt=None):
-        '''Handle write preparation and go to appropriate 'write' method
+    def write(self, _file=None, fmt=None):
+        '''Write the pipe commands to a file
 
         Attributes:
             _file: The file to write to
-            fmt: The script format. Must use if passing a handle.
-                Default: 'pbs'.
+            fmt: The script format. Use if non-standard file extension
         '''
 
-        try:
-            # get filename (if file-type handle)
-            filename = fh.name
-            extn = os.path.splitext(filename)[1]
+        # this method serves as a wrapper around the method(s) that
+        # actually write the file, so that we can accept
+        # -- a file name str
+        # -- a file handle
+        # -- nothing at all! (we create our own name)
+        if not _file:
+            try:
+                _file = os.path.join(
+                    self.output_dir,
+                    '{}__{}.pbs'.format(self.job_name, self.timestamp)
+                )
+            except TypeError:
+                # no output_dir given
+                msg = '[{}.write] No file given and output_dir not set'.format(
+                    self.__class__.__name__)
+                raise ValueError(msg)
 
-            # pbs / shell specific processing
-            if extn in ['.pbs', '.sh']:
-                self._write_pbs_template(fh)
+        self._write_script(_file, fmt=fmt)
 
-            self.script_file = filename
-        except AttributeError:
-            # Not a file handle (StringIO or otherwise)
-            filename = None
-        finally:
-            self._write_calling_command(fh)
-            self._write(fh)
-
-        self._update_file_permissions(filename)  # nothing if filename = None
         return
 
     #
@@ -257,7 +269,7 @@ class PipeBase(CmdInterface):
     def _run_pbs(self):
         pass
 
-    def _write(self, fh):
+    def _write_cmds(self, fh):
         fh.write(self.cmd(cmd_sep="\n\n"))
         fh.write('\n')  # add trailing new line
         return
@@ -296,6 +308,36 @@ class PipeBase(CmdInterface):
     def _write_pbs_template(self, fh):
         self._load_pbs_template()
         fh.write(self.pbs_template + "\n\n")
+        return
+
+    @file_or_handle(mode='w')
+    def _write_script(self, fh, fmt=None):
+        '''Handle write preparation and go to appropriate 'write' method
+
+        Attributes:
+            _file: The file to write to
+            fmt: The script format. Must use if passing a handle.
+                Default: 'pbs'.
+        '''
+
+        try:
+            # get filename (if file-type handle)
+            filename = fh.name
+            extn = os.path.splitext(filename)[1]
+
+            # pbs / shell specific processing
+            if extn in ['.pbs', '.sh']:
+                self._write_pbs_template(fh)
+
+            self.script_file = filename
+        except AttributeError:
+            # Not a file handle (StringIO or otherwise)
+            filename = None
+        finally:
+            self._write_calling_command(fh)
+            self._write_cmds(fh)
+
+        self._update_file_permissions(filename)  # nothing if filename = None
         return
 
     #

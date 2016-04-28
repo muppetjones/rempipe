@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 class AlignPipe(PipeBase):
 
-    def _setup(self, odir=None):
+    def _setup(self):
         '''Setup a basic RNA-Seq pipeline from alignment to counting reads
 
         Creates and links commands for a simple RNA-Seq pipeline. Also
@@ -26,7 +26,8 @@ class AlignPipe(PipeBase):
             4. Bedtools multicov (sorted BAM file, genome)
         '''
 
-        _align = align.Hisat2Cmd(odir=odir)  # genome passed from input
+        # genome passed from input
+        _align = align.Hisat2Cmd(odir=self.output_dir)
         _sort = samtools.SamtoolsSortCmd()
         _index = samtools.SamtoolsIndexCmd()
         _count = count.HtseqCountCmd()
@@ -37,7 +38,6 @@ class AlignPipe(PipeBase):
         # set the input and output dir
         fastq_files = [f for f in self.input() if isinstance(f, seq.FastqType)]
         self.input_dir = path.common_directory(fastq_files)
-        self.output_dir = odir
 
         # HACK: Explicitly add index used by _align to _count args
         #   Better than some of the alternatives, at least until
