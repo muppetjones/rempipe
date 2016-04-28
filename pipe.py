@@ -112,9 +112,11 @@ def run_pipes(file_dict, genome_list, data=None, odir=None):
 #
 
 def main(args):
+    '''Execute pipeline using given args'''
 
     log.info(summarize_args(args))
 
+    # create a file_dict with {name: file} format
     if args.summary is not None:
         file_dict = args.summary
     else:
@@ -126,6 +128,7 @@ def main(args):
             ): [f] for f in args.file_list
         }
 
+    # assume the output directory based on given root and project
     try:
         odir = os.path.join(args.root, args.project, 'samples')
     except AttributeError:

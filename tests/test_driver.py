@@ -93,7 +93,7 @@ class TestPipeDriver(LibpipeTestCase):
             driver.main(args)
         mock_run.assert_called_once_with(expected, None, data=None, odir=None)
 
-    def test_main_passes_out_dir_to_run_pipes(self):
+    def test_main_sets_odir_via_root_project(self):
         self.mock_protect()
         args = self.get_args('--project foo --root ~/projects')
         setattr(args, 'summary', {})
