@@ -1,4 +1,4 @@
-'''Test the PipeBase class'''
+'''Test the Pipe class'''
 
 import io
 import os.path
@@ -10,13 +10,13 @@ from unittest import mock
 from tests.base import LibpipeTestCase  # includes read and write mock
 
 from libpipe.cmd.interface import CmdInterface
-from libpipe.pipe.base import PipeBase
+from libpipe.pipe.base import Pipe
 
 import logging
 log = logging.getLogger(__name__)
 
 
-class PipeBaseTestCase(LibpipeTestCase):
+class PipeTestCase(LibpipeTestCase):
 
     def setUp(self):
 
@@ -46,7 +46,7 @@ class PipeBaseTestCase(LibpipeTestCase):
         return patcher.start()
 
 
-class TestPipeBase(PipeBaseTestCase):
+class TestPipe(PipeTestCase):
 
     def test_CmdBase_is_mocked(self):
         pass
@@ -61,47 +61,47 @@ class TestPipeBase(PipeBaseTestCase):
         u = list('rcdefblame')
         kwargs = {'shot_through_the_heart': u[1:-5]}
         with self.assertRaises(TypeError):
-            PipeBase(**kwargs)
+            Pipe(**kwargs)
 
     def test_init_saves_timestamp_if_given(self):
         kwargs = {'timestamp': '151012-162900'}
-        pipe = PipeBase(**kwargs)
+        pipe = Pipe(**kwargs)
         self.assertEqual(pipe.timestamp, kwargs['timestamp'])
 
     def test_init_saves_a_timestamp_if_not_given(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         self.assertRegex(pipe.timestamp, '\d{6}-\d{6}')
 
     def test_init_sets_jobname_to_class_name_if_not_given(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         self.assertEqual(pipe.job_name, pipe.__class__.__name__.lower())
 
     def test_init_sets_jobname_if_given(self):
-        pipe = PipeBase(job_name="foo_bar")
+        pipe = Pipe(job_name="foo_bar")
         self.assertEqual(pipe.job_name, 'foo_bar')
 
     def test_init_creates_a_dummy_cmd_for_linking(self):
         '''Test that init creates a cmd obj to use for linking'''
 
         with mock.patch('libpipe.pipe.base.CmdDummy') as mock_dummy:
-            PipeBase()
+            Pipe()
         mock_dummy.assert_called_once_with()
 
     def test_init_passes_input_to_dummy(self):
         '''Test that dummy output matches the pipe input list'''
 
-        pipe = PipeBase(input=list('abc'))
+        pipe = Pipe(input=list('abc'))
         self.assertEqual(pipe.dummy.output(), list('abc'))
 
     def test_init_adds_cmds_from_list(self):
         '''Test commands added and linked directly through init'''
         cmds = self.get_n_cmds(3)
-        pipe = PipeBase(input=list('abc'), cmds=cmds)
+        pipe = Pipe(input=list('abc'), cmds=cmds)
         self.assertEqual(pipe.cmds, cmds)
         self.assertEqual(pipe.cmds[0].input(), list('abc'))
 
     def test_input_returns_list_from_dummy_cmd(self):
-        pipe = PipeBase(input=list('abc'))
+        pipe = Pipe(input=list('abc'))
         _input = pipe.input()
         self.assertEqual(_input, list('abc'))
         self.assertEqual(pipe.dummy.input(), _input)
@@ -110,7 +110,7 @@ class TestPipeBase(PipeBaseTestCase):
         '''Test basic add cmd (implicit test for multiple adding methods)'''
 
         cmds = self.get_n_cmds(5)
-        pipe = PipeBase()
+        pipe = Pipe()
 
         # tests chaining
         # tests adding commands individually, as *args, and as a list
@@ -120,7 +120,7 @@ class TestPipeBase(PipeBaseTestCase):
 
     def test_add_sets_timestamp_on_each_cmd(self):
         cmds = self.get_n_cmds(3)
-        pipe = PipeBase()
+        pipe = Pipe()
         pipe.add(cmds)
 
         for cmd in pipe.cmds:
@@ -131,7 +131,7 @@ class TestPipeBase(PipeBaseTestCase):
         n = 3
         cmds = self.get_n_cmds(n)
 
-        pipe = PipeBase()
+        pipe = Pipe()
         for i in range(n):
             pipe.add(cmds[i])
 
@@ -147,7 +147,7 @@ class TestPipeBase(PipeBaseTestCase):
 
         _input = list('abc')
         cmd = self.mock_cmd()
-        pipe = PipeBase(input=_input)
+        pipe = Pipe(input=_input)
 
         pipe.add(cmd)
 
@@ -155,37 +155,37 @@ class TestPipeBase(PipeBaseTestCase):
         self.assertEqual(pipe.dummy.output(), cmd.input())
 
     def test_setup_raises_NotImplemented_error(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         with self.assertRaises(NotImplementedError):
             pipe._setup()
 
     def test_setup_called_during_init(self):
-        with mock.patch.object(PipeBase, '_setup') as mock_setup:
-            PipeBase()
+        with mock.patch.object(Pipe, '_setup') as mock_setup:
+            Pipe()
         mock_setup.assert_called_once_with()
 
     def test_setup_not_called_if_cmds_passed_to_init(self):
         cmds = self.get_n_cmds(3)
-        with mock.patch.object(PipeBase, '_setup') as mock_setup:
-            PipeBase(cmds=cmds)
+        with mock.patch.object(Pipe, '_setup') as mock_setup:
+            Pipe(cmds=cmds)
         self.assertEqual(mock_setup.call_count, 0, '_setup was called!')
 
     def test_setup_gets_unused_kwargs(self):
         kwargs = {'input': ['not_passed'], 'give_to_setup': 'passed'}
-        with mock.patch.object(PipeBase, '_setup') as mock_setup:
-            PipeBase(**kwargs)
+        with mock.patch.object(Pipe, '_setup') as mock_setup:
+            Pipe(**kwargs)
         mock_setup.assert_called_once_with(give_to_setup='passed')
 
 
-class TestPipeBase_CmdInterface(PipeBaseTestCase):
+class TestPipe_CmdInterface(PipeTestCase):
 
-    '''Test that PipeBase implements the CmdInterface
+    '''Test that Pipe implements the CmdInterface
 
     NOTE: Perhaps move to implementation tests?
     '''
 
     def test_inherits_from_cmd_interface(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         self.assertIsInstance(pipe, CmdInterface)
 
     #
@@ -193,18 +193,18 @@ class TestPipeBase_CmdInterface(PipeBaseTestCase):
     #
 
     def test_cmd_raises_ValueError_if_pipe_is_empty(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         with self.assertRaises(ValueError):
             pipe.cmd()
 
     def test_cmd_returns_a_string(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         pipe.add(self.get_n_cmds(3))
         cmd_str = pipe.cmd()
         self.assertIsInstance(cmd_str, str)
 
     def test_cmd_returns_string_with_one_cmd_per_line(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         cmds = self.get_n_cmds(3)
         pipe.add(cmds)
 
@@ -213,7 +213,7 @@ class TestPipeBase_CmdInterface(PipeBaseTestCase):
         self.assertEqual(cmd_str, expected)
 
     def test_cmd_uses_cmd_sep_parameter_to_join_cmds(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         cmds = self.get_n_cmds(3)
         pipe.add(cmds)
 
@@ -231,7 +231,7 @@ class TestPipeBase_CmdInterface(PipeBaseTestCase):
         n = 3
         for err in exception_list:
             which_cmd = random.randrange(0, n)
-            pipe = PipeBase()
+            pipe = Pipe()
             cmds = self.get_n_cmds(n)
             pipe.add(cmds)
 
@@ -247,14 +247,14 @@ class TestPipeBase_CmdInterface(PipeBaseTestCase):
 
     def test_link_raises_ValueError_if_pipe_is_empty(self):
         cmd = self.mock_cmd()
-        pipe = PipeBase()
+        pipe = Pipe()
         with self.assertRaises(ValueError):
             pipe.link(cmd)
 
     def test_link_returns_given_obj(self):
         '''Test link enables chaining by returning linked object'''
         cmd_add, cmd_link = self.get_n_cmds(2)
-        pipe = PipeBase()
+        pipe = Pipe()
         pipe.add(cmd_add)
         link_out = pipe.link(cmd_link)
         self.assertEqual(link_out, cmd_link)
@@ -262,14 +262,14 @@ class TestPipeBase_CmdInterface(PipeBaseTestCase):
     def test_link_sets_linked_obj_input_to_last_cmd_output(self):
         cmd_add, cmd_link = self.get_n_cmds(2)
         cmd_add.output = lambda: list('abc')
-        pipe = PipeBase()
+        pipe = Pipe()
         pipe.add(cmd_add)
         pipe.link(cmd_link)
         self.assertEqual(cmd_link.input(), cmd_add.output())
 
     def test_pipe_can_be_linked(self):
-        pipe1 = PipeBase(input=list('xyz'), fall_through=True)
-        pipe2 = PipeBase()
+        pipe1 = Pipe(input=list('xyz'), fall_through=True)
+        pipe2 = Pipe()
         pipe1.add(*self.get_n_cmds(2))
         pipe2.add(*self.get_n_cmds(2))
         link_ret = pipe1.link(pipe2)
@@ -282,7 +282,7 @@ class TestPipeBase_CmdInterface(PipeBaseTestCase):
     #
 
     def test_output_raises_ValueError_if_pipe_is_empty(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         with self.assertRaises(ValueError):
             pipe.output()
 
@@ -290,19 +290,19 @@ class TestPipeBase_CmdInterface(PipeBaseTestCase):
         cmd = self.mock_cmd()
         cmd.output = lambda: list('abc')
 
-        pipe = PipeBase()
+        pipe = Pipe()
         pipe.add(cmd)
 
         self.assertEqual(pipe.output(), cmd.output())
 
     def test_fall_through_passes_all_input_to_output(self):
         _input = list('abc')
-        pipe = PipeBase(input=_input, fall_through=True)
+        pipe = Pipe(input=_input, fall_through=True)
         pipe.add(*self.get_n_cmds(2))
         self.assertEqual(pipe.output(), _input)
 
 
-class TestPipeBase_run(PipeBaseTestCase):
+class TestPipe_run(PipeTestCase):
 
     '''Test ability to run commands
 
@@ -320,7 +320,7 @@ class TestPipeBase_run(PipeBaseTestCase):
 
     def test_run_calls_each_cmd_run_if_no_script_file(self):
         '''Test each cmd is run sep. if script_file not set'''
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.run()
 
         for cmd in pipe.cmds:
@@ -331,7 +331,7 @@ class TestPipeBase_run(PipeBaseTestCase):
         '''Test script_file is executed if set (implicit logfile check)'''
 
         cmds = self.get_n_cmds(3)
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.script_file = 'script.pbs'
         pipe.run()
 
@@ -343,28 +343,28 @@ class TestPipeBase_run(PipeBaseTestCase):
     def test_run_script_raises_CalledProcessError_if_problem(self):
         self.mock_call.side_effect = subprocess.CalledProcessError(1, 'AH!')
 
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.script_file = 'script.pbs'
         with self.assertRaises(subprocess.CalledProcessError):
             pipe.run()
 
     def test_run_script_does_not_call_subprocess_directly(self):
         # assumes default mode of local
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.script_file = 'script.pbs'
         with mock.patch.object(pipe, '_run_local'):
             pipe.run()
         self.assertEqual(self.mock_call.call_count, 0)
 
     def test_run_script_raises_ValueError_for_unknown_mode(self):
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.script_file = 'script.pbs'
         with self.assertRaises(ValueError):
             pipe.run(mode='Dorian')
 
     def test_run_script_local_called_by_default(self):
         '''Test that run mode is 'local' by default'''
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.script_file = 'script.pbs'
         with mock.patch.object(pipe, '_run_local') as mock_run_local:
             pipe.run()
@@ -373,7 +373,7 @@ class TestPipeBase_run(PipeBaseTestCase):
     def test_run_script_calls_run_pbs_if_mode_is_pbs(self):
         '''Test that _run_pbs is used when mode=pbs'''
 
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.script_file = 'script.pbs'
         with mock.patch.object(pipe, '_run_local') as mock_run_local, \
                 mock.patch.object(pipe, '_run_pbs') as mock_run_pbs:
@@ -382,7 +382,7 @@ class TestPipeBase_run(PipeBaseTestCase):
         self.assertEqual(mock_run_local.call_count, 0)
 
 
-class TestPipeBase_write(PipeBaseTestCase):
+class TestPipe_write(PipeTestCase):
 
     '''Test ability to write a script'''
 
@@ -409,7 +409,7 @@ class TestPipeBase_write(PipeBaseTestCase):
         return mock_obj
 
     def test_write_raises_ValueError_if_pipe_is_empty(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         with self.assertRaises(ValueError):
             pipe.write('script.pbs')
 
@@ -418,7 +418,7 @@ class TestPipeBase_write(PipeBaseTestCase):
     #
 
     def test_default_pbs_template_actually_exists(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         self.assertTrue(
             os.path.exists(pipe.pbs_template_path),
             'Default template ({}) does not exist'.format(
@@ -426,16 +426,16 @@ class TestPipeBase_write(PipeBaseTestCase):
         )
 
     def test_init_sets_default_template_path(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         self.assertIsNotNone(pipe.pbs_template_path)
 
     def test_init_sets_given_template_path(self):
         template_path = '~/template.pbs'
-        pipe = PipeBase(template_path=template_path)
+        pipe = Pipe(template_path=template_path)
         self.assertEqual(pipe.pbs_template_path, template_path)
 
     def test_pbs_template_not_set_before_call_to_write(self):
-        pipe = PipeBase()
+        pipe = Pipe()
         self.assertIsNone(pipe.pbs_template)
 
     def test_pbs_template_not_loaded_if_non_pbs_extension_found(self):
@@ -444,7 +444,7 @@ class TestPipeBase_write(PipeBaseTestCase):
         self.mock_splitext(_file)
         self.setup_mock_read('Hello world')
 
-        pipe = PipeBase()
+        pipe = Pipe()
         with mock.patch.object(pipe, '_load_pbs_template') as mock_load, \
                 mock.patch.object(pipe, '_write_cmds'):
             pipe.write(_file)
@@ -453,7 +453,7 @@ class TestPipeBase_write(PipeBaseTestCase):
 
     def test_pbs_template_loaded_once_on_initial_call(self):
         mock_read = self.setup_mock_read('Hello world')
-        pipe = PipeBase()
+        pipe = Pipe()
 
         for i in range(5):
             pipe._load_pbs_template()
@@ -469,7 +469,7 @@ class TestPipeBase_write(PipeBaseTestCase):
         '''Assert `write` attempts to open the file'''
         _file = 'script.pbs'
         self.mock_splitext(_file)
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
 
         pipe.write(_file)
         self.mock_write.assert_any_call(_file, 'w')
@@ -478,7 +478,7 @@ class TestPipeBase_write(PipeBaseTestCase):
         self.mock_protect()
         odir = 'foo/bar'
         self.mock_splitext('meh.pbs')
-        pipe = PipeBase(cmds=self.get_n_cmds(3), odir=odir)
+        pipe = Pipe(cmds=self.get_n_cmds(3), odir=odir)
         _file = os.path.join(odir, '{}__{}.pbs'.format(
             pipe.job_name, pipe.timestamp))
 
@@ -487,13 +487,13 @@ class TestPipeBase_write(PipeBaseTestCase):
 
     def test_write_raises_ValueError_if_no_file_or_output_dir_given(self):
         self.mock_protect()
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
 
         with self.assertRaises(ValueError):
             pipe.write()
 
     def test_pipe_writes_all_commands_to_handle(self):
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
 
         with io.StringIO() as sh:
             pipe.write(sh)  # should not raise!
@@ -507,7 +507,7 @@ class TestPipeBase_write(PipeBaseTestCase):
 
     def test_pbs_template_written_if_pbs_or_shell_file_given(self):
         '''Tests pbs template loaded when needed'''
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.pbs_template = 'Thou cream faced loon'  # prevent template loading
         mock_splitext = self.mock_splitext('script.pbs')
 
@@ -522,7 +522,7 @@ class TestPipeBase_write(PipeBaseTestCase):
     def test_write_attempts_to_update_permissions_if_filename_given(self):
         _file = 'script.pbs'
         self.mock_splitext(_file)
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.pbs_template = 'You fustilarian!'  # prevent template loading
 
         with mock.patch.object(pipe, '_write_cmds'):  # prevent write
@@ -532,7 +532,7 @@ class TestPipeBase_write(PipeBaseTestCase):
             self.mock_write().name, self.mock_osstat().st_mode.__or__())
 
     def test_write_does_not_attempt_permissions_if_non_file_handle(self):
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.pbs_template = 'You fustilarian!'  # prevent template loading
 
         with io.StringIO() as sh:
@@ -544,12 +544,12 @@ class TestPipeBase_write(PipeBaseTestCase):
         '''Test that the filename written to is stored by pipe'''
         _file = 'script.pbs'
         self.mock_splitext(_file)
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
         pipe.write(_file)
         self.assertEqual(pipe.script_file, self.mock_write().name)
 
     def test_write_includes_cmd_str_that_generated_the_file(self):
-        pipe = PipeBase(cmds=self.get_n_cmds(3))
+        pipe = Pipe(cmds=self.get_n_cmds(3))
 
         fake_argv = ['ABC', '--easy as', '123', '*' * 70]
         with io.StringIO() as sh, mock.patch('sys.argv', fake_argv):

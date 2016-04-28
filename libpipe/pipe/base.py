@@ -18,17 +18,17 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class PipeBase(CmdInterface):
+class Pipe(CmdInterface):
 
     '''Pipe object for storing and handling a series of command-line objs
 
-    PipeBase stores a series of command line objects and can execute those
+    Pipe stores a series of command line objects and can execute those
     commands a number of fashions
         * Via a BASH script
         * Directly through python subprocesses
         * Through a resource manager system, such as Torque
 
-    PipeBase also impements a full command-line interface:
+    Pipe also impements a full command-line interface:
         * cmd, link, output
 
     Arguments/Attributes:

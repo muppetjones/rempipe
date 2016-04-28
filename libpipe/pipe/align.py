@@ -3,7 +3,7 @@
 from libpipe.cmd import align
 from libpipe.cmd import count
 from libpipe.cmd import samtools
-from libpipe.pipe.base import PipeBase
+from libpipe.pipe.base import Pipe
 from libpipe.type import seq
 from libpipe.util import path
 
@@ -11,7 +11,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-class AlignPipe(PipeBase):
+class AlignPipe(Pipe):
 
     def _setup(self):
         '''Setup a basic RNA-Seq pipeline from alignment to counting reads
