@@ -31,6 +31,8 @@ class CmdBase(CmdInterface):
         flags: A list of flag-only arguments.
         kwargs: A dict of flag-value pairs.
 
+        odir: A path string to the desired output directory.
+            Sets 'output_dir' attribute, but should be used by children.
         timestamp: A timestamp string. Default: init time. Useful for
             creating a unique time id that is syncronized within a pipe.
 
@@ -77,7 +79,7 @@ class CmdBase(CmdInterface):
 
     def __init__(
             self, *args,
-            complain=False, flags=[], strict=True, timestamp=None,
+            complain=False, flags=[], odir=None, strict=True, timestamp=None,
             **kwargs
     ):
 
@@ -124,6 +126,10 @@ class CmdBase(CmdInterface):
         self.flags = _flags
         self.kwargs = dict.copy(self.attr.defaults)
         self.kwargs.update(_kwargs)
+
+        # set the output directory
+        # NOTE: Children must use this themselves! (for now)
+        self.output_dir = odir
 
         self.strict = strict
         self.complain = complain

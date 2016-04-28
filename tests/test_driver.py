@@ -5,6 +5,7 @@ import os.path
 from unittest import mock
 
 from libpipe import argp
+from libpipe.pipe import align
 from tests.base import LibpipeTestCase
 
 import pipe as driver
@@ -101,6 +102,14 @@ class TestPipeDriver(LibpipeTestCase):
             driver.main(args)
         mock_run.assert_called_once_with({}, None, data=None, odir=expected)
 
+    def test_run_pipes_passes_out_dir_to_pipe_obj(self):
+        with mock.patch('libpipe.pipe.align.AlignPipe') as m:
+            driver.run_pipes(
+                {'name': ['file']}, ['genome'], odir='path/to/odir')
+        m.assert_called_once_with(
+            input=['genome', 'file'], odir='path/to/odir'
+        )
+
     def test_main_calls_AlignPipe_with_genome_in_input(self):
         args = self.get_args('--genome genome/hisat_index')
         setattr(args, 'file_list', ['a.fq'])
@@ -108,7 +117,7 @@ class TestPipeDriver(LibpipeTestCase):
             driver.main(args)
 
         expected = args.genome_list + args.file_list
-        mock_pipe.assert_called_once_with(input=expected)
+        mock_pipe.assert_called_once_with(input=expected, odir=None)
 
     def test_data_dir_is_added_to_file_names_if_given(self):
         args = self.get_args('--data=foo/bar --genome genome/hisat_index')
@@ -118,4 +127,4 @@ class TestPipeDriver(LibpipeTestCase):
 
         expected = args.genome_list + [
             os.path.join('foo/bar', f) for f in args.file_list]
-        mock_pipe.assert_called_once_with(input=expected)
+        mock_pipe.assert_called_once_with(input=expected, odir=None)

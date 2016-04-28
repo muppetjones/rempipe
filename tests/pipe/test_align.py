@@ -49,8 +49,26 @@ class TestAlignPipe_MockedCmds(LibpipeTestCase):
         for i, cmd in enumerate(cmds[:-1]):
             cmd.link.assert_called_once_with(cmds[i + 1])
         self.assertEqual(pipe.cmds, cmds)
-        # mock_add.assert_called_once_with(
-        #     *[cmd() for name, cmd in self.mock_cmds])
+
+    def test_AlignPipe_sets_input_dir_as_common_input_path(self):
+        pipe = align.AlignPipe(
+            input=['genome', 'path/to/file.fq', 'path/to/file1.fq'],
+        )
+        self.assertEqual(pipe.input_dir, 'path/to')
+
+    def test_AlignPipe_sets_output_dir_as_given(self):
+        pipe = align.AlignPipe(
+            odir='path/to/odir'
+        )
+        self.assertEqual(pipe.output_dir, 'path/to/odir')
+
+    def test_AlignPipe_passes_odir_to_Hisat2Cmd(self):
+        # only the first command will need the output directory
+        # -- however, each command must handle it separately
+        #    (until rempipe can handle it dynamically)
+        with mock.patch('libpipe.cmd.align.Hisat2Cmd') as m:
+            align.AlignPipe(odir='path/to/odir')
+        m.assert_called_once_with(odir='path/to/odir')
 
 
 class TestAlignPipe_Linking(LibpipeTestCase):

@@ -101,7 +101,7 @@ def run_pipes(file_dict, genome_list, data=None, odir=None):
                 _input = _genome + _file_list
             except TypeError:
                 _input = _genome + file_list
-            pipe = align.AlignPipe(input=_input)
+            pipe = align.AlignPipe(input=_input, odir=odir)
             pipe.write('~/dev/tempus/data/test_script.pbs')
 
     return

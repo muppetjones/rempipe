@@ -232,6 +232,10 @@ class TestCmdBase_init(BaseTestCase):
         with self.assertRaises(ValueError):
             self.CMD(complain=True, **kwargs)
 
+    def test_init_sets_odir_if_given(self):
+        cmd = self.CMD(odir='la/la/la')
+        self.assertEqual(cmd.output_dir, 'la/la/la')
+
 
 class TestCmdBase_classmethods(BaseTestCase):
 
