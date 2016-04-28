@@ -58,7 +58,7 @@ class TestAlignPipe_MockedCmds(LibpipeTestCase):
 
     def test_AlignPipe_sets_output_dir_as_given(self):
         pipe = align.AlignPipe(
-            odir='path/to/odir'
+            output_dir='path/to/odir'
         )
         self.assertEqual(pipe.output_dir, 'path/to/odir')
 
@@ -67,8 +67,8 @@ class TestAlignPipe_MockedCmds(LibpipeTestCase):
         # -- however, each command must handle it separately
         #    (until rempipe can handle it dynamically)
         with mock.patch('libpipe.cmd.align.Hisat2Cmd') as m:
-            align.AlignPipe(odir='path/to/odir')
-        m.assert_called_once_with(odir='path/to/odir')
+            align.AlignPipe(output_dir='path/to/odir')
+        m.assert_called_once_with(output_dir='path/to/odir')
 
 
 class TestAlignPipe_Linking(LibpipeTestCase):

@@ -27,7 +27,7 @@ class AlignPipe(Pipe):
         '''
 
         # genome passed from input
-        _align = align.Hisat2Cmd(odir=self.output_dir)
+        _align = align.Hisat2Cmd(output_dir=self.output_dir)
         _sort = samtools.SamtoolsSortCmd()
         _index = samtools.SamtoolsIndexCmd()
         _count = count.HtseqCountCmd()

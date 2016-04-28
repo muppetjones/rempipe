@@ -232,8 +232,8 @@ class TestCmdBase_init(BaseTestCase):
         with self.assertRaises(ValueError):
             self.CMD(complain=True, **kwargs)
 
-    def test_init_sets_odir_if_given(self):
-        cmd = self.CMD(odir='la/la/la')
+    def test_init_sets_output_dir_if_given(self):
+        cmd = self.CMD(output_dir='la/la/la')
         self.assertEqual(cmd.output_dir, 'la/la/la')
 
 
@@ -403,11 +403,11 @@ class TestCmdBase_cmd(BaseTestCase):
         self.assertIn('data/seq.s.bam', cmd_str)
         self.assertIn('data/seq2.s.bam', cmd_str)
 
-    def test_cmd_updates_args_in_attr_output_args_with_given_odir(self):
+    def test_cmd_updates_args_in_attr_output_args_with_given_output_dir(self):
         '''Test the dir path is updated on listed args'''
 
         self.CMD.attr.output_args = [1, '--blue']
-        cmd = self.CMD(odir='brave/new')
+        cmd = self.CMD(output_dir='brave/new')
         cmd.args = ['hello', 'path/to/world']
         cmd.kwargs = {'--blue': 'suede/shoes', '-o': 'suede/sandals'}
 
@@ -418,20 +418,20 @@ class TestCmdBase_cmd(BaseTestCase):
         self.assertEqual(cmd.args, expected_args)
         self.assertEqual(cmd.kwargs, expected_kwargs)
 
-    def test_cmd_updates_redirect_tuple_with_odir(self):
+    def test_cmd_updates_redirect_tuple_with_output_dir(self):
         '''Redirect should be handled by the child, but child may not know'''
 
-        cmd = self.CMD(odir='brave/new')
+        cmd = self.CMD(output_dir='brave/new')
         cmd.redirect = ('>', 'hello/world')
         expected_redirect = ('>', 'brave/new/world')
 
         cmd.cmd()
         self.assertEqual(cmd.redirect, expected_redirect)
 
-    def test_cmd_does_not_update_redirect_str_with_odir(self):
+    def test_cmd_does_not_update_redirect_str_with_output_dir(self):
         '''Redirect value not modified if str'''
 
-        cmd = self.CMD(odir='brave/new')
+        cmd = self.CMD(output_dir='brave/new')
         cmd.redirect = '> hello/world'
         expected_redirect = '> hello/world'
 
@@ -440,10 +440,10 @@ class TestCmdBase_cmd(BaseTestCase):
 
     def test_update_output_dir_does_not_raise_if_output_arg_not_set(self):
         self.CMD.attr.output_args = [1, '--blue']
-        cmd = self.CMD(odir='brave/new')
+        cmd = self.CMD(output_dir='brave/new')
         cmd._update_output_directory()  # should not raise
 
-    def test_update_output_directory_does_not_raise_if_no_odir_given(self):
+    def test_update_output_directory_does_not_raise_if_no_output_dir_given(self):
 
         self.CMD.attr.output_args = [1, '--blue']
         cmd = self.CMD()

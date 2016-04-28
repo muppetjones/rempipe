@@ -120,7 +120,7 @@ class TestPipeDriver(LibpipeTestCase):
         expected = args.genome_list + [
             os.path.join('foo/bar', f) for f in args.file_list]
         mock_pipe.assert_called_once_with(
-            input=expected, job_name='a', odir=None)
+            input=expected, job_name='a', output_dir=None)
 
     #
     #   Test output directory setup
@@ -171,7 +171,7 @@ class TestPipeDriver(LibpipeTestCase):
         m.assert_called_once_with(
             input=['genome', 'file'],
             job_name='name_key',
-            odir='path/to/odir/name_key',
+            output_dir='path/to/odir/name_key',
         )
 
     #
@@ -186,7 +186,7 @@ class TestPipeDriver(LibpipeTestCase):
 
         expected = args.genome_list + args.file_list
         mock_pipe.assert_called_once_with(
-            input=expected, job_name='a', odir=None)
+            input=expected, job_name='a', output_dir=None)
 
 
 # __END__

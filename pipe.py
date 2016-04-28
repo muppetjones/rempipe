@@ -111,7 +111,7 @@ def run_pipes(file_dict, genome_list, data=None, odir=None):
                 output_dir = None
 
             pipe = align.AlignPipe(
-                input=_input, job_name=name, odir=output_dir)
+                input=_input, job_name=name, output_dir=output_dir)
             pipe.write()  # '~/dev/tempus/data/test_script.pbs')
 
     return

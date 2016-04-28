@@ -36,7 +36,7 @@ class Pipe(CmdInterface):
         fall_through: A boolean indicating whether input should be
             included in the output.
         cmds: A list of commands in the pipeline
-        odir/output_dir: The dir for output. In most cases, the Cmd
+        output_dir: The dir for output. In most cases, the Cmd
             should handle this itself.
         template_path: The path to the script template.
         timestamp: A timestamp string.
@@ -60,7 +60,7 @@ class Pipe(CmdInterface):
     def __init__(
             self,
             cmds=None, fall_through=False,
-            job_name=None, odir=None,
+            job_name=None, output_dir=None,
             template_path=None, timestamp=None,
             **kwargs):
 
@@ -96,7 +96,7 @@ class Pipe(CmdInterface):
         # set the output dir (if given)
         # -- children must worry about input_dir
         self.input_dir = None
-        self.output_dir = odir
+        self.output_dir = output_dir
 
         # set an rx dict for general use
         # -- see '_write_dir_shortcuts' for example

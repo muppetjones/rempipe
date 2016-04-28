@@ -484,10 +484,10 @@ class TestPipe_write(PipeTestCase):
 
     def test_write_opens_self_named_file_if_not_given(self):
         self.mock_protect()
-        odir = 'foo/bar'
+        output_dir = 'foo/bar'
         self.mock_splitext('meh.pbs')
-        pipe = Pipe(cmds=self.get_n_cmds(3), odir=odir)
-        _file = os.path.join(odir, '{}__{}.pbs'.format(
+        pipe = Pipe(cmds=self.get_n_cmds(3), output_dir=output_dir)
+        _file = os.path.join(output_dir, '{}__{}.pbs'.format(
             pipe.job_name, pipe.timestamp))
 
         pipe.write()
