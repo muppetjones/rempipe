@@ -11,6 +11,7 @@ from libpipe import argp
 from textwrap import dedent
 
 from libpipe.pipe import align
+from libpipe.util import path
 
 import logging
 log = logging.getLogger(__name__)
@@ -101,7 +102,15 @@ def run_pipes(file_dict, genome_list, data=None, odir=None):
                 _input = _genome + _file_list
             except TypeError:
                 _input = _genome + file_list
-            pipe = align.AlignPipe(input=_input, odir=odir)
+
+            # add name as a directory and ensure exists
+            if odir:
+                output_dir = os.path.join(odir, name)
+                path.makedirs(output_dir)
+            else:
+                output_dir = None
+
+            pipe = align.AlignPipe(input=_input, odir=output_dir)
             pipe.write('~/dev/tempus/data/test_script.pbs')
 
     return
@@ -131,7 +140,8 @@ def main(args):
     # assume the output directory based on given root and project
     try:
         odir = os.path.join(args.root, args.project, 'samples')
-    except AttributeError:
+    except (AttributeError, TypeError):
+        # arg not set or set to None
         odir = None  # output will go directly to input folder
 
     run_pipes(file_dict, args.genome_list, data=args.data, odir=odir)

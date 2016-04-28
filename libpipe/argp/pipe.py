@@ -119,6 +119,7 @@ def __add_pipe_group(parser):
     grp.add_argument(
         '--genome', metavar='INDEX', dest='genome_list',
         action=ProtectAbsPathList,
+        default=[],
         help=('The name of one or more alignment indices, including path.'),
     )
 

@@ -58,7 +58,7 @@ def protect(path_str, abspath=True):
     # -- don't do it if no directory is included
     # otherwise it will add path to curr directory
     if abspath and os.path.dirname(val_path):
-        val_path = os.path.normpath(val_path)
+        # val_path = os.path.normpath(val_path)  # not needed--handled by abs
         val_path = os.path.abspath(val_path)
 
     return val_path

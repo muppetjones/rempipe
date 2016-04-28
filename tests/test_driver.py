@@ -24,9 +24,14 @@ class TestPipeDriver(LibpipeTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def mock_abspath(self):
         # prevents addition of pwd while testing due to abspath
-        # -- (poor?) design choices were made to avoid this checking...
         patcher = mock.patch('os.path.abspath', side_effect=lambda x: x)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def mock_expanduser(self):
+        patcher = mock.patch('os.path.expanduser', side_effect=lambda x: x)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -91,7 +96,7 @@ class TestPipeDriver(LibpipeTestCase):
 
         with mock.patch.object(driver, 'run_pipes') as mock_run:
             driver.main(args)
-        mock_run.assert_called_once_with(expected, None, data=None, odir=None)
+        mock_run.assert_called_once_with(expected, [], data=None, odir=None)
 
     def test_main_sets_odir_via_root_project(self):
         self.mock_protect()
@@ -100,14 +105,43 @@ class TestPipeDriver(LibpipeTestCase):
         expected = os.path.join('~/projects', 'foo', 'samples')
         with mock.patch.object(driver, 'run_pipes') as mock_run:
             driver.main(args)
-        mock_run.assert_called_once_with({}, None, data=None, odir=expected)
+        mock_run.assert_called_once_with({}, [], data=None, odir=expected)
+
+    def test_main_does_not_set_odir_without_root_and_project(self):
+        tests = [
+            '--root ~/projects',
+            '--project foo',
+            '',
+        ]
+
+        for test in tests:
+            with self.subTest(arg_str=test):
+                args = self.get_args(test)
+                setattr(args, 'summary', {})
+                setattr(args, 'genome_list', [])
+                with mock.patch.object(driver, 'run_pipes') as mock_run:
+                    driver.main(args)
+                mock_run.assert_called_once_with(
+                    {}, [], data=None, odir=None)
+
+    def test_run_pipe_tries_to_create_odir(self):
+        self.mock_expanduser()
+        self.mock_abspath()
+        args = self.get_args('--project foo --root ~/projects')
+        setattr(args, 'summary', {})
+        setattr(args, 'genome_list', [])
+        with mock.patch('libpipe.pipe.align.AlignPipe') as mock_pipe, \
+                mock.patch('libpipe.util.path.makedirs') as m:
+            driver.run_pipes(
+                {'name': ['file']}, ['genome'], odir='path/to/odir')
+        m.assert_called_once_with('path/to/odir/name')
 
     def test_run_pipes_passes_out_dir_to_pipe_obj(self):
         with mock.patch('libpipe.pipe.align.AlignPipe') as m:
             driver.run_pipes(
-                {'name': ['file']}, ['genome'], odir='path/to/odir')
+                {'name_key': ['file']}, ['genome'], odir='path/to/odir')
         m.assert_called_once_with(
-            input=['genome', 'file'], odir='path/to/odir'
+            input=['genome', 'file'], odir='path/to/odir/name_key'
         )
 
     def test_main_calls_AlignPipe_with_genome_in_input(self):
@@ -120,6 +154,7 @@ class TestPipeDriver(LibpipeTestCase):
         mock_pipe.assert_called_once_with(input=expected, odir=None)
 
     def test_data_dir_is_added_to_file_names_if_given(self):
+        self.mock_abspath()
         args = self.get_args('--data=foo/bar --genome genome/hisat_index')
         setattr(args, 'file_list', ['a.fq'])
         with mock.patch('libpipe.pipe.align.AlignPipe') as mock_pipe:

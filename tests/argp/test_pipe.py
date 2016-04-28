@@ -91,7 +91,6 @@ class TestArgpPipe(TestArgpPipeTestCase):
             if '/' in v
         }
 
-        # with mock.patch('libpipe.util.path.protect') as mock_protect:
         self.get_args(self.default)
         expected = [
             mock.call(v) for v in dir_args.values()]
@@ -101,6 +100,10 @@ class TestArgpPipe(TestArgpPipeTestCase):
         args = self.get_args('--genome=gen/idx0 --genome gen/idx1')
         filters = [self.mock_protect('gen/idx{}'.format(i)) for i in range(2)]
         self.assertEqual(args.genome_list, filters)
+
+    def test_pipe_parser_sets_genome_list_to_empty_by_default(self):
+        args = self.get_args('')
+        self.assertEqual(args.genome_list, [])
 
     def test_pipe_parser_stores_multiple_filter_args_in_filter_list(self):
         args = self.get_args('--filter=gen/idx0 --filter gen/idx1')
