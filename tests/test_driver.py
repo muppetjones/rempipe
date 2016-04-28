@@ -62,13 +62,21 @@ class TestPipeDriver(LibpipeTestCase):
             args = parser.parse_args(arg_str.split())
         return args
 
+    #
+    #   Test summary arg
+    #
+
     def test_main_passes_summary_arg_dict_to_run_pipes(self):
         # Do not create an argp object and pass it. Doing so
         # tests the ability of argp to create a dict from a
         # summary file. Instead, check that args.summary is
         # passed to run_pipes.
+
+        # Impicitly tests addition of summary file dir to each
+        # file in the summary
         args = mock.MagicMock(
-            summary={k: v for v, k in enumerate(list('abc'))},
+            summary_file='ha/ha/ha/summary.txt',
+            summary={k: str(v) for v, k in enumerate(list('abc'))},
             data=None,
             genome_list=None,
             project='project',
@@ -80,6 +88,10 @@ class TestPipeDriver(LibpipeTestCase):
 
         mock_run.assert_called_once_with(
             args.summary, None, data=None, odir='root/project/samples')
+
+    #
+    #   Test file and dir args
+    #
 
     def test_main_passes_dir_dict_to_run_pipes(self):
         dir_files = ['seq{}.fq'.format(i) for i in range(3)]
@@ -97,6 +109,21 @@ class TestPipeDriver(LibpipeTestCase):
         with mock.patch.object(driver, 'run_pipes') as mock_run:
             driver.main(args)
         mock_run.assert_called_once_with(expected, [], data=None, odir=None)
+
+    def test_data_dir_is_added_to_file_names_if_given(self):
+        self.mock_abspath()
+        args = self.get_args('--data=foo/bar --genome genome/hisat_index')
+        setattr(args, 'file_list', ['a.fq'])
+        with mock.patch('libpipe.pipe.align.AlignPipe') as mock_pipe:
+            driver.main(args)
+
+        expected = args.genome_list + [
+            os.path.join('foo/bar', f) for f in args.file_list]
+        mock_pipe.assert_called_once_with(input=expected, odir=None)
+
+    #
+    #   Test output directory setup
+    #
 
     def test_main_sets_odir_via_root_project(self):
         self.mock_protect()
@@ -144,6 +171,10 @@ class TestPipeDriver(LibpipeTestCase):
             input=['genome', 'file'], odir='path/to/odir/name_key'
         )
 
+    #
+    #   Test genome
+    #
+
     def test_main_calls_AlignPipe_with_genome_in_input(self):
         args = self.get_args('--genome genome/hisat_index')
         setattr(args, 'file_list', ['a.fq'])
@@ -151,15 +182,4 @@ class TestPipeDriver(LibpipeTestCase):
             driver.main(args)
 
         expected = args.genome_list + args.file_list
-        mock_pipe.assert_called_once_with(input=expected, odir=None)
-
-    def test_data_dir_is_added_to_file_names_if_given(self):
-        self.mock_abspath()
-        args = self.get_args('--data=foo/bar --genome genome/hisat_index')
-        setattr(args, 'file_list', ['a.fq'])
-        with mock.patch('libpipe.pipe.align.AlignPipe') as mock_pipe:
-            driver.main(args)
-
-        expected = args.genome_list + [
-            os.path.join('foo/bar', f) for f in args.file_list]
         mock_pipe.assert_called_once_with(input=expected, odir=None)

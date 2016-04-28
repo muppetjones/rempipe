@@ -125,8 +125,8 @@ def main(args):
 
     log.info(summarize_args(args))
 
-    # create a file_dict with {name: file} format
     if args.summary is not None:
+        # create a file_dict with {name: file} format
         file_dict = args.summary
     else:
         # convert file_list to to dict (akin to args.summary)

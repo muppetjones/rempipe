@@ -5,6 +5,7 @@ Functions for setting up and adding to a single parser.
 '''
 
 import argparse
+import os.path
 
 from libpipe.type import seq
 from libpipe.util import path
@@ -55,8 +56,7 @@ def build_args(args):
     '''Perform additional parsing of given args.
 
     Rather than create a dozen specialized argparse.Action objects,
-    of which ParseSummaryArg is an example, separate that functionality
-    into individual functions.
+    we separate that functionality into individual functions.
 
     `build_args` should provide a single interface to these specialized
     functions, removing the need to call each separately.
@@ -170,6 +170,15 @@ def __read_summary(args):
         seq.SeqType(first_file)
     except ValueError:
         del summary[first_name]  # Nope! Remove it.
+
+    # prefix each file with a path
+    # -- assumes data is in same directory as the summary file
+    # -- unless we have a data dir!
+    prefix = args.data if args.data else os.path.dirname(args.summary_file)
+    summary = {
+        k: [os.path.join(prefix, _v) for _v in v]
+        for k, v in summary.items()
+    }
 
     setattr(args, 'summary', summary)
     return args

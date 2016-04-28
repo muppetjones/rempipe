@@ -1,7 +1,7 @@
 # import argparse
 # import unittest
-# import os.path
 
+import os.path
 from unittest import mock
 
 from libpipe import argp
@@ -155,13 +155,31 @@ class TestArgpPipe__build_args(TestArgpPipeTestCase):
         self.assertNotIn('Name', args.summary)
 
     def test_build_args_sets_summary_as_dict_of_lists(self):
+        # NOTE: implicitly tests that the summary file path is
+        #   added to each file
         dat = 'A\tA1.fq;A2.fq\nB\tB1.fq\n'
         self.setup_mock_read(dat)
         args = self.get_args('--summary=data/summary.txt')
         args = argp.pipe.build_args(args)
 
+        prefix = os.path.dirname(args.summary_file)
         expected = {
-            'A': ['A1.fq', 'A2.fq'],
-            'B': ['B1.fq', ],
+            'A': [os.path.join(prefix, 'A1.fq'),
+                  os.path.join(prefix, 'A2.fq')],
+            'B': [os.path.join(prefix, 'B1.fq'), ],
+        }
+        self.assertEqual(args.summary, expected)
+
+    def test_build_args_prefixes_summary_files_with_data_dir(self):
+        dat = 'A\tA1.fq;A2.fq\nB\tB1.fq\n'
+        self.setup_mock_read(dat)
+        args = self.get_args('--summary=data/s.txt --data=yellow/brick/road')
+        args = argp.pipe.build_args(args)
+
+        prefix = os.path.join('protect', 'yellow/brick/road')
+        expected = {
+            'A': [os.path.join(prefix, 'A1.fq'),
+                  os.path.join(prefix, 'A2.fq')],
+            'B': [os.path.join(prefix, 'B1.fq'), ],
         }
         self.assertEqual(args.summary, expected)
