@@ -475,6 +475,15 @@ class CmdBase(CmdInterface):
             except KeyError:
                 pass  # kwarg not given
 
+        # only modify redirect if it's a tuple
+        # and even then, ASSUME that the LAST element is the file value
+        if self.redirect and isinstance(self.redirect, tuple):
+            redirect = list(self.redirect)
+            redirect_to = os.path.basename(redirect[-1])
+            redirect_to = os.path.join(self.output_dir, redirect_to)
+            redirect[-1] = redirect_to
+            self.redirect = tuple(redirect)
+
     #
     #   Private methods
     #   NOTE: These are unavailable in the children.

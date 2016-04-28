@@ -2,6 +2,7 @@
 import datetime
 import os
 import os.path
+import re
 import stat
 import subprocess
 import sys
@@ -94,7 +95,12 @@ class Pipe(CmdInterface):
 
         # set the output dir (if given)
         # -- children must worry about input_dir
+        self.input_dir = None
         self.output_dir = odir
+
+        # set an rx dict for general use
+        # -- see '_write_dir_shortcuts' for example
+        self.rx = {}
 
         # set the job name
         if job_name:
@@ -270,7 +276,24 @@ class Pipe(CmdInterface):
         pass
 
     def _write_cmds(self, fh):
-        fh.write(self.cmd(cmd_sep="\n\n"))
+        cmd = self.cmd(cmd_sep="\n\n")
+
+        # parse in directory shortcuts
+        # -- sub output_dir first in case it's a sub dir to input_dir
+        # -- CLEANUP: del the rx attributes set by _write_dir_shortcuts
+        rx_keys = ['output_dir', 'input_dir']
+        try:
+            for k in rx_keys:
+                try:
+                    rx, rep = self.rx[k]
+                    cmd = rx.sub(rep, cmd)
+                    del self.rx[k]
+                except KeyError:
+                    pass  # specific rx not set
+        except AttributeError:
+            pass  # rx set in '_write_dir_shortcuts'
+
+        fh.write(cmd)
         fh.write('\n')  # add trailing new line
         return
 
@@ -310,6 +333,41 @@ class Pipe(CmdInterface):
         fh.write(self.pbs_template + "\n\n")
         return
 
+    def _write_dir_shortcuts(self, fh):
+        '''Write repeated dir paths as BASH variables
+
+        Write the input and output directories to the script as
+        BASH variables. Also, compile regex for easier replacement later.
+        (These regex should be deleted ASAP!)
+
+        Arguments:
+            fh: The file handle.
+        Return or Raise:
+            None.
+        '''
+
+        if self.input_dir:
+            _input = 'DATA_DIR={}\n'.format(self.input_dir)
+            self.rx['input_dir'] = (
+                re.compile(r'{}'.format(self.input_dir)),
+                '${DATA_DIR}'
+            )
+        else:
+            _input = ''
+
+        # output_dir should at least be None
+        if self.output_dir:
+            output = 'OUTPUT_DIR={}\n'.format(self.output_dir)
+            self.rx['output_dir'] = (
+                re.compile(r'{}'.format(self.output_dir)),
+                '${OUTPUT_DIR}'
+            )
+        else:
+            output = ''
+
+        if _input or output:
+            fh.write('{}{}\n'.format(_input, output))
+
     @file_or_handle(mode='w')
     def _write_script(self, fh, fmt=None):
         '''Handle write preparation and go to appropriate 'write' method
@@ -335,6 +393,7 @@ class Pipe(CmdInterface):
             filename = None
         finally:
             self._write_calling_command(fh)
+            self._write_dir_shortcuts(fh)
             self._write_cmds(fh)
 
         self._update_file_permissions(filename)  # nothing if filename = None

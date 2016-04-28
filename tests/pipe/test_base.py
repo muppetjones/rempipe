@@ -80,6 +80,14 @@ class TestPipe(PipeTestCase):
         pipe = Pipe(job_name="foo_bar")
         self.assertEqual(pipe.job_name, 'foo_bar')
 
+    def test_init_sets_to_None_if_not_given(self):
+        pipe = Pipe()
+
+        tests = ['input_dir', 'output_dir', 'pbs_template']
+        for test in tests:
+            with self.subTest(none_test=test):
+                self.assertIsNone(getattr(pipe, test))
+
     def test_init_creates_a_dummy_cmd_for_linking(self):
         '''Test that init creates a cmd obj to use for linking'''
 
@@ -562,5 +570,64 @@ class TestPipe_write(PipeTestCase):
         result = re.sub(r'[\\\#\s\n]+', ' ', result)
         self.assertIn(' '.join(fake_argv), result)
 
+    def test_write_declares_dir_variables_if_set(self):
+        pipe = Pipe(cmds=self.get_n_cmds(3))
+        pipe.input_dir = 'input/path'
+        pipe.output_dir = 'output/path'
+
+        with io.StringIO() as sh:
+            pipe.write(sh)  # should not raise!
+            sh.seek(0)
+            result = sh.read()
+
+        expected = 'DATA_DIR={}\nOUTPUT_DIR={}\n\n'.format(
+            pipe.input_dir, pipe.output_dir)
+
+        # The script should/could insert extra new lines or comments
+        self.assertIn(expected, result)
+
+    def test_write_replaces_full_path_with_dir_variables(self):
+        input_dir = os.path.join('input', 'path')
+        output_dir = os.path.join('output', 'path')
+
+        # setup cmds
+        cmds = []
+        order = [input_dir, output_dir, output_dir]
+        expected = []
+        for i, d in enumerate(order):
+            f = 'cmd' + str(i) + '.txt'
+            cmds.append(self.create_mock_cmd(os.path.join(d, f)))
+            expected.append(
+                os.path.join(
+                    '${DATA_DIR}' if 'input' in d else '${OUTPUT_DIR}',
+                    f,
+                )
+            )
+
+        # run the test
+        pipe = Pipe(cmds=cmds)
+        pipe.input_dir = input_dir
+        pipe.output_dir = output_dir
+
+        with io.StringIO() as sh:
+            pipe.write(sh)  # should not raise!
+            sh.seek(0)
+            result = sh.read()
+        no_comments = re.sub(r'\#.*\n', '', result)
+        clean_result = no_comments.replace('\n\n', '\n').lstrip().rstrip()
+
+        for exp in expected:
+            self.assertIn(exp, clean_result)
+
+    def test_write_deletes_dir_variable_rx(self):
+        pipe = Pipe(cmds=self.get_n_cmds(3))
+        pipe.input_dir = 'input/path'
+        pipe.output_dir = 'output/path'
+
+        with io.StringIO() as sh:
+            pipe.write(sh)  # should not raise!
+
+        self.assertFalse(hasattr(pipe, 'rx_input_dir'), 'Regex not deleted')
+        self.assertFalse(hasattr(pipe, 'rx_output_dir'), 'Regex not deleted')
 
 # ENDFILE

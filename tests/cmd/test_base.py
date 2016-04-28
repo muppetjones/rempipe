@@ -418,12 +418,22 @@ class TestCmdBase_cmd(BaseTestCase):
         self.assertEqual(cmd.args, expected_args)
         self.assertEqual(cmd.kwargs, expected_kwargs)
 
-    def test_cmd_does_not_update_redirect_with_odir(self):
-        '''Redirect should be handled by the child--no assumptions'''
+    def test_cmd_updates_redirect_tuple_with_odir(self):
+        '''Redirect should be handled by the child, but child may not know'''
 
         cmd = self.CMD(odir='brave/new')
-        expected_redirect = ('>', 'path/to/output')
-        cmd.redirect = expected_redirect
+        cmd.redirect = ('>', 'hello/world')
+        expected_redirect = ('>', 'brave/new/world')
+
+        cmd.cmd()
+        self.assertEqual(cmd.redirect, expected_redirect)
+
+    def test_cmd_does_not_update_redirect_str_with_odir(self):
+        '''Redirect value not modified if str'''
+
+        cmd = self.CMD(odir='brave/new')
+        cmd.redirect = '> hello/world'
+        expected_redirect = '> hello/world'
 
         cmd.cmd()
         self.assertEqual(cmd.redirect, expected_redirect)
