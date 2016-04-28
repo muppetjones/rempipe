@@ -50,15 +50,20 @@ class CmdBase(CmdInterface):
     Class methods for override (in call order)
             NOTE: The 'cmd' method calls several functions that may be
                 overriden to customize how requirements are checked.
-                None of these methods are implemented in the base class
+                None of these methods are implemented in the base class.
+            NOTE: _pre_req and _pre_cmd may be used to dynamically setup
+                any missing arguments. The former should be used when
+                those arguments are REQUIRED (by the program or the
+                Cmd object); the latter in all other situations.
         _pre_req(): Use to setup any last minute details before
             requirements are checked, such as handling the
-            results of linking.
+            results of linking or dynamically setting required args.
         _post_req(): Use to define additional requirements indirectly
             related to successful command execution. This should raise
             an exception if conditions are not met. Use sparingly.
         _pre_cmd(): Final modification before creating the executable string,
-            e.g., such as setting up redirect.
+            e.g., such as setting up redirect or dynamically setting
+            optional args.
 
     Example:
         # Flags may be given as positional arguments
@@ -172,8 +177,10 @@ class CmdBase(CmdInterface):
             5. Process arguments as needed AFTER checkeing requirements.
                 > via '_pre_cmd', as defined per child class.
                 > e.g., defining a redirect based on args.
-            6. Generate the command string.
-            7. Wrap the command string (if given).
+            6. Update output directory (if given)
+                > for each arg listed in attr.output_args
+            7. Generate the command string.
+            8. Wrap the command string (if given).
 
         TODO(sjbush): Implement 'wrap' argument to encase the command as
             a BASH-style variable, e.g., wrap='k' would yield 'k=$(<cmd>)'
@@ -198,6 +205,7 @@ class CmdBase(CmdInterface):
         self._post_req()
         self._check_requirements()
         self._pre_cmd()
+        self._update_output_directory()
         cmd_str = self._cmd(**kwargs)
         return cmd_str
 
@@ -436,6 +444,36 @@ class CmdBase(CmdInterface):
         if queue not in known_queues:
             msg = 'Unknown resource manager queue {}'.format(queue)
             raise ValueError(msg)
+
+    def _update_output_directory(self):
+        '''Update the dir path for all output args
+
+        If the output_dir arg is set, the dir path for all expected
+        arguments will be updated, including redirect. If output_dir is
+        not set, does nothing.
+
+        Accepts, returns, and raises nothing.
+        '''
+
+        if not self.output_dir:
+            # prevent TypeError due to missing self.output_dir
+            return
+
+        for arg in self.attr.output_args:
+            try:
+                # attempt to update the output argument
+                try:
+                    # assume arg is an integer, i.e., positional
+                    basename = os.path.basename(self.args[arg])
+                    self.args[arg] = os.path.join(self.output_dir, basename)
+                except TypeError:
+                    # not an integer index -- therefore kwarg
+                    basename = os.path.basename(self.kwargs[arg])
+                    self.kwargs[arg] = os.path.join(self.output_dir, basename)
+            except IndexError:
+                pass  # pos arg not given
+            except KeyError:
+                pass  # kwarg not given
 
     #
     #   Private methods

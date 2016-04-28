@@ -57,6 +57,12 @@ class TestHisat2Cmd(unittest.TestCase):
     def test_command_can_be_initialized(self):
         TEST_CMD()  # should not fail
 
+    def test_output_args_set_as_expected(self):
+
+        expected = ['-S', '--un', '--un-conc']
+        found = TEST_CMD.attr.output_args
+        self.assertEqual(sorted(found), sorted(expected))
+
     #
     #   Test Output
     #

@@ -93,7 +93,7 @@ class CmdAttributes(object):
         expected = [
             'name', 'synopsis', 'description',  # help related
             'req_args', 'req_kwargs', 'req_types',  # argument checking
-            'defaults', 'flag_sep',
+            'defaults', 'flag_sep', 'output_args',
         ]
 
         # ID10T Error -- forgot to use ** when calling
@@ -120,6 +120,7 @@ class CmdAttributes(object):
             'req_args': 0,
             'req_kwargs': [],
             'req_types': [],
+            'output_args': [],
         }
 
         # Ensure the defaults only provide values for known arguments

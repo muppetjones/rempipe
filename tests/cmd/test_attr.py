@@ -102,6 +102,11 @@ class TestCmdAttributes(unittest.TestCase):
         self.assertIsNotNone(ca.defaults)
         self.assertIsInstance(ca.defaults, dict)
 
+    def test_init_defaults_output_args_to_empty_list(self):
+        ca = CmdAttributes(**self.kwargs)
+        self.assertIsNotNone(ca.output_args, [])
+        self.assertIsInstance(ca.output_args, list)
+
     # def test_init_throws_ValueError_if_multiple_IndexTypes_required(self):
     #     '''Ensure that each cmd can require only one index type
     #

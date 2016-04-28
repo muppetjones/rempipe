@@ -285,6 +285,13 @@ class TestCmdBase_cmd(BaseTestCase):
             cmd.cmd()
         mock_match.assert_called_once_with()
 
+    def test_cmd_calls_update_output_directory_method(self):
+
+        cmd = self.CMD()
+        with mock.patch.object(cmd, '_update_output_directory') as mock_match:
+            cmd.cmd()
+        mock_match.assert_called_once_with()
+
     def test_cmd_calls_each_user_defined_customization(self):
         '''Test cmd calls each available user defined methods for cmd prep'''
 
@@ -395,6 +402,50 @@ class TestCmdBase_cmd(BaseTestCase):
         cmd_str = cmd.cmd()
         self.assertIn('data/seq.s.bam', cmd_str)
         self.assertIn('data/seq2.s.bam', cmd_str)
+
+    def test_cmd_updates_args_in_attr_output_args_with_given_odir(self):
+        '''Test the dir path is updated on listed args'''
+
+        self.CMD.attr.output_args = [1, '--blue']
+        cmd = self.CMD(odir='brave/new')
+        cmd.args = ['hello', 'path/to/world']
+        cmd.kwargs = {'--blue': 'suede/shoes', '-o': 'suede/sandals'}
+
+        cmd.cmd()
+        expected_args = ['hello', 'brave/new/world']
+        expected_kwargs = {'--blue': 'brave/new/shoes', '-o': 'suede/sandals'}
+
+        self.assertEqual(cmd.args, expected_args)
+        self.assertEqual(cmd.kwargs, expected_kwargs)
+
+    def test_cmd_does_not_update_redirect_with_odir(self):
+        '''Redirect should be handled by the child--no assumptions'''
+
+        cmd = self.CMD(odir='brave/new')
+        expected_redirect = ('>', 'path/to/output')
+        cmd.redirect = expected_redirect
+
+        cmd.cmd()
+        self.assertEqual(cmd.redirect, expected_redirect)
+
+    def test_update_output_dir_does_not_raise_if_output_arg_not_set(self):
+        self.CMD.attr.output_args = [1, '--blue']
+        cmd = self.CMD(odir='brave/new')
+        cmd._update_output_directory()  # should not raise
+
+    def test_update_output_directory_does_not_raise_if_no_odir_given(self):
+
+        self.CMD.attr.output_args = [1, '--blue']
+        cmd = self.CMD()
+        expected_args = ['hello', 'path/to/world']
+        expected_kwargs = {'--blue': 'suede/shoes', '-o': 'suede/sandals'}
+
+        cmd.args = expected_args
+        cmd.kwargs = expected_kwargs
+
+        cmd._update_output_directory()  # should not raise
+        self.assertEqual(cmd.args, expected_args)
+        self.assertEqual(cmd.kwargs, expected_kwargs)
 
 
 class TestBaseCmd_link(BaseTestCase):

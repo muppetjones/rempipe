@@ -63,6 +63,7 @@ class Hisat2Cmd(CmdBase):
             '-X': 500,
         },
 
+        output_args=['-S', '--un', '--un-conc'],
         req_kwargs=['-x', ('-1', '-2'), ['-1', '-U']],
         req_args=0,
         req_types=[
