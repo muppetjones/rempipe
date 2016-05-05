@@ -1,4 +1,6 @@
 
+from unittest import mock
+
 from libpipe.cmd import interface
 from libpipe.pipe import base
 from libpipe.pipe import batch
@@ -14,7 +16,7 @@ class BatchPipeTestCase(LibpipeTestCase):
 #
 
 
-class TestBatchPipe_Pipe(BatchPipeTestCase):
+class TestBatchPipe(BatchPipeTestCase):
 
     '''Test that BatchPipe still acts like a pipe'''
 
@@ -22,6 +24,18 @@ class TestBatchPipe_Pipe(BatchPipeTestCase):
 
         pipe = batch.BatchPipe()
         self.assertIsInstance(pipe, base.Pipe)
+
+    def test_init_calls_super_init(self):
+        self.fail()
+
+    def test_init_raises_ValueError_if_not_given_input_dict(self):
+        '''Test that init complains if not given kwarg input as dict'''
+
+        tests = ['filename.txt', ['a.txt', 'b.txt'], 0]
+        for test in tests:
+            with self.subTest(input=test):
+                with self.assertRaises(ValueError):
+                    batch.BatchPipe(input=test)
 
 #
 #   CmdInterface
@@ -35,3 +49,9 @@ class TestBatchPipe_CmdInterface(BatchPipeTestCase):
     def test_inherits_from_cmd_interface(self):
         pipe = batch.BatchPipe()
         self.assertIsInstance(pipe, interface.CmdInterface)
+
+    def test_link_raises_TypeError_when_called(self):
+        pipe = batch.BatchPipe()
+        m = mock.MagicMock('libpipe.cmd.base.CmdBase')
+        with self.assertRaises(TypeError):
+            pipe.link(m)

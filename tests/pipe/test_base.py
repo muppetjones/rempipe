@@ -91,6 +91,13 @@ class TestPipe(PipeTestCase):
             Pipe()
         mock_dummy.assert_called_once_with()
 
+    def test_init_raises_ValueError_if_input_is_not_expandable(self):
+        tests = [0, 0.0]
+        for test in tests:
+            with self.subTest(input=test):
+                with self.assertRaises(ValueError):
+                    Pipe(input=test)
+
     def test_init_passes_input_to_dummy(self):
         '''Test that dummy output matches the pipe input list'''
 

@@ -76,7 +76,12 @@ class Pipe(CmdInterface):
         except KeyError:
             _input = []
 
-        self.dummy = CmdDummy(*_input)
+        try:
+            self.dummy = CmdDummy(*_input)
+        except TypeError:
+            # CRITICAL: Open to failure due to string input
+            msg = 'Pipe input must be exapandable, e.g., list'
+            raise ValueError(msg)
         self.script_file = None
         self.cmds = []
         if cmds:
