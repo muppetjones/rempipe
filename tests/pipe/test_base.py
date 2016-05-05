@@ -48,10 +48,6 @@ class PipeTestCase(LibpipeTestCase):
 
 class TestPipe(PipeTestCase):
 
-    def test_CmdBase_is_mocked(self):
-        pass
-        # pipe.CmdBase()  # should not raise
-
     def test_init_raises_TypeError_if_unexpected_kwarg_and_no_setup(self):
         '''Test we don't get arguments we don't expect
 
