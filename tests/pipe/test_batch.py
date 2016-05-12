@@ -11,10 +11,10 @@ class BatchPipeTestCase(LibpipeTestCase):
 
     pass
 
+
 #
 #   Pipe
 #
-
 
 class TestBatchPipe(BatchPipeTestCase):
 
@@ -26,7 +26,33 @@ class TestBatchPipe(BatchPipeTestCase):
         self.assertIsInstance(pipe, base.Pipe)
 
     def test_init_calls_super_init(self):
-        self.fail()
+
+        with mock.patch('libpipe.pipe.base.Pipe.__init__') as m:
+            batch.BatchPipe()
+        m.assert_called_once_with()
+
+    def test_init_passes_args_and_kwargs_to_super_init(self):
+
+        args = list('abc')
+        kwargs = {k: i for i, k in enumerate(args)}
+        with mock.patch('libpipe.pipe.base.Pipe.__init__') as m:
+            batch.BatchPipe(*args, **kwargs)
+        m.assert_called_once_with(*args, **kwargs)
+
+    def test_input_kwarg_not_passed_to_super_init(self):
+        args = list('abc')
+        kwargs = {k: i for i, k in enumerate(args)}
+        _input = {'input': 'dict'}
+        with mock.patch('libpipe.pipe.base.Pipe.__init__') as m:
+            batch.BatchPipe(*args, input=_input, **kwargs)
+        m.assert_called_once_with(*args, **kwargs)
+
+    def test_init_stores_copy_of_input_dict(self):
+        _input = {'sample1': ['seq_1.fq', 'seq2.fq']}
+        pipe = batch.BatchPipe(input=_input)
+        self.assertEqual(pipe._input, _input)
+        _input['sample1'][1] = 'Gotcha!'
+        self.assertNotEqual(pipe._input, _input)
 
     def test_init_raises_ValueError_if_not_given_input_dict(self):
         '''Test that init complains if not given kwarg input as dict'''
@@ -37,10 +63,10 @@ class TestBatchPipe(BatchPipeTestCase):
                 with self.assertRaises(ValueError):
                     batch.BatchPipe(input=test)
 
+
 #
 #   CmdInterface
 #
-
 
 class TestBatchPipe_CmdInterface(BatchPipeTestCase):
 

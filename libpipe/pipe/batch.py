@@ -1,7 +1,7 @@
 
+import copy
 
 from libpipe.pipe import base
-
 
 import logging
 log = logging.getLogger(__name__)
@@ -30,8 +30,11 @@ class BatchPipe(base.Pipe):
     *   Input must be given as a dict with a {jobname: filename(s)} format.
     '''
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
 
+        # input kwarg *must* be a dict instead of a list
+        # -- do not pass to super
+        # -- also complain if not expected.
         try:
             _input = kwargs['input']
             del kwargs['input']
@@ -41,6 +44,8 @@ class BatchPipe(base.Pipe):
             if not isinstance(_input, dict):
                 msg = 'BatchPipe input must be a dict'
                 raise ValueError(msg)
+            super().__init__(*args, **kwargs)
+            self._input = copy.deepcopy(_input)
 
     #
     #   CmdInterface
