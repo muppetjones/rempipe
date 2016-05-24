@@ -9,7 +9,7 @@ import re
 
 from libpipe.parsers.pipe import BasePipeParser
 from libpipe.pipes.assemble import WgsPipe
-from libpipe.pipes.align import RnaSeqPipe
+from libpipe.pipes.align import NestedRnaSeqPipe
 
 import logging
 log = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class WgsPipeParser(BasePipeParser):
         )
 
         self.subparser.add_argument(
-            '--reference', dest='reference_genome',
+            '--reference', dest='reference_genomes',
             help='The reference genome.',
         )
 
@@ -41,13 +41,19 @@ class WgsPipeParser(BasePipeParser):
 class RnaseqPipeScripted(BasePipeParser):
 
     subcmd = 'rnaseq'
-    pipe = RnaSeqPipe
+    pipe = NestedRnaSeqPipe
 
     def setup(self):
         super().setup()
 
         self.subparser.add_argument(
-            '--genome', dest='genome',
+            '--filter', dest='filter_genomes',
+            action='append',
+            help='Align to genome and use unaligned sequences',
+        )
+
+        self.subparser.add_argument(
+            '--reference', dest='reference_genomes',
             action='append',
             help='Hisat genome',
         )

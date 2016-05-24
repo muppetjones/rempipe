@@ -24,15 +24,15 @@ for name in $(cat "$ROOT_DIR"/genome_names_sorted.txt); do
 
     # loop over all of the contigs.fa files
     # -- essentially, any velvet assembly
-    for assembly in $(find "$(pwd)" -type f -path "*${name}*" -name 'contigs.fa'); do
+    for assembly in $(find "$(pwd)" -type f -path "*${name}*" -name '*MULTI*.fa'); do
 
-        echo "Assembly: $(basename $(dirname "$assembly"))"
+        echo "Assembly: $(basename $(dirname "$assembly"))/$(basename "$assembly")"
 
         odir="$(dirname "${assembly}")"
         svr_submit_RAST_job --user $uname --passwd $pswrd \
             --domain Bacteria --bioname "Mycobacterium tuberculosis" \
-            --fasta "$assembly" 2>&1 | tee -a "${odir}"/rast.txt
+            --fasta "$assembly" 2>&1 | tee "${odir}"/rast.txt
 
-        grep "Job" | sed -e "s/'\([0-9]\+\)'/\1" > "${odir}"/rast.id
+        grep "Job" "${odir}"/rast.txt | sed -e "s/.*'\([0-9]\+\)'.*/\1/" > "${odir}"/rast.id
     done
 done

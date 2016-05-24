@@ -27,24 +27,26 @@ class AlignPipe(PresetPipe):
         4. Bedtools multicov (sorted BAM file, genome)
     '''
 
-    def _setup(self, input_list=[], genome='', odir='', **kwargs):
-        if not isinstance(genome, str):
+    def _setup(self, input_list=[], reference='', odir='', **kwargs):
+        log.debug(reference)
+
+        if not isinstance(reference, str):
 
             # could be a size 1 list!
-            if len(genome) != 1:
+            if len(reference) != 1:
                 msg = '{} only accepts a single genome. {}'.format(
                     self.__class__.__name__,
                     'Use "NestedGenomicsPipe" for multiple'
                 )
                 raise ValueError(msg)
             else:
-                genome = genome[0]
+                reference = reference[0]
 
         # Step 1 -- align trimmed reads
         # > input: link from previous (fastq)
         # > output: sam files to given directory
         args = []
-        kwargs = {'-x': genome, '-p': os.cpu_count() - 1}
+        kwargs = {'-x': reference, '-p': os.cpu_count() - 1}
         if kwargs['-p'] is None:
             del kwargs['-p']
         hisat = Hisat2Cmd(*args, **kwargs)
@@ -77,7 +79,7 @@ class AlignPipe(PresetPipe):
         # Step 4 -- count index
         # > input: link from previous (bam)
         # > output: bam index files to given directory
-        args = [genome, ]
+        args = [reference, ]
         kwargs = {}
         count_cmd = HtseqCountCmd(*args, **kwargs)
 
@@ -104,10 +106,13 @@ class RnaSeqPipe(PresetPipe):
         7. Bedtools multicov (sorted BAM file, genome)
     '''
 
-    REQ_PARAM = ['input_list', 'genome', 'odir']
+    REQ_PARAM = ['input_list', 'reference', 'odir']
 
     def _setup(self, *args, **kwargs):
         # NOTE: TrimPipe uses 'input_list' to set FastQC input.
+        log.debug(args)
+        log.debug(kwargs)
+
         trim = TrimPipe(*args, **kwargs)
         align = AlignPipe(*args, **kwargs)
 
@@ -135,29 +140,40 @@ class NestedRnaSeqPipe(RnaSeqPipe):
         from hisat (step 4).
     '''
 
-    def _setup(self, *args, genome=[], **kwargs):
+    REQ_PARAM = ['input_list', 'reference', 'odir']
 
-        if not isinstance(genome, list) or len(genome) < 2:
+    def _setup(self, *args, reference=[], **kwargs):
+
+        try:
+            _filter = kwargs['filter']
+        except KeyError:
+            _filter = None  # reference[0]
+            # reference = reference[1:]
+
+        # or not isinstance(reference, list) or len(reference) < 2:
+        if not _filter:
             msg = 'Multiple genomes must be given. For a single genome,' + \
                 'use "RnaSeqPipe"'
             raise ValueError(msg)
 
-        kwargs['genome'] = genome[0]
-        secondary_genomes = genome[1:]
+        # kwargs['genome'] = kwargs['filter']
+        # secondary_genomes = reference[:]
 
         # setup initial trim and alignment
         # CRITICAL: Must use soft_output to ensure the unaligned fastq
         #           files from hisat are available as input
-        super()._setup(*args, **kwargs)
+        _kwargs_filter = dict.copy(kwargs)
+        _kwargs_filter['reference'] = _filter
+        super()._setup(*args, **_kwargs_filter)
         self.cmds[-1].soft_output = True
 
         # create subpipe for each genome
         # CRITICAL: remove the genome from the kwargs before comprehension!!
         # CRITICAL: each subpipe MUST have soft_output, same as above
-        del kwargs['genome']
+        # del kwargs['genome']
         secondary_alignments = [
-            AlignPipe(*args, soft_output=True, genome=gen, **kwargs)
-            for gen in secondary_genomes
+            AlignPipe(*args, soft_output=True, reference=ref, **kwargs)
+            for ref in reference
         ]
 
         self.add(*secondary_alignments)

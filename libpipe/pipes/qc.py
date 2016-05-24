@@ -19,8 +19,11 @@ class TrimPipe(BasePipe):
         3: FastQC
     '''
 
-    def __init__(self, *args, input_list=[], genome='', odir='', **kwargs):
+    def __init__(self, *args, input_list=[], genome='', reference='', odir='', **kwargs):
         super().__init__(*args, **kwargs)
+
+        if reference:
+            genome = reference
 
         try:
             self._setup(input_list=input_list, genome=genome, odir=odir)

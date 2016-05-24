@@ -79,6 +79,10 @@ class HisatCmd(BaseCmd):
             encoding='--phred33', orientation='--fr', format='-q',
             **kwargs):
 
+        log.debug(self.attr.name)
+        log.debug(args)
+        log.debug(kwargs)
+
         try:
             super().__init__(*args, **kwargs)
         except ValueError:
@@ -123,6 +127,10 @@ class HisatCmd(BaseCmd):
 
         # ensure we have an output file
         try:
+            # force a custom output name based on input
+            # HACK: prevents output overwrite during NestedRnaseqPipe
+            if genome_name not in self.kwargs['-S']:
+                del self.kwargs['-S']
             out_dir = os.path.dirname(self.kwargs['-S'])
             run_name = self._trubase(self.kwargs['-S'])
         except KeyError:
@@ -179,6 +187,9 @@ class HisatCmd(BaseCmd):
 
         index_pattern = r'{}\..*{}'.format(genome_base, extension)
         index_files = path.walk_file(genome_dir, pattern=index_pattern)
+
+        log.debug(self.args)
+        log.debug(self.kwargs)
 
         if len(index_files) != expected_file_count:
             raise self.GenomeIndexError('missing')

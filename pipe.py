@@ -143,7 +143,7 @@ def run_pipe2(args):
             input_list=files,
             force=args.force,
             filter=args.filter_genomes,
-            reference=args.reference_genome,
+            reference=args.reference_genomes,
         )
         pipe.write_script(directory=sample_dir)
         pipes.append(pipe)

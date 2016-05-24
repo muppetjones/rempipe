@@ -713,6 +713,7 @@ class BaseCmd(CmdInterface):
 
         # check for expected number of args
         if len(self.args) < self.attr.req_args:
+            log.debug(self.attr.name)
             raise self.PositionalArgError('missing', details=[
                 self.attr.req_args - len(self.args), self.attr.req_args,
             ])

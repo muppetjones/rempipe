@@ -220,7 +220,7 @@ if __name__ == '__main__':
 
     log = setup_logger()
 
-    read_dir = '/Users/biiremployee/work/projects/laura_wgs/samples'
+    read_dir = '$HOME/work/projects/HF04/samples'
     zipped_files = path.walk_file(read_dir, pattern=r'trimmed.*\.zip')
 
     log.debug('foo')

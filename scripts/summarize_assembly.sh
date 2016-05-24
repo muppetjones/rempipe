@@ -56,7 +56,7 @@ else
     pattern="$2"
 fi
 
-echo
+echo -e "Using...\n\tdirectory '$absin'\n\tpattern '$pattern'"
 
 # genome list
 genomelist="${absin}/genome_list_all.txt"
@@ -74,7 +74,7 @@ done
 ### -- this will be a list of the genome names, sorted by the longest contigs
 
 # create file of contig sizes for each genome
-for f in "${absin}${pattern}"; do
+for f in ${absin}${pattern}; do
     # skip if the file is empty (! -s)
     if [ -s "$f" ]; then
         contigsize="$(dirname "$f")/contig_sizes.txt"
@@ -110,7 +110,8 @@ summary="${absin}/assembly_summary.txt"
 # rm -f "$summary"
 echo "# $(date)" > "${summary}"
 echo "# $0 $@" >> "${summary}"
-for f in "${absin}"/*/assembly/contig_sizes.txt; do
+for f in ${absin}/*/assembly/contig_sizes.txt; do
+    echo "$f"
     genomename="$(basename "$(dirname "$(dirname "$f")")")"
     if [ -s "$f" ]; then
         num_contig="$(wc -l < "$f")"

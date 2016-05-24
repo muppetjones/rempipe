@@ -218,6 +218,7 @@ class BasePipe(CmdInterface):
             oh.write(self.pbs_template + "\n")
             oh.write(self.__get_called_by_str(comment=True))
             self._write_commands(oh)
+            oh.write("\n")
         return
 
     def __get_called_by_str(self, fmt=' \\\n   ', comment=True):

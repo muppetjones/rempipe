@@ -1,7 +1,4 @@
 '''Summarize alignment and count info for samples
-
-
-
 '''
 
 import abc
@@ -11,17 +8,23 @@ import re
 import sys
 from itertools import cycle
 
-
-# print("libpipe init -- add 'remsci' to path")
-# sys.path.insert(
-#     0, os.path.join(os.path.dirname(os.path.dirname(
-#         os.path.dirname(os.path.abspath(__file__)))), 'remsci'))
-
-import libpipe.parsers.base as remparse
 from libpipe.decorators import file_or_handle
 
 import libpipe.templates
 from libpipe.parsers.aggregate import AggregateScripted
+from libpipe.parsers import base as remparse
+
+
+def setup_logger():
+    # setup logger
+    import logging
+    from libpipe.utility import logging as pipelog
+    pipelog.config()
+    log = logging.getLogger(__name__)
+    return log
+
+log = setup_logger()
+log.debug('hello world')
 
 
 class Aggregator(metaclass=abc.ABCMeta):
@@ -80,6 +83,9 @@ class Aggregator(metaclass=abc.ABCMeta):
 
     def _calc_stats(self):
 
+        log.debug([' '.join(row[0][1:])
+                   for row in self.summary])
+
         unique_grp = sorted(list(set(
             ' '.join(row[0][1:])
             for row in self.summary
@@ -93,6 +99,8 @@ class Aggregator(metaclass=abc.ABCMeta):
 
     def _calc_stat(self, stat, unique_grp):
         stats_rows = []
+        log.debug(stat)
+        log.debug(unique_grp)
         for grp in unique_grp:
 
             # get relevant data
@@ -141,6 +149,7 @@ class Aggregator(metaclass=abc.ABCMeta):
         color_cycle = cycle(['negative', ''])
         for row in self.summary:
             sample_group = row[0][0]
+
             if sample_group != previous:
                 color = next(color_cycle)
                 previous = sample_group
@@ -216,22 +225,33 @@ class Aggregator(metaclass=abc.ABCMeta):
         return base_html
 
     def _filter_header(self, header):
-        header_list = [
-            h for h in re.split(r'[_\-]', header)
+
+        try:
+            index = header.index('trimmed')
+        except ValueError:
+            index = 0
+
+        prefix = header[:index].replace('-', '_').rstrip('-_ ')
+        header_list = [prefix] + [
+            h for h in re.split(r'[_\-]', header[index:])
             if h != 'unal'
+            and h not in ['trimmed', 'pair', 'hisat2']
         ]
+        # header_list = [
+        #     v for v in header_list
+        # ]
+
         # keep up to timestamp
-        last_index = 0
+        last_index = len(header_list)
         for i, h in enumerate(header_list):
-            last_index = i + 1
             try:
                 int(h)
+                if len(h) == 6:
+                    last_index = i
+                    break
             except ValueError:
-                continue
-            else:
-                last_index = last_index - 1
-                break
-        return header_list[0:last_index]
+                pass
+        return header_list[:last_index]
 
     def _split_headers(self):
         new_summary = [
@@ -425,31 +445,15 @@ class CoverageAggregator(Aggregator):
         return summary_details
 
 
-def setup_logger():
-    # setup logger
-    import logging
-    from libpipe.utility import logging as pipelog
-    pipelog.config()
-    log = logging.getLogger(__name__)
-    return log
-
-
 def add_subparsers(subparser):
     '''Use this function to add subparsers from modules'''
     AggregateScripted(subparser)
 
 
 if __name__ == '__main__':
-    import sys
-    from os.path import dirname, abspath, join
-
-    print("libpipe init -- add 'remsci' to path")
-    sys.path.insert(
-        0, join(dirname(dirname(dirname(abspath(__file__)))), 'remsci'))
-
-    from remsci.lib.utility import path
 
     log = setup_logger()
+    log.debug('hello world')
 
     parser = remparse.get_parser()
     subpar = remparse.get_subparser()
@@ -458,10 +462,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     file_list = args.func(args)
 
-    # read_dir = '/Users/biiremployee/work/projects/lzd_babies_rnaseq/samples'
-    # count_files = path.walk_file(read_dir, pattern=r'\.count[^\.]')
-    # align_files = path.walk_file(read_dir, pattern=r'hisat2?\.log')
-    #
     agg_list = []
 
     omit = ['trimmed', 'pair']
@@ -472,17 +472,22 @@ if __name__ == '__main__':
         agg.write_html(omit=omit)
         return agg
 
+    log.debug('alignment')
     if args.alignment_summary:
         agg_list.append(aggregate_with(file_list, AlignmentAggregator))
 
+    log.debug('count')
     if args.count_summary:
         agg_list.append(aggregate_with(file_list, CountAggregator))
 
+    log.debug('finished alignment and count')
     common_dir = os.path.dirname(os.path.commonprefix(file_list))
     cov_file = os.path.join(common_dir, 'coverage.txt')
     if os.path.isfile(cov_file):
         agg_list.append(aggregate_with([cov_file], CoverageAggregator))
+    log.debug('finished cov')
 
     for agg in agg_list[1:]:
         agg_list[0].combine(agg)
+    log.debug('finished combinging')
     ofile = agg_list[0].write_html(omit=omit)
